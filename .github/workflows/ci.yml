@@ -1,0 +1,53 @@
+name: 基础门禁
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    services:
+      postgres:
+        image: postgres:18.4-bookworm
+        env:
+          POSTGRES_DB: rongguang
+          POSTGRES_PASSWORD: rongguang_local
+          POSTGRES_USER: rongguang
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U rongguang -d rongguang"
+          --health-interval 2s
+          --health-timeout 3s
+          --health-retries 20
+
+    env:
+      DATABASE_URL: postgresql://rongguang:rongguang_local@127.0.0.1:5432/rongguang
+
+    steps:
+      - name: 检出代码
+        uses: actions/checkout@v5
+
+      - name: 安装 Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: 24
+
+      - name: 启用 pnpm
+        run: |
+          corepack enable
+          corepack prepare pnpm@11.10.0 --activate
+
+      - name: 安装依赖
+        run: corepack pnpm install --frozen-lockfile
+
+      - name: 迁移并写入基础种子
+        run: |
+          corepack pnpm db:migrate
+          corepack pnpm db:reset
+
+      - name: 运行格式、Lint、类型、测试和生产构建
+        run: corepack pnpm check

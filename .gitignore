@@ -1,0 +1,15 @@
+.DS_Store
+.data/
+.env
+.env.*
+!.env.example
+.turbo/
+*.tsbuildinfo
+**/coverage/
+**/dist/
+**/node_modules/
+apps/mini-program/project.config.json
+apps/mini-program/project.private.config.json
+apps/mini-program/private.*
+data/
+uploads/

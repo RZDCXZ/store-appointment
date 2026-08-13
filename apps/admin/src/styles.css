@@ -1,0 +1,456 @@
+:root {
+  color: #24312c;
+  background: #f6f1e7;
+  font-family: "PingFang SC", "Microsoft YaHei", system-ui, sans-serif;
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+  --canvas: #f6f1e7;
+  --surface: #fffcf7;
+  --sage-700: #3f6253;
+  --sage-500: #6f8f7e;
+  --sage-100: #e4ece6;
+  --coral-600: #c95f50;
+  --coral-100: #f9e2dc;
+  --ink-900: #24312c;
+  --ink-600: #61706a;
+  --line-200: #ddd7cb;
+  --danger-700: #a84444;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  min-width: 320px;
+  min-height: 100vh;
+  background: var(--canvas);
+}
+
+button,
+a {
+  font: inherit;
+}
+
+a {
+  color: inherit;
+}
+
+.app-shell {
+  display: grid;
+  grid-template-columns: 248px minmax(0, 1fr);
+  min-height: 100vh;
+}
+
+.sidebar {
+  display: flex;
+  flex-direction: column;
+  gap: 32px;
+  padding: 34px 20px 24px;
+  background: rgb(255 252 247 / 92%);
+  border-right: 1px solid var(--line-200);
+}
+
+.brand-mark {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.brand-mark__glow {
+  width: 40px;
+  height: 40px;
+  border: 1px solid rgb(63 98 83 / 30%);
+  border-radius: 50% 46% 52% 44%;
+  background: radial-gradient(circle at 38% 34%, #fffcf7 0 16%, #b9c8bd 18% 38%, #577967 40% 100%);
+  box-shadow: 0 8px 24px rgb(63 98 83 / 18%);
+}
+
+.brand-mark h1,
+.brand-mark p {
+  margin: 0;
+}
+
+.brand-mark h1 {
+  color: var(--sage-700);
+  font-size: 18px;
+  font-weight: 650;
+  letter-spacing: 0.08em;
+}
+
+.brand-mark p {
+  margin-top: 3px;
+  color: var(--ink-600);
+  font-size: 12px;
+}
+
+.sidebar nav ul {
+  display: grid;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.nav-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-height: 46px;
+  padding: 0 14px;
+  border-radius: 10px;
+  color: var(--ink-600);
+  font-size: 15px;
+  text-decoration: none;
+}
+
+.nav-item--active {
+  color: var(--sage-700);
+  background: var(--sage-100);
+  font-weight: 600;
+}
+
+.nav-item--future {
+  opacity: 0.62;
+}
+
+.nav-item__icon {
+  width: 9px;
+  height: 9px;
+  border: 1.5px solid currentColor;
+  border-radius: 3px;
+  transform: rotate(45deg);
+}
+
+.sidebar__note {
+  margin: auto 0 0;
+  color: var(--ink-600);
+  font-size: 12px;
+  line-height: 1.6;
+}
+
+.workspace {
+  min-width: 0;
+}
+
+.demo-banner {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  min-height: 52px;
+  padding: 10px 24px;
+  color: #754818;
+  background: #fff5e8;
+  border-bottom: 1px solid #eed8bd;
+  font-size: 13px;
+}
+
+.demo-banner > span:last-child {
+  color: #7b6a58;
+}
+
+.main-content {
+  width: min(1180px, 100%);
+  margin: 0 auto;
+  padding: 36px 32px 56px;
+}
+
+.page-heading,
+.next-step,
+.health-card,
+.intro-grid {
+  border: 1px solid var(--line-200);
+}
+
+.page-heading {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 24px;
+  padding-bottom: 20px;
+  border-width: 0 0 1px;
+}
+
+.page-heading h2,
+.page-heading p {
+  margin: 0;
+}
+
+.page-heading h2 {
+  margin-top: 8px;
+  font-size: clamp(26px, 3vw, 38px);
+  font-weight: 620;
+  letter-spacing: -0.04em;
+}
+
+.page-heading__route {
+  color: var(--sage-700);
+  font-family: ui-monospace, "SFMono-Regular", Consolas, monospace;
+  font-size: 13px;
+}
+
+.text-link {
+  color: var(--sage-700);
+  font-size: 14px;
+  text-underline-offset: 4px;
+}
+
+.intro-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(320px, 0.75fr);
+  min-height: 330px;
+  margin-top: 28px;
+  overflow: hidden;
+  border-radius: 16px;
+  background: var(--surface);
+}
+
+.intro-copy {
+  align-self: center;
+  padding: clamp(28px, 5vw, 60px);
+}
+
+.intro-copy > p:first-child {
+  color: var(--sage-700);
+  font-weight: 600;
+}
+
+.intro-copy h2 {
+  max-width: 12em;
+  margin: 16px 0;
+  font-size: clamp(28px, 4vw, 46px);
+  font-weight: 600;
+  line-height: 1.18;
+  letter-spacing: -0.045em;
+}
+
+.intro-copy > p:last-child {
+  max-width: 42em;
+  margin: 0;
+  color: var(--ink-600);
+  font-size: 15px;
+  line-height: 1.8;
+}
+
+.hero-image {
+  min-height: 330px;
+  background:
+    linear-gradient(90deg, #fffcf7 0%, rgb(255 252 247 / 14%) 32%, transparent 55%),
+    url("/assets/brand/rongguang-hero-shiba.png") center 44% / cover;
+}
+
+.health-card {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 18px;
+  margin-top: 20px;
+  padding: 24px;
+  border-radius: 14px;
+  background: var(--surface);
+}
+
+.health-card--error {
+  border-color: #e5bdb7;
+  background: #fff9f7;
+}
+
+.health-card h2,
+.health-card p {
+  margin: 0;
+}
+
+.health-card h2 {
+  font-size: 18px;
+}
+
+.health-card p {
+  margin-top: 7px;
+  color: var(--ink-600);
+  font-size: 14px;
+  line-height: 1.6;
+}
+
+.health-card__hint {
+  color: var(--danger-700) !important;
+}
+
+.status-dot {
+  width: 14px;
+  height: 14px;
+  margin-top: 4px;
+  border: 3px solid var(--sage-100);
+  border-radius: 50%;
+  background: var(--sage-700);
+  box-shadow: 0 0 0 4px var(--sage-100);
+}
+
+.status-dot--loading {
+  background: #9a5d1f;
+  box-shadow: 0 0 0 4px #faecd8;
+}
+
+.status-dot--error {
+  background: var(--danger-700);
+  box-shadow: 0 0 0 4px var(--coral-100);
+}
+
+.health-facts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px 32px;
+  margin: 18px 0 0;
+}
+
+.health-facts div {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+}
+
+.health-facts dt {
+  color: var(--ink-600);
+  font-size: 12px;
+}
+
+.health-facts dd {
+  margin: 0;
+  color: var(--sage-700);
+  font-family: ui-monospace, "SFMono-Regular", Consolas, monospace;
+  font-size: 13px;
+}
+
+.next-step {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 24px;
+  margin-top: 20px;
+  padding: 24px;
+  border-radius: 14px;
+  background: transparent;
+}
+
+.next-step > div {
+  display: flex;
+  align-items: center;
+  gap: 18px;
+}
+
+.next-step h2,
+.next-step p {
+  margin: 0;
+}
+
+.next-step h2 {
+  font-size: 17px;
+}
+
+.next-step p:not(.next-step__number) {
+  margin-top: 6px;
+  color: var(--ink-600);
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.next-step__number {
+  color: var(--coral-600);
+  font-family: ui-monospace, "SFMono-Regular", Consolas, monospace;
+  font-size: 26px;
+}
+
+.next-step code {
+  flex: none;
+  padding: 8px 10px;
+  border-radius: 8px;
+  color: var(--sage-700);
+  background: var(--sage-100);
+  font-size: 12px;
+}
+
+.route-error {
+  display: grid;
+  min-height: 100vh;
+  place-content: center;
+  text-align: center;
+}
+
+.route-error__code {
+  margin: 0;
+  color: var(--coral-600);
+  font-size: 48px;
+}
+
+.route-error a {
+  color: var(--sage-700);
+}
+
+@media (max-width: 800px) {
+  .app-shell {
+    grid-template-columns: 1fr;
+  }
+
+  .sidebar {
+    gap: 18px;
+    padding: 18px 20px 12px;
+    border-right: 0;
+    border-bottom: 1px solid var(--line-200);
+  }
+
+  .sidebar nav ul {
+    display: flex;
+    overflow-x: auto;
+  }
+
+  .nav-item {
+    min-height: 42px;
+    white-space: nowrap;
+  }
+
+  .nav-item--future,
+  .sidebar__note {
+    display: none;
+  }
+
+  .demo-banner {
+    align-items: flex-start;
+    justify-content: flex-start;
+    flex-wrap: wrap;
+    padding-inline: 20px;
+  }
+
+  .demo-banner > span:last-child {
+    flex-basis: 100%;
+    padding-left: 24px;
+  }
+
+  .main-content {
+    padding: 28px 20px 44px;
+  }
+
+  .intro-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .hero-image {
+    min-height: 260px;
+    order: -1;
+    background:
+      linear-gradient(0deg, #fffcf7 0%, transparent 45%),
+      url("/assets/brand/rongguang-hero-shiba.png") center 42% / cover;
+  }
+
+  .next-step {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    scroll-behavior: auto !important;
+  }
+}

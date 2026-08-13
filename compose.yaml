@@ -1,0 +1,22 @@
+name: rongguang-store-appointment
+
+services:
+  postgres:
+    image: postgres:18.4-bookworm
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-rongguang}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-rongguang_local}
+      POSTGRES_USER: ${POSTGRES_USER:-rongguang}
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 2s
+      timeout: 3s
+      retries: 20
+      start_period: 5s
+    ports:
+      - "${POSTGRES_PORT:-5432}:5432"
+    volumes:
+      - postgres-data:/var/lib/postgresql
+
+volumes:
+  postgres-data:

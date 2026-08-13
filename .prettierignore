@@ -1,0 +1,15 @@
+.data
+.scratch
+.turbo
+AGENTS.md
+CONTEXT.md
+DESIGN_PRD.md
+PROJECT_PLAN.md
+**/coverage
+**/dist
+**/node_modules
+**/*.tsbuildinfo
+docs/adr
+docs/agents
+pnpm-lock.yaml
+product-ui

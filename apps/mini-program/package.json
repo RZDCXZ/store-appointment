@@ -1,0 +1,18 @@
+{
+  "name": "@rongguang/mini-program",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "build": "tsc --noEmit && node scripts/verify-project.mjs",
+    "dev": "node scripts/watch.mjs",
+    "lint": "eslint miniprogram scripts test --max-warnings=0",
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "@types/node": "24.13.3",
+    "miniprogram-api-typings": "4.0.2",
+    "typescript": "6.0.3",
+    "vitest": "4.1.10"
+  }
+}

@@ -1,0 +1,37 @@
+{
+  "name": "@rongguang/api",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "db:migrate": "tsx src/database/cli.ts migrate",
+    "db:reset": "tsx src/database/cli.ts reset",
+    "db:seed": "tsx src/database/cli.ts seed",
+    "dev": "tsx watch src/main.ts",
+    "lint": "eslint src test --max-warnings=0",
+    "start": "node dist/main.js",
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@fastify/static": "10.1.3",
+    "@nestjs/common": "11.1.29",
+    "@nestjs/core": "11.1.29",
+    "@nestjs/platform-fastify": "11.1.29",
+    "@nestjs/swagger": "11.4.6",
+    "@rongguang/contracts": "workspace:*",
+    "drizzle-orm": "0.45.2",
+    "fastify": "5.11.3",
+    "pg": "8.23.0",
+    "reflect-metadata": "0.2.2",
+    "rxjs": "7.8.2"
+  },
+  "devDependencies": {
+    "@nestjs/testing": "11.1.29",
+    "@types/node": "24.13.3",
+    "@types/pg": "8.21.0",
+    "tsx": "4.23.12",
+    "vitest": "4.1.10"
+  }
+}

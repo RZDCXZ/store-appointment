@@ -1,0 +1,12 @@
+{
+  "pages": ["pages/home/index"],
+  "window": {
+    "backgroundColor": "#F6F1E7",
+    "backgroundTextStyle": "dark",
+    "navigationBarBackgroundColor": "#F6F1E7",
+    "navigationBarTextStyle": "black",
+    "navigationBarTitleText": "茸光宠物洗护"
+  },
+  "sitemapLocation": "sitemap.json",
+  "style": "v2"
+}

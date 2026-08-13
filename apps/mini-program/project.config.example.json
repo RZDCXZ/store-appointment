@@ -1,0 +1,12 @@
+{
+  "appid": "请填写自己的测试AppID",
+  "compileType": "miniprogram",
+  "miniprogramRoot": "miniprogram/",
+  "projectname": "茸光宠物洗护",
+  "setting": {
+    "es6": true,
+    "minified": false,
+    "postcss": true,
+    "urlCheck": false
+  }
+}

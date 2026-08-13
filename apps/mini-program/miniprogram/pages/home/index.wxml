@@ -1,0 +1,42 @@
+<view class="page-shell">
+  <view class="hero">
+    <image
+      class="hero__image"
+      src="/assets/brand/rongguang-hero-shiba.png"
+      mode="aspectFill"
+      aria-label="晨光中的柴犬"
+    />
+    <view class="hero__veil"></view>
+    <view class="hero__content">
+      <view class="wordmark">
+        <text class="wordmark__title">茸光</text>
+        <text class="wordmark__subtitle">— 宠物洗护 —</text>
+      </view>
+      <view class="opening">
+        <text>今日营业 · 09:30–19:00</text>
+        <text class="opening__date">8月13日 周四</text>
+      </view>
+    </view>
+  </view>
+
+  <view class="readiness-card">
+    <view class="readiness-card__topline">
+      <view class="readiness-card__dot"></view>
+      <text>原生小程序骨架已就绪</text>
+    </view>
+    <text class="readiness-card__body">
+      这里是茸光后续预约页面的品牌壳层。真实微信登录与订阅消息尚未接入，不会伪装成可用能力。
+    </text>
+    <view class="readiness-card__divider"></view>
+    <view class="readiness-card__row">
+      <text>当前页面路径</text>
+      <text class="readiness-card__code">pages/home/index</text>
+    </view>
+  </view>
+
+  <view class="local-boundary">
+    <text class="local-boundary__label">真机联调提示</text>
+    <text>手机不能访问电脑的 localhost，请使用同一局域网中的电脑 IP：</text>
+    <text class="local-boundary__code">{{apiPath}}</text>
+  </view>
+</view>
