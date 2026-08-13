@@ -18,7 +18,7 @@
     "format": "prettier --write . --ignore-unknown",
     "format:check": "prettier --check . --ignore-unknown",
     "lint": "eslint scripts eslint.config.mjs --max-warnings=0 && turbo lint",
-    "test": "turbo test",
+    "test": "node --test scripts/*.test.mjs && turbo test",
     "typecheck": "turbo typecheck"
   },
   "devDependencies": {

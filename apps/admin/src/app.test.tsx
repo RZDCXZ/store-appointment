@@ -1,11 +1,17 @@
 import { render, screen } from "@testing-library/react";
 import { createMemoryRouter, RouterProvider } from "react-router-dom";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { routes } from "./routes";
 
 describe("后台路由与健康状态", () => {
+  beforeEach(() => {
+    vi.stubEnv("VITE_DEMO_NOW", "2026-08-13T02:50:00.000Z");
+    vi.stubEnv("VITE_API_BASE_URL", "http://localhost:4100");
+  });
+
   afterEach(() => {
+    vi.unstubAllEnvs();
     vi.restoreAllMocks();
   });
 
@@ -26,7 +32,12 @@ describe("后台路由与健康状态", () => {
     render(<RouterProvider router={router} />);
 
     expect(await screen.findByRole("heading", { name: "茸光宠物洗护" })).toBeVisible();
+    expect(screen.getByText("上海演示时间：2026年8月13日 周四 10:50")).toBeVisible();
     expect(screen.getByText("API 与数据库已就绪")).toBeVisible();
+    expect(screen.getByRole("link", { name: "查看 OpenAPI" })).toHaveAttribute(
+      "href",
+      "http://localhost:4100/docs",
+    );
     expect(router.state.location.pathname).toBe("/manager/workbench");
   });
 });

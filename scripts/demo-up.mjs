@@ -2,6 +2,8 @@ import { spawn } from "node:child_process";
 import { loadEnvFile } from "node:process";
 import { setTimeout as delay } from "node:timers/promises";
 
+import { resolveDemoEnvironment } from "./demo-config.mjs";
+
 function loadLocalEnvironment() {
   try {
     loadEnvFile(".env");
@@ -9,11 +11,12 @@ function loadLocalEnvironment() {
   } catch (error) {
     if (error && typeof error === "object" && "code" in error && error.code === "ENOENT") {
       console.info("未找到 .env，使用仓库安全的本地默认值；可从 .env.example 复制覆盖。");
-      return;
+    } else {
+      throw error;
     }
-
-    throw error;
   }
+
+  return resolveDemoEnvironment(process.env);
 }
 
 function run(command, args, options = {}) {
@@ -79,8 +82,47 @@ async function waitForPostgres() {
   );
 }
 
-async function startDevServers() {
-  console.info("正在启动 API（http://localhost:3000）与后台（http://localhost:5173）…");
+async function serviceIsReady(url) {
+  try {
+    const response = await fetch(url, { signal: AbortSignal.timeout(1_000) });
+    return response.ok;
+  } catch {
+    return false;
+  }
+}
+
+async function waitForDevServers(child, config) {
+  const attempts = 30;
+
+  for (let attempt = 1; attempt <= attempts; attempt += 1) {
+    if (child.exitCode !== null) {
+      throw new Error(`开发服务在健康检查完成前退出，退出码 ${child.exitCode}。`);
+    }
+
+    const [apiReady, adminReady] = await Promise.all([
+      serviceIsReady(config.apiHealthUrl),
+      serviceIsReady(config.adminWorkbenchUrl),
+    ]);
+
+    if (apiReady && adminReady) {
+      console.info("API 与后台健康检查通过，可开始本地演示。");
+      return;
+    }
+
+    if (attempt === 1 || attempt % 5 === 0) {
+      console.info(`等待 API 与后台健康（${attempt}/${attempts}）…`);
+    }
+
+    await delay(1_000);
+  }
+
+  throw new Error(
+    `API 或后台在 30 秒内未就绪。探测目标：${config.apiHealthUrl}、${config.adminWorkbenchUrl}。请检查对应端口并查看上方服务日志。`,
+  );
+}
+
+async function startDevServers(config) {
+  console.info(`正在启动 API（${config.apiHealthUrl}）与后台（${config.adminWorkbenchUrl}）…`);
   const child = spawn(
     "corepack",
     ["pnpm", "exec", "turbo", "dev", "--filter=@rongguang/api", "--filter=@rongguang/admin"],
@@ -91,7 +133,7 @@ async function startDevServers() {
     process.once(signal, () => child.kill(signal));
   }
 
-  return new Promise((resolve, reject) => {
+  const completion = new Promise((resolve, reject) => {
     child.once("error", reject);
     child.once("exit", (code, signal) => {
       if (signal === "SIGINT" || signal === "SIGTERM" || code === 0) {
@@ -101,22 +143,38 @@ async function startDevServers() {
       }
     });
   });
+
+  try {
+    await Promise.race([
+      waitForDevServers(child, config),
+      completion.then(() => {
+        throw new Error("开发服务在健康检查完成前退出。");
+      }),
+    ]);
+    await completion;
+  } catch (error) {
+    if (child.exitCode === null) {
+      child.kill("SIGTERM");
+    }
+
+    throw error;
+  }
 }
 
 async function main() {
-  loadLocalEnvironment();
+  const config = loadLocalEnvironment();
   console.info("正在启动锁定小版本的 PostgreSQL 18.4…");
   await run("docker", ["compose", "up", "-d", "postgres"]);
   await waitForPostgres();
   await run("corepack", ["pnpm", "db:migrate"]);
   await run("corepack", ["pnpm", "db:reset"]);
-  await startDevServers();
+  await startDevServers(config);
 }
 
 main().catch((error) => {
   const message = error instanceof Error ? error.message : String(error);
 
   console.error(`\n茸光本地环境启动失败：${message}`);
-  console.error("排查顺序：确认 Docker 正在运行 → 确认 5432/3000/5173 端口未占用 → 检查 .env。\n");
+  console.error("排查顺序：确认 Docker 正在运行 → 确认上方探测目标对应端口未占用 → 检查 .env。\n");
   process.exitCode = 1;
 });

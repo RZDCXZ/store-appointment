@@ -7,6 +7,7 @@
     "es6": true,
     "minified": false,
     "postcss": true,
-    "urlCheck": false
+    "urlCheck": false,
+    "useCompilerPlugins": ["typescript"]
   }
 }

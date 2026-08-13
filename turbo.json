@@ -8,6 +8,15 @@
     "dev": {
       "dependsOn": ["^build"],
       "cache": false,
+      "env": [
+        "ADMIN_ORIGIN",
+        "API_HOST",
+        "API_PORT",
+        "DATABASE_URL",
+        "DEMO_NOW",
+        "VITE_API_BASE_URL",
+        "VITE_DEMO_NOW"
+      ],
       "persistent": true
     },
     "lint": {

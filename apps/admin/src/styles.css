@@ -116,11 +116,14 @@ a {
 }
 
 .nav-item__icon {
-  width: 9px;
-  height: 9px;
-  border: 1.5px solid currentColor;
-  border-radius: 3px;
-  transform: rotate(45deg);
+  flex: none;
+  width: 19px;
+  height: 19px;
+  fill: none;
+  stroke: currentColor;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 1.7;
 }
 
 .sidebar__note {
@@ -149,6 +152,11 @@ a {
 
 .demo-banner > span:last-child {
   color: #7b6a58;
+}
+
+.demo-banner__time {
+  color: #754818;
+  font-variant-numeric: tabular-nums;
 }
 
 .main-content {
@@ -404,7 +412,7 @@ a {
   }
 
   .nav-item {
-    min-height: 42px;
+    min-height: 44px;
     white-space: nowrap;
   }
 
@@ -423,6 +431,11 @@ a {
   .demo-banner > span:last-child {
     flex-basis: 100%;
     padding-left: 24px;
+  }
+
+  .demo-banner__time {
+    flex-basis: auto;
+    padding-left: 0;
   }
 
   .main-content {

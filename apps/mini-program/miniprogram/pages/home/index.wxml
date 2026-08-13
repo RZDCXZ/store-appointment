@@ -13,8 +13,9 @@
         <text class="wordmark__subtitle">— 宠物洗护 —</text>
       </view>
       <view class="opening">
-        <text>今日营业 · 09:30–19:00</text>
-        <text class="opening__date">8月13日 周四</text>
+        <text>{{businessHours}}</text>
+        <text class="opening__date">{{demoTime}}</text>
+        <text class="opening__demo-label">上海演示时间</text>
       </view>
     </view>
   </view>

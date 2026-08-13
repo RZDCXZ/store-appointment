@@ -17,6 +17,19 @@ async function ensureMigrationTable(client: PoolClient): Promise<void> {
   `);
 }
 
+async function withTransaction<T>(client: PoolClient, work: () => Promise<T>): Promise<T> {
+  await client.query("BEGIN");
+
+  try {
+    const result = await work();
+    await client.query("COMMIT");
+    return result;
+  } catch (error) {
+    await client.query("ROLLBACK");
+    throw error;
+  }
+}
+
 async function migrate(client: PoolClient): Promise<void> {
   await ensureMigrationTable(client);
 
@@ -41,19 +54,14 @@ async function migrate(client: PoolClient): Promise<void> {
       continue;
     }
 
-    await client.query("BEGIN");
-    try {
+    await withTransaction(client, async () => {
       await client.query(sql);
       await client.query("INSERT INTO app_migrations (name, checksum) VALUES ($1, $2)", [
         file,
         checksum,
       ]);
-      await client.query("COMMIT");
-      console.info(`migration 已执行：${file}`);
-    } catch (error) {
-      await client.query("ROLLBACK");
-      throw error;
-    }
+    });
+    console.info(`migration 已执行：${file}`);
   }
 }
 
@@ -79,16 +87,11 @@ async function seed(client: PoolClient): Promise<void> {
 }
 
 async function reset(client: PoolClient): Promise<void> {
-  await client.query("BEGIN");
-  try {
+  await withTransaction(client, async () => {
     await client.query("TRUNCATE TABLE app_metadata");
     await seed(client);
-    await client.query("COMMIT");
-    console.info("本地演示数据已重置");
-  } catch (error) {
-    await client.query("ROLLBACK");
-    throw error;
-  }
+  });
+  console.info("本地演示数据已重置");
 }
 
 async function run(): Promise<void> {

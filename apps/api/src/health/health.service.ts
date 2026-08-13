@@ -9,11 +9,15 @@ export class HealthService {
   constructor(@Inject(DatabaseService) private readonly database: DatabaseService) {}
 
   async check(): Promise<HealthResponse> {
-    await this.database.client.execute(sql`
+    const metadata = await this.database.client.execute(sql`
       SELECT value
       FROM app_metadata
       WHERE key = 'brand'
     `);
+
+    if (metadata.rows.length !== 1) {
+      throw new Error("茸光演示元数据尚未 seed，数据库不应报告 ready。");
+    }
 
     return {
       database: "ready",

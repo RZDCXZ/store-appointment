@@ -6,7 +6,112 @@ type HealthState =
   | { kind: "ready"; response: HealthResponse }
   | { kind: "error"; message: string };
 
-const navigation = ["工作台", "预约", "排班", "服务", "顾客", "经营", "系统"];
+type NavigationIconName =
+  "workbench" | "appointments" | "shifts" | "services" | "customers" | "operations" | "system";
+
+const navigation = [
+  { label: "工作台", icon: "workbench" },
+  { label: "预约", icon: "appointments" },
+  { label: "排班", icon: "shifts" },
+  { label: "服务", icon: "services" },
+  { label: "顾客", icon: "customers" },
+  { label: "经营", icon: "operations" },
+  { label: "系统", icon: "system" },
+] satisfies { label: string; icon: NavigationIconName }[];
+
+function NavigationIcon({ name }: { name: NavigationIconName }): React.JSX.Element {
+  const shapes: Record<NavigationIconName, React.JSX.Element> = {
+    workbench: (
+      <>
+        <rect x="3" y="3" width="7" height="7" rx="1" />
+        <rect x="14" y="3" width="7" height="7" rx="1" />
+        <rect x="3" y="14" width="7" height="7" rx="1" />
+        <rect x="14" y="14" width="7" height="7" rx="1" />
+      </>
+    ),
+    appointments: (
+      <>
+        <path d="M6 2v4M18 2v4M3 9h18" />
+        <rect x="3" y="4" width="18" height="17" rx="2" />
+        <path d="m8 15 2 2 5-5" />
+      </>
+    ),
+    shifts: (
+      <>
+        <circle cx="12" cy="12" r="9" />
+        <path d="M12 7v5l3 2" />
+      </>
+    ),
+    services: (
+      <>
+        <path d="m4 19 6-6M14 9l6-6M14 3l6 6" />
+        <circle cx="6" cy="6" r="3" />
+        <circle cx="18" cy="18" r="3" />
+        <path d="m8 8 8 8" />
+      </>
+    ),
+    customers: (
+      <>
+        <circle cx="9" cy="8" r="3" />
+        <path d="M3 20c0-3.3 2.7-6 6-6s6 2.7 6 6" />
+        <path d="M16 5.2a3 3 0 0 1 0 5.6M17 14c2.3.7 4 2.8 4 5.3" />
+      </>
+    ),
+    operations: (
+      <>
+        <path d="M4 20V10M10 20V4M16 20v-7M22 20H2" />
+      </>
+    ),
+    system: (
+      <>
+        <path d="M4 6h10M18 6h2M4 12h2M10 12h10M4 18h8M16 18h4" />
+        <circle cx="16" cy="6" r="2" />
+        <circle cx="8" cy="12" r="2" />
+        <circle cx="14" cy="18" r="2" />
+      </>
+    ),
+  };
+
+  return (
+    <svg className="nav-item__icon" viewBox="0 0 24 24" aria-hidden="true">
+      {shapes[name]}
+    </svg>
+  );
+}
+
+function formatShanghaiDemoTime(value: string | undefined): string | null {
+  if (!value) {
+    return null;
+  }
+
+  const date = new Date(value);
+
+  if (Number.isNaN(date.getTime())) {
+    return "上海演示时间配置无效";
+  }
+
+  const parts = Object.fromEntries(
+    new Intl.DateTimeFormat("zh-CN", {
+      timeZone: "Asia/Shanghai",
+      year: "numeric",
+      month: "numeric",
+      day: "numeric",
+      weekday: "short",
+      hour: "2-digit",
+      minute: "2-digit",
+      hour12: false,
+    })
+      .formatToParts(date)
+      .map(({ type, value: partValue }) => [type, partValue]),
+  );
+
+  return `上海演示时间：${parts.year}年${parts.month}月${parts.day}日 ${parts.weekday} ${parts.hour}:${parts.minute}`;
+}
+
+function createApiUrl(path: string): string {
+  const apiBaseUrl = import.meta.env.VITE_API_BASE_URL ?? "http://localhost:3000";
+  return new URL(path, apiBaseUrl.endsWith("/") ? apiBaseUrl : `${apiBaseUrl}/`).href;
+}
 
 function BrandMark(): React.JSX.Element {
   return (
@@ -69,14 +174,14 @@ function HealthCard({ state }: { state: HealthState }): React.JSX.Element {
 
 export function WorkbenchPage(): React.JSX.Element {
   const [health, setHealth] = useState<HealthState>({ kind: "loading" });
+  const demoTime = formatShanghaiDemoTime(import.meta.env.VITE_DEMO_NOW);
 
   useEffect(() => {
     const abortController = new AbortController();
-    const apiBaseUrl = import.meta.env.VITE_API_BASE_URL ?? "http://localhost:3000";
 
     async function loadHealth(): Promise<void> {
       try {
-        const response = await fetch(`${apiBaseUrl}/health`, { signal: abortController.signal });
+        const response = await fetch(createApiUrl("health"), { signal: abortController.signal });
 
         if (!response.ok) {
           throw new Error(`健康检查返回 HTTP ${response.status}。`);
@@ -106,20 +211,20 @@ export function WorkbenchPage(): React.JSX.Element {
         <nav aria-label="店长导航">
           <ul>
             {navigation.map((item, index) => (
-              <li key={item}>
+              <li key={item.label}>
                 {index === 0 ? (
                   <a
                     className="nav-item nav-item--active"
                     href="/manager/workbench"
                     aria-current="page"
                   >
-                    <span className="nav-item__icon" aria-hidden="true" />
-                    {item}
+                    <NavigationIcon name={item.icon} />
+                    {item.label}
                   </a>
                 ) : (
                   <span className="nav-item nav-item--future" aria-disabled="true">
-                    <span className="nav-item__icon" aria-hidden="true" />
-                    {item}
+                    <NavigationIcon name={item.icon} />
+                    {item.label}
                   </span>
                 )}
               </li>
@@ -133,6 +238,7 @@ export function WorkbenchPage(): React.JSX.Element {
         <header className="demo-banner">
           <span aria-hidden="true">ⓘ</span>
           <strong>本地演示模式</strong>
+          {demoTime ? <span className="demo-banner__time">{demoTime}</span> : null}
           <span>微信登录与消息能力将在后续工单使用明确的模拟边界</span>
         </header>
 
@@ -142,7 +248,7 @@ export function WorkbenchPage(): React.JSX.Element {
               <p className="page-heading__route">MG-01 · /manager/workbench</p>
               <h2>三端启动检查</h2>
             </div>
-            <a className="text-link" href="http://localhost:3000/docs">
+            <a className="text-link" href={createApiUrl("docs")}>
               查看 OpenAPI
             </a>
           </div>
