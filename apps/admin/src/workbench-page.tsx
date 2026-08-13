@@ -125,7 +125,13 @@ function BrandMark(): React.JSX.Element {
   );
 }
 
-function HealthCard({ state }: { state: HealthState }): React.JSX.Element {
+function HealthCard({
+  state,
+  onRetry,
+}: {
+  state: HealthState;
+  onRetry: () => void;
+}): React.JSX.Element {
   if (state.kind === "loading") {
     return (
       <section className="health-card" aria-live="polite">
@@ -145,7 +151,10 @@ function HealthCard({ state }: { state: HealthState }): React.JSX.Element {
         <div>
           <h2>本地服务尚未就绪</h2>
           <p>{state.message}</p>
-          <p className="health-card__hint">请查看运行 demo:up 的终端，修复后刷新本页。</p>
+          <p className="health-card__hint">请查看运行 demo:up 的终端，修复后可在此重试。</p>
+          <button className="health-card__retry" type="button" onClick={onRetry}>
+            重新检查
+          </button>
         </div>
       </section>
     );
@@ -174,6 +183,7 @@ function HealthCard({ state }: { state: HealthState }): React.JSX.Element {
 
 export function WorkbenchPage(): React.JSX.Element {
   const [health, setHealth] = useState<HealthState>({ kind: "loading" });
+  const [healthAttempt, setHealthAttempt] = useState(0);
   const demoTime = formatShanghaiDemoTime(import.meta.env.VITE_DEMO_NOW);
 
   useEffect(() => {
@@ -202,7 +212,7 @@ export function WorkbenchPage(): React.JSX.Element {
 
     void loadHealth();
     return () => abortController.abort();
-  }, []);
+  }, [healthAttempt]);
 
   return (
     <div className="app-shell">
@@ -265,7 +275,13 @@ export function WorkbenchPage(): React.JSX.Element {
             <div className="hero-image" role="img" aria-label="晨光中的柴犬" />
           </div>
 
-          <HealthCard state={health} />
+          <HealthCard
+            state={health}
+            onRetry={() => {
+              setHealth({ kind: "loading" });
+              setHealthAttempt((attempt) => attempt + 1);
+            }}
+          />
 
           <section className="next-step" aria-labelledby="next-step-title">
             <div>

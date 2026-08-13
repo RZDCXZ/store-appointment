@@ -1,4 +1,4 @@
-import { render, screen } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { createMemoryRouter, RouterProvider } from "react-router-dom";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -11,6 +11,7 @@ describe("后台路由与健康状态", () => {
   });
 
   afterEach(() => {
+    cleanup();
     vi.unstubAllEnvs();
     vi.restoreAllMocks();
   });
@@ -39,5 +40,35 @@ describe("后台路由与健康状态", () => {
       "http://localhost:4100/docs",
     );
     expect(router.state.location.pathname).toBe("/manager/workbench");
+  });
+
+  it("retries a failed health query in place and recovers", async () => {
+    const fetchMock = vi
+      .spyOn(globalThis, "fetch")
+      .mockRejectedValueOnce(new Error("API 暂时离线"))
+      .mockResolvedValueOnce(
+        new Response(
+          JSON.stringify({
+            database: "ready",
+            service: "rongguang-api",
+            status: "ok",
+            timestamp: "2026-08-13T02:50:00.000Z",
+          }),
+          { status: 200, headers: { "Content-Type": "application/json" } },
+        ),
+      );
+    const router = createMemoryRouter(routes, { initialEntries: ["/manager/workbench"] });
+
+    render(<RouterProvider router={router} />);
+
+    expect(await screen.findByRole("alert")).toHaveTextContent("API 暂时离线");
+    fireEvent.click(screen.getByRole("button", { name: "重新检查" }));
+
+    expect(await screen.findByText("API 与数据库已就绪")).toBeVisible();
+    expect(fetchMock).toHaveBeenNthCalledWith(
+      2,
+      "http://localhost:4100/health",
+      expect.objectContaining({ signal: expect.any(AbortSignal) }),
+    );
   });
 });

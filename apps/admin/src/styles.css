@@ -284,6 +284,27 @@ a {
   color: var(--danger-700) !important;
 }
 
+.health-card__retry {
+  min-width: 112px;
+  min-height: 44px;
+  margin-top: 16px;
+  padding: 0 18px;
+  border: 1px solid #d59b91;
+  border-radius: 10px;
+  color: var(--danger-700);
+  background: var(--surface);
+  cursor: pointer;
+}
+
+.health-card__retry:hover {
+  background: var(--coral-100);
+}
+
+.health-card__retry:focus-visible {
+  outline: 3px solid rgb(201 95 80 / 28%);
+  outline-offset: 2px;
+}
+
 .status-dot {
   width: 14px;
   height: 14px;
