@@ -24,6 +24,32 @@ export const backofficeNavigation = {
 export type BackofficeRole = keyof typeof backofficeNavigation;
 export type BackofficeNavigationKey = (typeof backofficeNavigation)[BackofficeRole][number]["key"];
 
+export const backofficeRoles = {
+  manager: {
+    label: "店长",
+    workspaceLabel: "店长后台",
+    navigationLabel: "店长导航",
+    loadingNavigationLabel: "店长导航加载中",
+    landingPath: "/manager/workbench",
+  },
+  staff: {
+    label: "员工",
+    workspaceLabel: "员工工作台",
+    navigationLabel: "员工导航",
+    loadingNavigationLabel: "员工导航加载中",
+    landingPath: "/staff/today",
+  },
+} as const satisfies Record<
+  BackofficeRole,
+  {
+    label: string;
+    workspaceLabel: string;
+    navigationLabel: string;
+    loadingNavigationLabel: string;
+    landingPath: `/${string}`;
+  }
+>;
+
 export interface BackofficeAccount {
   id: string;
   username: string;

@@ -1,4 +1,4 @@
-import { backofficeNavigation, type BackofficeRole } from "@rongguang/contracts";
+import { backofficeNavigation, backofficeRoles, type BackofficeRole } from "@rongguang/contracts";
 
 export function SessionCheckingState(): React.JSX.Element {
   return (
@@ -29,18 +29,18 @@ export function SessionErrorState({
 }
 
 export function BackofficeLoadingSkeleton({ role }: { role: BackofficeRole }): React.JSX.Element {
-  const roleLabel = role === "manager" ? "店长" : "员工";
+  const roleMetadata = backofficeRoles[role];
 
   return (
     <div
       className={`backoffice-shell backoffice-shell--${role} backoffice-skeleton`}
       role="status"
-      aria-label={`正在确认${roleLabel}后台身份`}
+      aria-label={`正在确认${roleMetadata.label}后台身份`}
     >
       <aside className="sidebar">
         <div className="skeleton-brand skeleton-block" />
         <div className="skeleton-role skeleton-block" />
-        <nav aria-label={`${roleLabel}导航加载中`}>
+        <nav aria-label={roleMetadata.loadingNavigationLabel}>
           <ul>
             {backofficeNavigation[role].map((item) => (
               <li key={item.key}>

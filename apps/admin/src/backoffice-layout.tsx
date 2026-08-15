@@ -2,6 +2,7 @@ import { useState } from "react";
 import { NavLink, Outlet, useLocation, useNavigate } from "react-router-dom";
 import {
   backofficeNavigation,
+  backofficeRoles,
   type BackofficeNavigationKey,
   type BackofficeRole,
 } from "@rongguang/contracts";
@@ -88,7 +89,7 @@ export function BackofficeLayout({ account }: { account: BackofficeAccount }): R
     ...item,
     to: navigationPath(account.role, item.key),
   }));
-  const roleLabel = account.role === "manager" ? "店长后台" : "员工工作台";
+  const roleMetadata = backofficeRoles[account.role];
   const demoTime = formatShanghaiDemoTime(import.meta.env.VITE_DEMO_NOW);
 
   async function logout(): Promise<void> {
@@ -112,8 +113,8 @@ export function BackofficeLayout({ account }: { account: BackofficeAccount }): R
             <small>宠物洗护</small>
           </span>
         </a>
-        <p className="role-label">{roleLabel}</p>
-        <nav aria-label={account.role === "manager" ? "店长导航" : "员工导航"}>
+        <p className="role-label">{roleMetadata.workspaceLabel}</p>
+        <nav aria-label={roleMetadata.navigationLabel}>
           <ul>
             {navigation.map((item) => (
               <li key={item.to}>
@@ -135,7 +136,7 @@ export function BackofficeLayout({ account }: { account: BackofficeAccount }): R
           <span>
             <strong>{account.displayName}</strong>
             <small>
-              {account.role === "manager" ? "店长" : "员工"} · {account.username}
+              {roleMetadata.label} · {account.username}
             </small>
           </span>
         </div>

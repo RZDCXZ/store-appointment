@@ -33,16 +33,24 @@ describe("管理端浏览器路由 history fallback", () => {
     await server.close();
   });
 
-  it.each(["/login", "/manager/workbench", "/staff/today"])(
-    "%s 可直接访问并在刷新后恢复应用入口",
-    async (path) => {
-      for (let attempt = 0; attempt < 2; attempt += 1) {
-        const response = await fetch(`${origin}${path}`, { headers: { connection: "close" } });
-        const html = await response.text();
+  it.each([
+    "/login",
+    "/manager/workbench",
+    "/manager/appointments",
+    "/manager/schedule",
+    "/manager/services",
+    "/manager/customers",
+    "/manager/business",
+    "/manager/system",
+    "/staff/today",
+    "/staff/appointments",
+  ])("%s 可直接访问并在刷新后恢复应用入口", async (path) => {
+    for (let attempt = 0; attempt < 2; attempt += 1) {
+      const response = await fetch(`${origin}${path}`, { headers: { connection: "close" } });
+      const html = await response.text();
 
-        expect(response.status).toBe(200);
-        expect(html).toContain('<div id="root"></div>');
-      }
-    },
-  );
+      expect(response.status).toBe(200);
+      expect(html).toContain('<div id="root"></div>');
+    }
+  });
 });

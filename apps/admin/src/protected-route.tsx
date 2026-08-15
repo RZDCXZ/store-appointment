@@ -1,4 +1,5 @@
 import { Navigate, useLocation } from "react-router-dom";
+import { backofficeRoles } from "@rongguang/contracts";
 
 import type { BackofficeRole } from "./api";
 import { BackofficeLayout } from "./backoffice-layout";
@@ -29,20 +30,17 @@ export function RoleBoundary({ role }: { role: BackofficeRole }): React.JSX.Elem
   }
 
   if (auth.state.account.role !== role) {
-    const expected = role === "manager" ? "店长" : "员工";
-    const current = auth.state.account.role === "manager" ? "店长" : "员工";
+    const expected = backofficeRoles[role];
+    const current = backofficeRoles[auth.state.account.role];
 
     return (
       <main className="centered-state forbidden-state">
         <p className="state-code">403 · 无权限</p>
         <h1>没有权限</h1>
         <p>
-          {current}身份不能访问{expected}页面。
+          {current.label}身份不能访问{expected.label}页面。
         </p>
-        <a
-          className="primary-button"
-          href={current === "店长" ? "/manager/workbench" : "/staff/today"}
-        >
+        <a className="primary-button" href={current.landingPath}>
           返回我的工作台
         </a>
       </main>
@@ -56,12 +54,7 @@ export function RootRedirect(): React.JSX.Element {
   const auth = useAuth();
 
   if (auth.state.kind === "authenticated") {
-    return (
-      <Navigate
-        to={auth.state.account.role === "manager" ? "/manager/workbench" : "/staff/today"}
-        replace
-      />
-    );
+    return <Navigate to={backofficeRoles[auth.state.account.role].landingPath} replace />;
   }
 
   if (auth.state.kind === "checking") {

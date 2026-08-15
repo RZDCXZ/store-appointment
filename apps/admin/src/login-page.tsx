@@ -1,5 +1,6 @@
 import { useRef, useState } from "react";
 import { Navigate, useNavigate, useSearchParams } from "react-router-dom";
+import { backofficeRoles } from "@rongguang/contracts";
 
 import { apiFetch, type BackofficeAccount, readApiError } from "./api";
 import { useAuth } from "./auth-context";
@@ -13,7 +14,7 @@ const demoAccounts = [
 ] as const;
 
 function landingPath(account: BackofficeAccount): string {
-  return account.role === "manager" ? "/manager/workbench" : "/staff/today";
+  return backofficeRoles[account.role].landingPath;
 }
 
 function safeTarget(value: string | null, account: BackofficeAccount): string {
