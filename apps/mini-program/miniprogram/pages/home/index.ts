@@ -1,9 +1,8 @@
-import { loadCustomerContext, rememberRecoveryPath } from "../../services/customer-session";
+import { loadCustomerTabState, openCustomerSelector } from "../../services/customer-session";
 import type { CustomerProfile } from "../../types/customer";
 
 Page({
   data: {
-    apiPath: "http://局域网电脑IP:3000",
     businessHours: "设计样例营业 · 09:30–19:00",
     demoTime: "2026年8月13日 周四 10:50",
     authState: "loading" as "active" | "expired" | "missing" | "unavailable" | "loading",
@@ -11,15 +10,20 @@ Page({
     connectionMessage: "",
   },
   async onShow() {
-    const context = await loadCustomerContext("/pages/home/index");
-    this.setData({
-      authState: context.kind,
-      customer: "customer" in context ? context.customer : null,
-      connectionMessage: context.kind === "unavailable" ? context.message : "",
-    });
+    this.setData(await loadCustomerTabState("/pages/home/index"));
+  },
+  primaryAction() {
+    if (this.data.customer) {
+      wx.switchTab({ url: "/pages/appointments/index" });
+      return;
+    }
+
+    openCustomerSelector("/pages/home/index");
+  },
+  goAppointments() {
+    wx.switchTab({ url: "/pages/appointments/index" });
   },
   chooseCustomer() {
-    rememberRecoveryPath("/pages/home/index");
-    wx.switchTab({ url: "/pages/profile/index" });
+    openCustomerSelector("/pages/home/index");
   },
 });

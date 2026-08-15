@@ -20,6 +20,10 @@
         <text class="opening__date">{{demoTime}}</text>
         <text class="opening__demo-label">上海演示时间</text>
       </view>
+      <button class="hero__cta" bindtap="primaryAction">
+        {{customer ? '查看我的预约记录' : '选择顾客开始体验'}}
+        <text>›</text>
+      </button>
     </view>
   </view>
 
@@ -33,13 +37,13 @@
       <text class="readiness-card__status">会话有效</text>
     </view>
     <text class="readiness-card__body">
-      当前页面会使用服务端签发的短期 Bearer 会话读取本人资料，不接受客户端声明顾客 ID 或角色。
+      当前体验故事为“{{customer.story}}”。四个主页面都会跟随 {{customer.displayName}} 的演示身份。
     </text>
     <text wx:if="{{connectionMessage}}" class="readiness-card__warning">{{connectionMessage}} 已保留当前身份，可稍后重试。</text>
     <view class="readiness-card__divider"></view>
     <view class="readiness-card__row">
-      <text>演示模式</text>
-      <text class="readiness-card__code">不是微信真实登录</text>
+      <text>预约记录</text>
+      <button class="readiness-card__link" bindtap="goAppointments">直接查看 ›</button>
     </view>
   </view>
 
@@ -53,9 +57,17 @@
     <button class="primary-button" bindtap="chooseCustomer">重新选择演示顾客</button>
   </view>
 
+  <view class="service-promises">
+    <text class="service-promises__title">安心预约洗护</text>
+    <view class="service-promises__list">
+      <view><text class="service-promises__mark">人</text><text>确定员工</text></view>
+      <view><text class="service-promises__mark">价</text><text>价格透明</text></view>
+      <view><text class="service-promises__mark">码</text><text>到店核销</text></view>
+    </view>
+  </view>
+
   <view class="local-boundary">
-    <text class="local-boundary__label">本地演示边界</text>
-    <text>手机不能访问电脑的 localhost，请使用同一局域网中的电脑 IP：</text>
-    <text class="local-boundary__code">{{apiPath}}</text>
+    <text class="local-boundary__label">演示身份说明</text>
+    <text>顾客身份由本地 API 临时签发，不是微信真实登录。会话失效时可重新选择，并回到之前的 tab。</text>
   </view>
 </view>

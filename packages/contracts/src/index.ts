@@ -73,12 +73,16 @@ export interface ApiErrorResponse {
 export interface DemoCustomerChoice {
   key: string;
   displayName: string;
-  phoneMasked: string;
   story: "正常预约" | "已有未来预约" | "取消或爽约历史";
   avatarInitial: string;
 }
 
-export type MiniappCustomerProfile = Omit<DemoCustomerChoice, "key">;
+export interface MiniappCustomerProfile {
+  displayName: string;
+  phoneMasked: string;
+  story: DemoCustomerChoice["story"];
+  avatarInitial: string;
+}
 
 export interface DemoCustomerChoicesResponse {
   customers: DemoCustomerChoice[];

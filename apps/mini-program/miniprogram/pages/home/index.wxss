@@ -52,18 +52,43 @@
   position: absolute;
   top: 58rpx;
   right: 32rpx;
-  min-height: 68rpx;
+  min-height: 88rpx;
   margin: 0;
   padding: 0 20rpx;
   border-radius: 999rpx;
   color: #24312c;
   background: rgba(255, 252, 247, 0.78);
-  font-size: 24rpx;
-  line-height: 68rpx;
+  font-size: 28rpx;
+  line-height: 88rpx;
 }
 
 .hero__identity::after {
   border: 0;
+}
+
+.hero__cta {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  box-sizing: border-box;
+  width: 390rpx;
+  min-height: 108rpx;
+  margin: 0;
+  padding: 0 34rpx;
+  border-radius: 24rpx;
+  color: #fff;
+  background: #3f6253;
+  font-size: 30rpx;
+  font-weight: 600;
+}
+
+.hero__cta::after {
+  border: 0;
+}
+
+.hero__cta text {
+  font-size: 48rpx;
+  font-weight: 300;
 }
 
 .wordmark__title {
@@ -151,7 +176,7 @@
 .readiness-card__story {
   margin-top: 5rpx;
   color: #61706a;
-  font-size: 22rpx;
+  font-size: 28rpx;
   font-weight: 400;
 }
 
@@ -160,7 +185,7 @@
   border-radius: 999rpx;
   color: #3f6253;
   background: #e4ece6;
-  font-size: 20rpx;
+  font-size: 28rpx;
 }
 
 .readiness-card--auth {
@@ -176,7 +201,7 @@
   display: block;
   margin-top: 16rpx;
   color: #9a5d1f;
-  font-size: 24rpx;
+  font-size: 28rpx;
   line-height: 1.55;
 }
 
@@ -209,6 +234,63 @@
   font-size: 28rpx;
   overflow-wrap: anywhere;
   text-align: right;
+}
+
+.readiness-card__link {
+  min-height: 88rpx;
+  margin: -24rpx 0;
+  padding: 0;
+  color: #3f6253;
+  background: transparent;
+  font-size: 28rpx;
+  line-height: 88rpx;
+}
+
+.readiness-card__link::after {
+  border: 0;
+}
+
+.service-promises {
+  margin: 32rpx 32rpx 0;
+}
+
+.service-promises__title {
+  font-size: 34rpx;
+  font-weight: 700;
+}
+
+.service-promises__list {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  margin-top: 20rpx;
+  padding: 28rpx 12rpx;
+  border-radius: 24rpx;
+  background: rgba(255, 252, 247, 0.72);
+}
+
+.service-promises__list view {
+  display: flex;
+  align-items: center;
+  flex-direction: column;
+  gap: 12rpx;
+  border-right: 1rpx solid #ddd7cb;
+  font-size: 28rpx;
+}
+
+.service-promises__list view:last-child {
+  border-right: 0;
+}
+
+.service-promises__mark {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 56rpx;
+  height: 56rpx;
+  border: 1rpx solid #6f8f7e;
+  border-radius: 50%;
+  color: #3f6253;
+  font-size: 28rpx;
 }
 
 .local-boundary {

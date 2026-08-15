@@ -26,17 +26,24 @@ describe("小程序演示顾客会话", () => {
     expect(response.statusCode).toBe(200);
     expect(response.json()).toEqual({
       customers: [
-        expect.objectContaining({ key: "xu-lan", displayName: "许岚", story: "正常预约" }),
-        expect.objectContaining({
+        {
+          avatarInitial: "许",
+          key: "xu-lan",
+          displayName: "许岚",
+          story: "正常预约",
+        },
+        {
+          avatarInitial: "程",
           key: "cheng-mo",
           displayName: "程墨",
           story: "已有未来预约",
-        }),
-        expect.objectContaining({
+        },
+        {
+          avatarInitial: "陆",
           key: "lu-yao",
           displayName: "陆遥",
           story: "取消或爽约历史",
-        }),
+        },
       ],
     });
   });

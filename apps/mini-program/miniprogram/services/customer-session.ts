@@ -1,4 +1,10 @@
 import type {
+  DemoCustomerChoicesResponse,
+  MiniappProfileResponse,
+  MiniappSessionResponse,
+} from "@rongguang/contracts";
+
+import type {
   CustomerProfile,
   DemoCustomerChoice,
   RongguangApp,
@@ -19,21 +25,17 @@ interface ApiErrorBody {
   message?: string;
 }
 
-interface DemoCustomerChoicesResponse {
-  customers: DemoCustomerChoice[];
-}
-
-type MiniappSessionResponse = StoredCustomerSession;
-
-interface MiniappProfileResponse {
-  customer: CustomerProfile;
-}
-
 export type CustomerContext =
   | { kind: "active"; customer: CustomerProfile }
   | { kind: "expired" }
   | { kind: "missing" }
   | { kind: "unavailable"; customer: CustomerProfile; message: string };
+
+export interface CustomerTabState {
+  authState: CustomerContext["kind"];
+  customer: CustomerProfile | null;
+  connectionMessage: string;
+}
 
 class MiniappApiError extends Error {
   constructor(
@@ -54,7 +56,9 @@ function isCustomerProfile(value: unknown): value is CustomerProfile {
   return (
     typeof profile.displayName === "string" &&
     typeof profile.phoneMasked === "string" &&
-    typeof profile.story === "string" &&
+    (profile.story === "正常预约" ||
+      profile.story === "已有未来预约" ||
+      profile.story === "取消或爽约历史") &&
     typeof profile.avatarInitial === "string"
   );
 }
@@ -191,6 +195,20 @@ export async function loadCustomerContext(pagePath: string): Promise<CustomerCon
       message: error instanceof Error ? error.message : "当前资料更新失败，请稍后重试。",
     };
   }
+}
+
+export async function loadCustomerTabState(pagePath: string): Promise<CustomerTabState> {
+  const context = await loadCustomerContext(pagePath);
+  return {
+    authState: context.kind,
+    customer: "customer" in context ? context.customer : null,
+    connectionMessage: context.kind === "unavailable" ? context.message : "",
+  };
+}
+
+export function openCustomerSelector(pagePath: string): void {
+  rememberRecoveryPath(pagePath);
+  wx.switchTab({ url: "/pages/profile/index" });
 }
 
 export async function fetchDemoCustomers(): Promise<DemoCustomerChoice[]> {

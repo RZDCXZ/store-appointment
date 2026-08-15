@@ -4,11 +4,11 @@
   border-radius: 20rpx;
   color: #376e91;
   background: rgba(55, 110, 145, 0.08);
-  font-size: 23rpx;
+  font-size: 28rpx;
 }
 
 .connection-note {
   margin-top: 20rpx;
   color: #9a5d1f;
-  font-size: 23rpx;
+  font-size: 28rpx;
 }

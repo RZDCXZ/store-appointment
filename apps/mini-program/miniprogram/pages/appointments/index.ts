@@ -1,4 +1,4 @@
-import { loadCustomerContext, rememberRecoveryPath } from "../../services/customer-session";
+import { loadCustomerTabState, openCustomerSelector } from "../../services/customer-session";
 import type { CustomerProfile } from "../../types/customer";
 
 Page({
@@ -8,15 +8,9 @@ Page({
     connectionMessage: "",
   },
   async onShow() {
-    const context = await loadCustomerContext("/pages/appointments/index");
-    this.setData({
-      authState: context.kind,
-      customer: "customer" in context ? context.customer : null,
-      connectionMessage: context.kind === "unavailable" ? context.message : "",
-    });
+    this.setData(await loadCustomerTabState("/pages/appointments/index"));
   },
   chooseCustomer() {
-    rememberRecoveryPath("/pages/appointments/index");
-    wx.switchTab({ url: "/pages/profile/index" });
+    openCustomerSelector("/pages/appointments/index");
   },
 });

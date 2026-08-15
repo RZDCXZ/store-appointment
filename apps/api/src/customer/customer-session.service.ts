@@ -40,6 +40,15 @@ function toProfile(customer: CustomerRow): MiniappCustomerProfile {
   };
 }
 
+function toChoice(customer: CustomerRow): DemoCustomerChoice {
+  return {
+    key: customer.demo_key,
+    displayName: customer.display_name,
+    story: customer.story,
+    avatarInitial: customer.display_name.slice(0, 1),
+  };
+}
+
 function toIdentity(customer: CustomerRow): CustomerIdentity {
   return { id: customer.id, ...toProfile(customer) };
 }
@@ -62,10 +71,7 @@ export class CustomerSessionService {
       `,
     );
 
-    return result.rows.map((customer) => ({
-      key: customer.demo_key,
-      ...toProfile(customer),
-    }));
+    return result.rows.map(toChoice);
   }
 
   async create(demoKey: string): Promise<MiniappSessionResponse | null> {

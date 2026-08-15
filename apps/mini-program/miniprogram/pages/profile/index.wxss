@@ -38,7 +38,7 @@
 
 .profile-summary__eyebrow {
   color: #6f8f7e;
-  font-size: 22rpx;
+  font-size: 28rpx;
 }
 
 .profile-summary__name {
@@ -50,18 +50,18 @@
 .profile-summary__phone {
   margin-top: 4rpx;
   color: #61706a;
-  font-size: 24rpx;
+  font-size: 28rpx;
 }
 
 .text-button {
   min-width: 88rpx;
-  min-height: 80rpx;
+  min-height: 88rpx;
   margin: 0;
   padding: 0 12rpx;
   color: #376e91;
   background: transparent;
-  font-size: 25rpx;
-  line-height: 80rpx;
+  font-size: 28rpx;
+  line-height: 88rpx;
 }
 
 .demo-banner {
@@ -95,14 +95,14 @@
 
 .demo-banner__title {
   color: #376e91;
-  font-size: 25rpx;
+  font-size: 28rpx;
   font-weight: 700;
 }
 
 .demo-banner__body {
   margin-top: 5rpx;
   color: #61706a;
-  font-size: 21rpx;
+  font-size: 28rpx;
   line-height: 1.55;
 }
 
@@ -123,7 +123,7 @@
 .expired-note__body {
   margin-top: 6rpx;
   color: #61706a;
-  font-size: 23rpx;
+  font-size: 28rpx;
 }
 
 .selector-section {
@@ -150,7 +150,7 @@
 .selector-heading__body {
   margin-top: 6rpx;
   color: #61706a;
-  font-size: 22rpx;
+  font-size: 28rpx;
 }
 
 .selector-loading {
@@ -207,18 +207,18 @@
 .choice-card__story {
   margin-top: 5rpx;
   color: #3f6253;
-  font-size: 23rpx;
+  font-size: 28rpx;
 }
 
-.choice-card__phone {
+.choice-card__meta {
   margin-top: 4rpx;
   color: #61706a;
-  font-size: 21rpx;
+  font-size: 28rpx;
 }
 
 .choice-card__action {
   color: #3f6253;
-  font-size: 23rpx;
+  font-size: 28rpx;
 }
 
 .error-note {
@@ -227,7 +227,7 @@
   border-radius: 18rpx;
   color: #a84444;
   background: #f9e2dc;
-  font-size: 23rpx;
+  font-size: 28rpx;
 }
 
 .profile-menu {
@@ -242,7 +242,7 @@
   min-height: 96rpx;
   padding: 0 26rpx;
   border-bottom: 1rpx solid #ddd7cb;
-  font-size: 27rpx;
+  font-size: 28rpx;
 }
 
 .profile-menu__row:last-child {
@@ -251,7 +251,7 @@
 
 .profile-menu__detail {
   color: #61706a;
-  font-size: 23rpx;
+  font-size: 28rpx;
 }
 
 .store-card {
@@ -263,12 +263,12 @@
   border-radius: 24rpx;
   color: #61706a;
   background: rgba(255, 252, 247, 0.68);
-  font-size: 23rpx;
+  font-size: 28rpx;
 }
 
 .store-card__title {
   margin-bottom: 5rpx;
   color: #24312c;
-  font-size: 27rpx;
+  font-size: 28rpx;
   font-weight: 700;
 }

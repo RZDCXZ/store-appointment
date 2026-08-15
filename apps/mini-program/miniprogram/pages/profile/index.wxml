@@ -56,9 +56,11 @@
         <view class="choice-card__copy">
           <text class="choice-card__name">{{item.displayName}}</text>
           <text class="choice-card__story">{{item.story}}</text>
-          <text class="choice-card__phone">{{item.phoneMasked}}</text>
+          <text class="choice-card__meta">预置演示顾客</text>
         </view>
-        <text class="choice-card__action">选择 ›</text>
+        <text class="choice-card__action">
+          {{currentCustomer && currentCustomer.displayName === item.displayName ? '当前' : '选择 ›'}}
+        </text>
       </button>
     </view>
     <button wx:if="{{errorMessage && !loadingChoices}}" class="secondary-button" bindtap="loadChoices">重新加载</button>

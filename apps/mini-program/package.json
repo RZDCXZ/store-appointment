@@ -9,6 +9,9 @@
     "test": "vitest run",
     "typecheck": "tsc --noEmit"
   },
+  "dependencies": {
+    "@rongguang/contracts": "workspace:*"
+  },
   "devDependencies": {
     "@types/node": "24.13.3",
     "miniprogram-api-typings": "4.0.2",
