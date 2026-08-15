@@ -2,7 +2,7 @@
   <view class="hero">
     <image
       class="hero__image"
-      src="/assets/brand/rongguang-hero-shiba.png"
+      src="/assets/brand/rongguang-hero-shiba.jpg"
       mode="aspectFill"
       aria-label="晨光中的柴犬"
     />
@@ -18,11 +18,14 @@
       <view class="opening">
         <text>{{businessSummary.statusLabel}} · {{businessSummary.hoursLabel}}</text>
         <text class="opening__date">{{businessSummary.dateLabel}}</text>
-        <text class="opening__demo-label">上海营业语境</text>
+        <text class="opening__demo-label">上海演示时间</text>
       </view>
       <button class="hero__cta" bindtap="primaryAction">
-        为宠物预约洗护
-        <text>›</text>
+        <view class="hero__cta-copy">
+          <text class="hero__cta-title">为宠物预约洗护</text>
+          <text class="hero__cta-note">先查看服务 · 创建功能后续开放</text>
+        </view>
+        <text class="hero__cta-arrow">›</text>
       </button>
     </view>
   </view>
@@ -47,23 +50,23 @@
   </view>
 
   <view wx:if="{{catalogError}}" class="home-query-error" role="alert">
-    <view>
-      <text>服务更新失败</text>
+    <view class="home-query-error__copy">
+      <text class="home-query-error__title">服务更新失败</text>
       <text>{{catalogError}} 这不是“暂无服务”。</text>
     </view>
-    <button bindtap="retryCatalog">重试</button>
+    <button class="home-query-error__action" bindtap="retryCatalog">重试</button>
   </view>
 
   <view class="services-preview">
     <view class="services-preview__heading">
-      <view>
+      <view class="services-preview__heading-copy">
         <text class="services-preview__title">洗护服务</text>
         <text class="services-preview__subtitle">犬猫与三种体型都有确定价格</text>
       </view>
       <button class="services-preview__more" bindtap="goServiceCatalog">全部服务 ›</button>
     </view>
 
-    <scroll-view wx:if="{{catalogState === 'ready'}}" class="service-rail" scroll-x enable-flex>
+    <view wx:if="{{catalogState === 'ready'}}" class="service-grid">
       <button
         class="service-preview-card"
         wx:for="{{serviceCards}}"
@@ -71,42 +74,41 @@
         data-id="{{item.id}}"
         bindtap="goServiceDetail"
       >
-        <image src="{{item.imagePath}}" mode="aspectFill" />
-        <view>
+        <image class="service-preview-card__image" src="{{item.imagePath}}" mode="aspectFill" />
+        <view class="service-preview-card__copy">
           <text class="service-preview-card__species">{{item.speciesLabel}}</text>
           <text class="service-preview-card__name">{{item.name}}</text>
           <text class="service-preview-card__fact">
             {{item.specifications[0].petSizeLabel}} {{item.specifications[0].priceLabel}} · {{item.specifications[0].durationLabel}}
           </text>
-          <text class="service-preview-card__link">查看全部体型 ›</text>
         </view>
       </button>
-    </scroll-view>
+    </view>
 
     <view wx:elif="{{catalogState === 'loading'}}" class="home-service-state">
       <view class="home-service-skeleton" wx:for="{{[1, 2]}}" wx:key="*this"></view>
     </view>
 
     <view wx:elif="{{catalogState === 'empty'}}" class="home-service-empty">
-      <text>当前没有可浏览的主要服务</text>
-      <text>目录为空时不会展示虚构价格。</text>
-      <button bindtap="retryCatalog">刷新目录</button>
+      <text class="home-service-empty__title">当前没有可浏览的主要服务</text>
+      <text class="home-service-empty__body">目录为空时不会展示虚构价格。</text>
+      <button class="home-service-empty__action" bindtap="retryCatalog">刷新目录</button>
     </view>
 
     <view wx:else class="home-service-empty home-service-empty--error">
-      <text>服务暂时没有加载出来</text>
-      <text>{{catalogError}}</text>
-      <button bindtap="retryCatalog">重新加载</button>
+      <text class="home-service-empty__title">服务暂时没有加载出来</text>
+      <text class="home-service-empty__body">{{catalogError}}</text>
+      <button class="home-service-empty__action" bindtap="retryCatalog">重新加载</button>
     </view>
     <text wx:if="{{refreshingCatalog}}" class="services-preview__refreshing">正在更新服务…</text>
   </view>
 
   <view class="store-facts">
-    <view>
+    <view class="store-facts__row">
       <text class="store-facts__label">茸光上海门店</text>
       <text>{{storeAddress}}</text>
     </view>
-    <view>
+    <view class="store-facts__row">
       <text class="store-facts__label">联系方式</text>
       <text>{{contactPhone}}</text>
     </view>
@@ -116,15 +118,15 @@
   <view class="service-promises">
     <text class="service-promises__title">安心预约洗护</text>
     <view class="service-promises__list">
-      <view>
+      <view class="service-promises__item">
         <image class="service-promises__icon" src="/assets/promises/employee.png" mode="aspectFit" />
         <text>确定员工</text>
       </view>
-      <view>
+      <view class="service-promises__item">
         <image class="service-promises__icon" src="/assets/promises/price.png" mode="aspectFit" />
         <text>价格透明</text>
       </view>
-      <view>
+      <view class="service-promises__item service-promises__item--last">
         <image class="service-promises__icon" src="/assets/promises/checkin.png" mode="aspectFit" />
         <text>到店核销</text>
       </view>

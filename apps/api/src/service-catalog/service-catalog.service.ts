@@ -1,6 +1,8 @@
 import { Injectable } from "@nestjs/common";
 import type { StorefrontCatalogResponse } from "@rongguang/contracts";
 
+import { getDemoNow } from "../config/environment.js";
+
 const weeklyBusinessHours: StorefrontCatalogResponse["store"]["weeklyBusinessHours"] = [
   { weekday: 1, label: "周一", openAt: null, closeAt: null },
   { weekday: 2, label: "周二", openAt: "09:30", closeAt: "19:00" },
@@ -11,7 +13,9 @@ const weeklyBusinessHours: StorefrontCatalogResponse["store"]["weeklyBusinessHou
   { weekday: 0, label: "周日", openAt: "09:30", closeAt: "19:00" },
 ];
 
-const storefrontCatalog: StorefrontCatalogResponse = {
+const storefrontCatalog: Omit<StorefrontCatalogResponse, "store"> & {
+  store: Omit<StorefrontCatalogResponse["store"], "demoNow">;
+} = {
   store: {
     brandName: "茸光宠物洗护",
     city: "上海",
@@ -98,6 +102,12 @@ const storefrontCatalog: StorefrontCatalogResponse = {
 @Injectable()
 export class ServiceCatalogService {
   getStorefront(): StorefrontCatalogResponse {
-    return storefrontCatalog;
+    return {
+      ...storefrontCatalog,
+      store: {
+        ...storefrontCatalog.store,
+        demoNow: getDemoNow(),
+      },
+    };
   }
 }

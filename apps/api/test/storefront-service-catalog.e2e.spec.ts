@@ -1,5 +1,5 @@
 import type { NestFastifyApplication } from "@nestjs/platform-fastify";
-import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 
 import { createApplication } from "../src/bootstrap.js";
 
@@ -7,12 +7,14 @@ describe("门店首页与服务目录", () => {
   let app: NestFastifyApplication;
 
   beforeAll(async () => {
+    vi.stubEnv("DEMO_NOW", "2026-08-13T02:50:00.000Z");
     app = await createApplication();
     await app.init();
   });
 
   afterAll(async () => {
     await app.close();
+    vi.unstubAllEnvs();
   });
 
   it("返回茸光门店、上海营业语境和以人民币分表示的完整服务目录", async () => {
@@ -24,6 +26,7 @@ describe("门店首页与服务目录", () => {
       store: {
         brandName: "茸光宠物洗护",
         city: "上海",
+        demoNow: "2026-08-13T02:50:00.000Z",
         address: "上海市徐汇区暖茸路 18 号",
         contactPhone: "021-6488 2618",
         timeZone: "Asia/Shanghai",

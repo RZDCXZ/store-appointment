@@ -17,34 +17,34 @@
   background: #fff8ee;
 }
 
-.detail-error view {
+.detail-error__copy {
   display: flex;
   flex: 1;
   flex-direction: column;
   gap: 6rpx;
   color: #61706a;
-  font-size: 24rpx;
+  font-size: 28rpx;
   line-height: 1.5;
 }
 
-.detail-error view text:first-child {
+.detail-error__title {
   color: #9a5d1f;
-  font-size: 27rpx;
+  font-size: 28rpx;
   font-weight: 700;
 }
 
-.detail-error button {
-  min-height: 70rpx;
+.detail-error__action {
+  min-height: 88rpx;
   margin: 0;
   padding: 0 22rpx;
   border-radius: 18rpx;
   color: #fff;
   background: #3f6253;
-  font-size: 25rpx;
-  line-height: 70rpx;
+  font-size: 28rpx;
+  line-height: 88rpx;
 }
 
-.detail-error button::after,
+.detail-error__action::after,
 .detail-primary::after {
   border: 0;
 }
@@ -68,21 +68,21 @@
   padding: 38rpx;
 }
 
-.detail-loading__body view {
+.detail-loading__line {
   height: 30rpx;
   border-radius: 999rpx;
   background: #eee7dc;
 }
 
-.detail-loading__body view:nth-child(2) {
+.detail-loading__line--long {
   width: 80%;
 }
 
-.detail-loading__body view:nth-child(3) {
+.detail-loading__line--short {
   width: 62%;
 }
 
-.detail-loading__body view:nth-child(4) {
+.detail-loading__line--medium {
   width: 72%;
 }
 
@@ -125,7 +125,7 @@
 .detail-refreshing {
   padding: 18rpx 32rpx;
   color: #6f8f7e;
-  font-size: 24rpx;
+  font-size: 28rpx;
   text-align: right;
 }
 
@@ -164,7 +164,7 @@
   border: 1rpx solid rgba(255, 255, 255, 0.5);
   border-radius: 999rpx;
   background: rgba(36, 49, 44, 0.25);
-  font-size: 24rpx;
+  font-size: 28rpx;
 }
 
 .detail-hero__title {
@@ -191,15 +191,15 @@
   gap: 20rpx;
 }
 
-.detail-section__heading text:first-child {
+.detail-section__title {
   color: #24312c;
   font-size: 34rpx;
   font-weight: 700;
 }
 
-.detail-section__heading text:last-child {
+.detail-section__meta {
   color: #61706a;
-  font-size: 23rpx;
+  font-size: 28rpx;
   text-align: right;
 }
 
@@ -228,15 +228,15 @@
   flex-direction: column;
 }
 
-.detail-spec__size text:first-child {
+.detail-spec__size-label {
   font-size: 30rpx;
   font-weight: 700;
 }
 
-.detail-spec__size text:last-child {
+.detail-spec__size-rule {
   margin-top: 6rpx;
   color: #61706a;
-  font-size: 23rpx;
+  font-size: 28rpx;
 }
 
 .detail-spec__facts {
@@ -244,17 +244,17 @@
   flex: none;
 }
 
-.detail-spec__facts text:first-child {
+.detail-spec__price {
   color: #3f6253;
   font-size: 34rpx;
   font-weight: 700;
   font-variant-numeric: tabular-nums;
 }
 
-.detail-spec__facts text:last-child {
+.detail-spec__duration {
   margin-top: 6rpx;
   color: #61706a;
-  font-size: 24rpx;
+  font-size: 28rpx;
 }
 
 .detail-addon {
@@ -271,35 +271,35 @@
   gap: 20rpx;
 }
 
-.detail-addon__heading view {
+.detail-addon__heading-copy {
   display: flex;
   flex-direction: column;
 }
 
-.detail-addon__heading view text:first-child {
+.detail-addon__name {
   font-size: 30rpx;
   font-weight: 700;
 }
 
-.detail-addon__heading view text:last-child {
+.detail-addon__species {
   margin-top: 5rpx;
   color: #61706a;
-  font-size: 23rpx;
+  font-size: 28rpx;
 }
 
-.detail-addon__heading > text {
+.detail-addon__tag {
   padding: 6rpx 12rpx;
   border-radius: 999rpx;
   color: #c95f50;
   background: #f9e2dc;
-  font-size: 22rpx;
+  font-size: 28rpx;
 }
 
 .detail-addon__body {
   display: block;
   margin-top: 14rpx;
   color: #61706a;
-  font-size: 25rpx;
+  font-size: 28rpx;
   line-height: 1.55;
 }
 
@@ -311,10 +311,10 @@
   padding-top: 14rpx;
   border-top: 1rpx solid #e4ddd2;
   color: #61706a;
-  font-size: 24rpx;
+  font-size: 28rpx;
 }
 
-.detail-addon__spec text:last-child {
+.detail-addon__spec-value {
   color: #24312c;
   font-variant-numeric: tabular-nums;
   text-align: right;
@@ -326,7 +326,7 @@
   border-radius: 20rpx;
   color: #61706a;
   background: #fffcf7;
-  font-size: 26rpx;
+  font-size: 28rpx;
 }
 
 .detail-promise {
@@ -339,15 +339,15 @@
   background: #e4ece6;
 }
 
-.detail-promise text:first-child {
+.detail-promise__title {
   color: #3f6253;
   font-size: 28rpx;
   font-weight: 700;
 }
 
-.detail-promise text:last-child {
+.detail-promise__body {
   color: #61706a;
-  font-size: 25rpx;
+  font-size: 28rpx;
   line-height: 1.6;
 }
 

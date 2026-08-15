@@ -12,7 +12,7 @@
 
 .catalog-heading__eyebrow {
   color: #6f8f7e;
-  font-size: 26rpx;
+  font-size: 28rpx;
   font-weight: 600;
   letter-spacing: 3rpx;
 }
@@ -45,7 +45,7 @@
   background: #fff8ee;
 }
 
-.query-banner view {
+.query-banner__copy {
   display: flex;
   flex: 1;
   flex-direction: column;
@@ -60,20 +60,20 @@
 .query-banner__body {
   margin-top: 6rpx;
   color: #61706a;
-  font-size: 26rpx;
+  font-size: 28rpx;
   line-height: 1.5;
 }
 
 .query-banner__action {
   flex: none;
-  min-height: 72rpx;
+  min-height: 88rpx;
   margin: 0;
   padding: 0 24rpx;
   border-radius: 18rpx;
   color: #fff;
   background: #3f6253;
-  font-size: 26rpx;
-  line-height: 72rpx;
+  font-size: 28rpx;
+  line-height: 88rpx;
 }
 
 .query-banner__action::after {
@@ -111,17 +111,17 @@
   padding: 36rpx 28rpx;
 }
 
-.loading-card__body view {
+.loading-card__line {
   height: 28rpx;
   border-radius: 999rpx;
   background: #ede7dc;
 }
 
-.loading-card__body view:nth-child(2) {
+.loading-card__line--medium {
   width: 75%;
 }
 
-.loading-card__body view:nth-child(3) {
+.loading-card__line--short {
   width: 55%;
 }
 
@@ -164,7 +164,7 @@
 .refreshing-note {
   margin-top: 24rpx;
   color: #6f8f7e;
-  font-size: 26rpx;
+  font-size: 28rpx;
   text-align: right;
 }
 
@@ -176,15 +176,15 @@
   margin-top: 38rpx;
 }
 
-.catalog-section-heading text:first-child {
+.catalog-section-heading__title {
   color: #24312c;
   font-size: 34rpx;
   font-weight: 700;
 }
 
-.catalog-section-heading text:last-child {
+.catalog-section-heading__meta {
   color: #61706a;
-  font-size: 24rpx;
+  font-size: 28rpx;
 }
 
 .catalog-section-heading--addons {
@@ -235,12 +235,12 @@
   border-radius: 999rpx;
   color: #3f6253;
   background: #e4ece6;
-  font-size: 22rpx;
+  font-size: 28rpx;
 }
 
 .service-card__link {
   color: #3f6253;
-  font-size: 24rpx;
+  font-size: 28rpx;
 }
 
 .service-card__title {
@@ -253,7 +253,7 @@
 .addon-card__description {
   margin-top: 10rpx;
   color: #61706a;
-  font-size: 24rpx;
+  font-size: 28rpx;
   line-height: 1.5;
 }
 
@@ -269,7 +269,7 @@
   padding: 12rpx 0;
   border-bottom: 1rpx solid #eee8de;
   color: #61706a;
-  font-size: 23rpx;
+  font-size: 28rpx;
 }
 
 .spec-table__price {
@@ -292,7 +292,7 @@
   gap: 20rpx;
 }
 
-.addon-card__heading view {
+.addon-card__heading-copy {
   display: flex;
   flex-direction: column;
 }
@@ -305,12 +305,12 @@
 .addon-card__species {
   margin-top: 6rpx;
   color: #61706a;
-  font-size: 24rpx;
+  font-size: 28rpx;
 }
 
 .addon-card__count {
   color: #c95f50;
-  font-size: 24rpx;
+  font-size: 28rpx;
 }
 
 .addon-card__specs {
@@ -320,7 +320,7 @@
   margin-top: 20rpx;
 }
 
-.addon-card__specs view {
+.addon-card__spec {
   display: flex;
   flex-direction: column;
   gap: 6rpx;
@@ -328,12 +328,12 @@
   border-radius: 14rpx;
   background: #f6f1e7;
   color: #61706a;
-  font-size: 20rpx;
+  font-size: 28rpx;
 }
 
 .addon-card__spec-value {
   color: #24312c;
-  font-size: 21rpx;
+  font-size: 28rpx;
   font-variant-numeric: tabular-nums;
 }
 
@@ -343,6 +343,6 @@
   border-radius: 20rpx;
   color: #61706a;
   background: #e4ece6;
-  font-size: 24rpx;
+  font-size: 28rpx;
   line-height: 1.55;
 }

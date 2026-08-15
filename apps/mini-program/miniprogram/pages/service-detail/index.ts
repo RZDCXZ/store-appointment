@@ -1,10 +1,10 @@
+import { fetchStorefrontCatalog } from "../../services/storefront-catalog";
 import {
   displayPrimaryService,
   displayServiceAddon,
-  fetchStorefrontCatalog,
   type PrimaryServiceDisplay,
   type ServiceAddonDisplay,
-} from "../../services/storefront-catalog";
+} from "../../services/storefront-presentation";
 
 type DetailState = "loading" | "ready" | "not-found" | "error";
 

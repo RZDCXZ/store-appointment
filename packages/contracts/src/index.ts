@@ -111,6 +111,7 @@ export interface WeeklyBusinessHours {
 export interface StorefrontStore {
   brandName: string;
   city: "上海";
+  demoNow: string;
   address: string;
   contactPhone: string;
   timeZone: "Asia/Shanghai";

@@ -6,7 +6,7 @@
   </view>
 
   <view wx:if="{{errorMessage}}" class="query-banner" role="alert">
-    <view>
+    <view class="query-banner__copy">
       <text class="query-banner__title">服务更新失败</text>
       <text class="query-banner__body">{{errorMessage}} 已显示的服务信息会继续保留。</text>
     </view>
@@ -17,9 +17,9 @@
     <view class="loading-card" wx:for="{{[1, 2, 3]}}" wx:key="*this">
       <view class="loading-card__image"></view>
       <view class="loading-card__body">
-        <view></view>
-        <view></view>
-        <view></view>
+        <view class="loading-card__line"></view>
+        <view class="loading-card__line loading-card__line--medium"></view>
+        <view class="loading-card__line loading-card__line--short"></view>
       </view>
     </view>
   </view>
@@ -41,8 +41,8 @@
   <block wx:else>
     <view wx:if="{{refreshing}}" class="refreshing-note">正在更新门店服务…</view>
     <view class="catalog-section-heading">
-      <text>主要服务 · {{primaryServices.length}}</text>
-      <text>金额均为确定标价</text>
+      <text class="catalog-section-heading__title">主要服务 · {{primaryServices.length}}</text>
+      <text class="catalog-section-heading__meta">金额均为确定标价</text>
     </view>
     <view class="service-list">
       <navigator
@@ -72,13 +72,13 @@
     </view>
 
     <view class="catalog-section-heading catalog-section-heading--addons">
-      <text>可选增项 · {{addons.length}}</text>
-      <text>与主要服务连续完成</text>
+      <text class="catalog-section-heading__title">可选增项 · {{addons.length}}</text>
+      <text class="catalog-section-heading__meta">与主要服务连续完成</text>
     </view>
     <view class="addon-list">
       <view class="addon-card" wx:for="{{addons}}" wx:key="id">
         <view class="addon-card__heading">
-          <view>
+          <view class="addon-card__heading-copy">
             <text class="addon-card__name">{{item.name}}</text>
             <text class="addon-card__species">{{item.speciesLabel}}</text>
           </view>
@@ -86,7 +86,7 @@
         </view>
         <text class="addon-card__description">{{item.description}}</text>
         <view class="addon-card__specs">
-          <view wx:for="{{item.specifications}}" wx:for-item="spec" wx:key="petSize">
+          <view class="addon-card__spec" wx:for="{{item.specifications}}" wx:for-item="spec" wx:key="petSize">
             <text>{{spec.petSizeLabel}}</text>
             <text class="addon-card__spec-value">{{spec.priceLabel}} · {{spec.durationLabel}}</text>
           </view>

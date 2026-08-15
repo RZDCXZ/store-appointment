@@ -1,12 +1,12 @@
 import { loadCustomerTabState, openCustomerSelector } from "../../services/customer-session";
+import { fetchStorefrontCatalog } from "../../services/storefront-catalog";
 import {
   displayPrimaryService,
-  fetchStorefrontCatalog,
   getStoreBusinessSummary,
   serviceDetailPath,
   type PrimaryServiceDisplay,
   type StoreBusinessSummary,
-} from "../../services/storefront-catalog";
+} from "../../services/storefront-presentation";
 import type { CustomerProfile } from "../../types/customer";
 
 type CatalogState = "loading" | "ready" | "empty" | "error";
@@ -89,7 +89,7 @@ Page({
         catalogState: serviceCards.length > 0 ? "ready" : "empty",
         catalogError: "",
         refreshingCatalog: false,
-        businessSummary: getStoreBusinessSummary(catalog.store),
+        businessSummary: getStoreBusinessSummary(catalog.store, new Date(catalog.store.demoNow)),
         storeAddress: catalog.store.address,
         contactPhone: catalog.store.contactPhone,
         serviceCards,
