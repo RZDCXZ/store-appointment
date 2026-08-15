@@ -97,3 +97,51 @@ export interface MiniappSessionResponse {
 export interface MiniappProfileResponse {
   customer: MiniappCustomerProfile;
 }
+
+export type PetSpecies = "dog" | "cat";
+export type PetSize = "small" | "medium" | "large";
+
+export interface WeeklyBusinessHours {
+  weekday: 0 | 1 | 2 | 3 | 4 | 5 | 6;
+  label: string;
+  openAt: string | null;
+  closeAt: string | null;
+}
+
+export interface StorefrontStore {
+  brandName: string;
+  city: "上海";
+  address: string;
+  contactPhone: string;
+  timeZone: "Asia/Shanghai";
+  weeklyBusinessHours: WeeklyBusinessHours[];
+}
+
+export interface ServiceSpecification {
+  petSize: PetSize;
+  priceCents: number;
+  durationMinutes: number;
+}
+
+export interface PrimaryService {
+  id: string;
+  name: string;
+  description: string;
+  applicableSpecies: PetSpecies[];
+  availableAddonIds: string[];
+  specifications: ServiceSpecification[];
+}
+
+export interface ServiceAddon {
+  id: string;
+  name: string;
+  description: string;
+  applicableSpecies: PetSpecies[];
+  specifications: ServiceSpecification[];
+}
+
+export interface StorefrontCatalogResponse {
+  store: StorefrontStore;
+  primaryServices: PrimaryService[];
+  addons: ServiceAddon[];
+}

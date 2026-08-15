@@ -121,8 +121,9 @@ function persistSession(session: StoredCustomerSession): void {
   state.customerSessionStatus = "active";
 }
 
-export function restoreCustomerSession(): CustomerContext {
-  const state = appState();
+export function restoreCustomerSession(
+  state: RongguangApp["globalData"] = appState(),
+): CustomerContext {
   const stored = wx.getStorageSync(SESSION_STORAGE_KEY) as unknown;
 
   if (!isStoredSession(stored)) {

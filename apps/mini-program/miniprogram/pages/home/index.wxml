@@ -16,9 +16,9 @@
         {{customer ? '演示顾客 · ' + customer.displayName : '选择演示顾客'}} ›
       </button>
       <view class="opening">
-        <text>{{businessHours}}</text>
-        <text class="opening__date">{{demoTime}}</text>
-        <text class="opening__demo-label">上海演示时间</text>
+        <text>{{businessSummary.statusLabel}} · {{businessSummary.hoursLabel}}</text>
+        <text class="opening__date">{{businessSummary.dateLabel}}</text>
+        <text class="opening__demo-label">上海营业语境</text>
       </view>
       <button class="hero__cta" bindtap="primaryAction">
         为宠物预约洗护
@@ -27,34 +27,90 @@
     </view>
   </view>
 
-  <view wx:if="{{authState === 'active' || authState === 'unavailable'}}" class="readiness-card">
+  <view class="readiness-card recent-card">
     <view class="readiness-card__topline">
-      <view class="readiness-card__avatar">{{customer.avatarInitial}}</view>
+      <view class="recent-card__calendar">近</view>
       <view class="readiness-card__identity">
-        <text>{{customer.displayName}}</text>
-        <text class="readiness-card__story">{{customer.story}}</text>
+        <text>最近预约</text>
+        <text class="readiness-card__story">{{recentAppointment.title}}</text>
       </view>
-      <text class="readiness-card__status">会话有效</text>
+      <text class="readiness-card__status">{{recentAppointment.badge}}</text>
     </view>
-    <text class="readiness-card__body">
-      当前体验故事为“{{customer.story}}”。四个主页面都会跟随 {{customer.displayName}} 的演示身份。
-    </text>
-    <text wx:if="{{connectionMessage}}" class="readiness-card__warning">{{connectionMessage}} 已保留当前身份，可稍后重试。</text>
+    <text class="readiness-card__body">{{recentAppointment.body}}</text>
+    <text wx:if="{{connectionMessage}}" class="readiness-card__warning">{{connectionMessage}} 已保留当前身份。</text>
     <view class="readiness-card__divider"></view>
     <view class="readiness-card__row">
-      <text>预约记录</text>
-      <button class="readiness-card__link" bindtap="goAppointments">直接查看 ›</button>
+      <text>{{customer ? customer.story : '本地演示身份未选择'}}</text>
+      <button wx:if="{{customer}}" class="readiness-card__link" bindtap="goAppointments">预约记录 ›</button>
+      <button wx:else class="readiness-card__link" bindtap="chooseCustomer">选择顾客 ›</button>
     </view>
   </view>
 
-  <view wx:elif="{{authState !== 'loading'}}" class="readiness-card readiness-card--auth">
-    <text class="readiness-card__auth-title">
-      {{authState === 'expired' ? '演示会话已失效' : '先选择一位演示顾客'}}
-    </text>
-    <text class="readiness-card__body">
-      {{authState === 'expired' ? '之前的页面位置已经保留，重新选择后可回到这里。' : '这是本地演示身份切换，不会调用微信真实登录。'}}
-    </text>
-    <button class="primary-button" bindtap="chooseCustomer">重新选择演示顾客</button>
+  <view wx:if="{{catalogError}}" class="home-query-error" role="alert">
+    <view>
+      <text>服务更新失败</text>
+      <text>{{catalogError}} 这不是“暂无服务”。</text>
+    </view>
+    <button bindtap="retryCatalog">重试</button>
+  </view>
+
+  <view class="services-preview">
+    <view class="services-preview__heading">
+      <view>
+        <text class="services-preview__title">洗护服务</text>
+        <text class="services-preview__subtitle">犬猫与三种体型都有确定价格</text>
+      </view>
+      <button class="services-preview__more" bindtap="goServiceCatalog">全部服务 ›</button>
+    </view>
+
+    <scroll-view wx:if="{{catalogState === 'ready'}}" class="service-rail" scroll-x enable-flex>
+      <button
+        class="service-preview-card"
+        wx:for="{{serviceCards}}"
+        wx:key="id"
+        data-id="{{item.id}}"
+        bindtap="goServiceDetail"
+      >
+        <image src="{{item.imagePath}}" mode="aspectFill" />
+        <view>
+          <text class="service-preview-card__species">{{item.speciesLabel}}</text>
+          <text class="service-preview-card__name">{{item.name}}</text>
+          <text class="service-preview-card__fact">
+            {{item.specifications[0].petSizeLabel}} {{item.specifications[0].priceLabel}} · {{item.specifications[0].durationLabel}}
+          </text>
+          <text class="service-preview-card__link">查看全部体型 ›</text>
+        </view>
+      </button>
+    </scroll-view>
+
+    <view wx:elif="{{catalogState === 'loading'}}" class="home-service-state">
+      <view class="home-service-skeleton" wx:for="{{[1, 2]}}" wx:key="*this"></view>
+    </view>
+
+    <view wx:elif="{{catalogState === 'empty'}}" class="home-service-empty">
+      <text>当前没有可浏览的主要服务</text>
+      <text>目录为空时不会展示虚构价格。</text>
+      <button bindtap="retryCatalog">刷新目录</button>
+    </view>
+
+    <view wx:else class="home-service-empty home-service-empty--error">
+      <text>服务暂时没有加载出来</text>
+      <text>{{catalogError}}</text>
+      <button bindtap="retryCatalog">重新加载</button>
+    </view>
+    <text wx:if="{{refreshingCatalog}}" class="services-preview__refreshing">正在更新服务…</text>
+  </view>
+
+  <view class="store-facts">
+    <view>
+      <text class="store-facts__label">茸光上海门店</text>
+      <text>{{storeAddress}}</text>
+    </view>
+    <view>
+      <text class="store-facts__label">联系方式</text>
+      <text>{{contactPhone}}</text>
+    </view>
+    <text class="store-facts__note">即使今日闭店，也可以继续浏览服务并为未来日期做准备。</text>
   </view>
 
   <view class="service-promises">
@@ -76,7 +132,7 @@
   </view>
 
   <view class="local-boundary">
-    <text class="local-boundary__label">演示身份说明</text>
-    <text>顾客身份由本地 API 临时签发，不是微信真实登录。会话失效时可重新选择，并回到之前的 tab。</text>
+    <text class="local-boundary__label">本地演示</text>
+    <text>顾客身份由本地 API 临时签发，不是微信真实登录。</text>
   </view>
 </view>

@@ -1,0 +1,98 @@
+<view class="detail-page">
+  <view wx:if="{{errorMessage}}" class="detail-error" role="alert">
+    <view>
+      <text>详情更新失败</text>
+      <text>{{errorMessage}} 已显示的信息会继续保留。</text>
+    </view>
+    <button bindtap="retry">重试</button>
+  </view>
+
+  <view wx:if="{{detailState === 'loading'}}" class="detail-loading" aria-label="服务详情加载中">
+    <view class="detail-loading__image"></view>
+    <view class="detail-loading__body">
+      <view></view>
+      <view></view>
+      <view></view>
+      <view></view>
+    </view>
+  </view>
+
+  <view wx:elif="{{detailState === 'error'}}" class="detail-state surface-card">
+    <text class="detail-state__mark">!</text>
+    <text class="detail-state__title">服务详情暂时没有加载出来</text>
+    <text class="detail-state__body">{{errorMessage}}</text>
+    <button class="primary-button" bindtap="retry">重新加载详情</button>
+    <button class="secondary-button" bindtap="goCatalog">返回服务列表</button>
+  </view>
+
+  <view wx:elif="{{detailState === 'not-found'}}" class="detail-state surface-card">
+    <text class="detail-state__mark">茸</text>
+    <text class="detail-state__title">没有找到这项服务</text>
+    <text class="detail-state__body">链接可能已经变化，请从当前服务目录重新选择。</text>
+    <button class="primary-button" bindtap="goCatalog">查看服务目录</button>
+  </view>
+
+  <block wx:else>
+    <view wx:if="{{refreshing}}" class="detail-refreshing">正在更新服务详情…</view>
+    <view class="detail-hero">
+      <image class="detail-hero__image" src="{{service.imagePath}}" mode="aspectFill" />
+      <view class="detail-hero__veil"></view>
+      <view class="detail-hero__content">
+        <text class="detail-hero__species">{{service.speciesLabel}}</text>
+        <text class="detail-hero__title">{{service.name}}</text>
+        <text class="detail-hero__body">{{service.description}}</text>
+      </view>
+    </view>
+
+    <view class="detail-section">
+      <view class="detail-section__heading">
+        <text>确定服务规格</text>
+        <text>按当前体重自动匹配体型</text>
+      </view>
+      <view class="detail-specs">
+        <view class="detail-spec" wx:for="{{service.specifications}}" wx:key="petSize">
+          <view class="detail-spec__size">
+            <text>{{item.petSizeLabel}}</text>
+            <text wx:if="{{item.petSize === 'small'}}">不超过 10kg</text>
+            <text wx:elif="{{item.petSize === 'medium'}}">超过 10kg 且不超过 25kg</text>
+            <text wx:else>超过 25kg</text>
+          </view>
+          <view class="detail-spec__facts">
+            <text>{{item.priceLabel}}</text>
+            <text>{{item.durationLabel}}</text>
+          </view>
+        </view>
+      </view>
+    </view>
+
+    <view class="detail-section">
+      <view class="detail-section__heading">
+        <text>可选增项 · {{addons.length}}</text>
+        <text>由同一员工连续完成</text>
+      </view>
+      <view wx:if="{{addons.length === 0}}" class="detail-addons-empty">这项主要服务当前没有可选增项。</view>
+      <view wx:else class="detail-addons">
+        <view class="detail-addon" wx:for="{{addons}}" wx:key="id">
+          <view class="detail-addon__heading">
+            <view>
+              <text>{{item.name}}</text>
+              <text>{{item.speciesLabel}}</text>
+            </view>
+            <text>可选</text>
+          </view>
+          <text class="detail-addon__body">{{item.description}}</text>
+          <view class="detail-addon__spec" wx:for="{{item.specifications}}" wx:for-item="spec" wx:key="petSize">
+            <text>{{spec.petSizeLabel}}</text>
+            <text>+{{spec.priceLabel}} · +{{spec.durationLabel}}</text>
+          </view>
+        </view>
+      </view>
+    </view>
+
+    <view class="detail-promise">
+      <text>预约前即可确定</text>
+      <text>适用犬猫、体型、价格和服务时长均以当前目录为准，选择规格时即可确定。</text>
+    </view>
+    <button class="detail-primary" bindtap="goCatalog">浏览其他服务</button>
+  </block>
+</view>

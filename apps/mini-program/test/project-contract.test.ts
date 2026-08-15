@@ -60,4 +60,20 @@ describe("原生小程序项目契约", () => {
       ) ?? []),
     ]);
   });
+
+  it("MP-02 服务列表与详情是可直接打开并可刷新恢复的独立原生页面", async () => {
+    const appConfig = JSON.parse(
+      await readFile(new URL("../miniprogram/app.json", import.meta.url), "utf8"),
+    ) as { pages: string[] };
+    const servicePages = ["pages/services/index", "pages/service-detail/index"];
+
+    expect(appConfig.pages).toEqual(expect.arrayContaining(servicePages));
+    await Promise.all(
+      servicePages.flatMap((page) =>
+        ["ts", "json", "wxml", "wxss"].map((extension) =>
+          access(new URL(`../miniprogram/${page}.${extension}`, import.meta.url)),
+        ),
+      ),
+    );
+  });
 });

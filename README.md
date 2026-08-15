@@ -2,7 +2,7 @@
 
 “茸光宠物洗护”是一个公开源码、仅承诺本地运行的单门店作品集案例。正式应用由三部分组成：原生 TypeScript 微信小程序、React/Vite 响应式后台，以及 NestJS/Fastify REST API。PostgreSQL 是唯一的 Docker 服务，Node 应用在宿主机保留热更新。
 
-当前完成 ticket 01 的可启动骨架、ticket 02 的后台演示账号与角色路由，以及 ticket 03 的小程序演示顾客 Bearer 会话与四个原生 tab 页面，不包含预约业务。真实微信登录、订阅消息、支付和生产运维不在本地演示能力内。
+当前完成 ticket 01 的可启动骨架、ticket 02 的后台演示账号与角色路由、ticket 03 的小程序演示顾客 Bearer 会话，以及 ticket 04 的门店首页与确定价格服务目录；预约创建业务尚未开放。真实微信登录、订阅消息、支付和生产运维不在本地演示能力内。
 
 ## 环境要求
 
@@ -121,6 +121,8 @@ product-ui/      设计稿与交互原型，只作为实现依据
 ```
 
 小程序不复用 Web 组件。页面实现必须先登记真实路由，格式和当前映射见 [`docs/route-map.md`](docs/route-map.md)。
+
+门店首页可进入 `pages/services/index` 浏览三个主要服务与三个增项；主要服务卡可直接打开 `pages/service-detail/index?id=<serviceId>`。目录价格由 `GET /miniapp/storefront` 返回，金额单位为人民币分，小程序只负责格式化展示，不包含支付或到店议价。
 
 ## 本地演示边界
 

@@ -1,0 +1,98 @@
+<view class="catalog-page">
+  <view class="catalog-heading">
+    <text class="catalog-heading__eyebrow">茸光 · 价格透明</text>
+    <text class="catalog-heading__title">洗护服务</text>
+    <text class="catalog-heading__body">按犬猫与体型查看确定价格和服务时长，预约前就能清楚选择。</text>
+  </view>
+
+  <view wx:if="{{errorMessage}}" class="query-banner" role="alert">
+    <view>
+      <text class="query-banner__title">服务更新失败</text>
+      <text class="query-banner__body">{{errorMessage}} 已显示的服务信息会继续保留。</text>
+    </view>
+    <button class="query-banner__action" bindtap="retry">重试</button>
+  </view>
+
+  <view wx:if="{{catalogState === 'loading'}}" class="catalog-loading" aria-label="服务加载中">
+    <view class="loading-card" wx:for="{{[1, 2, 3]}}" wx:key="*this">
+      <view class="loading-card__image"></view>
+      <view class="loading-card__body">
+        <view></view>
+        <view></view>
+        <view></view>
+      </view>
+    </view>
+  </view>
+
+  <view wx:elif="{{catalogState === 'error'}}" class="catalog-state surface-card">
+    <text class="catalog-state__mark">!</text>
+    <text class="catalog-state__title">服务暂时没有加载出来</text>
+    <text class="catalog-state__body">{{errorMessage}} 这不是“暂无服务”，可以稍后重试。</text>
+    <button class="primary-button" bindtap="retry">重新加载服务</button>
+  </view>
+
+  <view wx:elif="{{catalogState === 'empty'}}" class="catalog-state surface-card">
+    <text class="catalog-state__mark">茸</text>
+    <text class="catalog-state__title">当前没有可浏览的主要服务</text>
+    <text class="catalog-state__body">门店目录为空时不会显示虚构价格，请稍后再来看看。</text>
+    <button class="secondary-button" bindtap="retry">刷新目录</button>
+  </view>
+
+  <block wx:else>
+    <view wx:if="{{refreshing}}" class="refreshing-note">正在更新门店服务…</view>
+    <view class="catalog-section-heading">
+      <text>主要服务 · {{primaryServices.length}}</text>
+      <text>金额均为确定标价</text>
+    </view>
+    <view class="service-list">
+      <navigator
+        class="service-card"
+        wx:for="{{primaryServices}}"
+        wx:key="id"
+        url="/pages/service-detail/index?id={{item.id}}"
+        hover-class="service-card--pressed"
+      >
+        <image class="service-card__image" src="{{item.imagePath}}" mode="aspectFill" />
+        <view class="service-card__content">
+          <view class="service-card__topline">
+            <text class="service-card__species">{{item.speciesLabel}}</text>
+            <text class="service-card__link">查看详情 ›</text>
+          </view>
+          <text class="service-card__title">{{item.name}}</text>
+          <text class="service-card__description">{{item.description}}</text>
+          <view class="spec-table">
+            <view class="spec-table__row" wx:for="{{item.specifications}}" wx:for-item="spec" wx:key="petSize">
+              <text>{{spec.petSizeLabel}}</text>
+              <text class="spec-table__price">{{spec.priceLabel}}</text>
+              <text>{{spec.durationLabel}}</text>
+            </view>
+          </view>
+        </view>
+      </navigator>
+    </view>
+
+    <view class="catalog-section-heading catalog-section-heading--addons">
+      <text>可选增项 · {{addons.length}}</text>
+      <text>与主要服务连续完成</text>
+    </view>
+    <view class="addon-list">
+      <view class="addon-card" wx:for="{{addons}}" wx:key="id">
+        <view class="addon-card__heading">
+          <view>
+            <text class="addon-card__name">{{item.name}}</text>
+            <text class="addon-card__species">{{item.speciesLabel}}</text>
+          </view>
+          <text class="addon-card__count">3 种体型</text>
+        </view>
+        <text class="addon-card__description">{{item.description}}</text>
+        <view class="addon-card__specs">
+          <view wx:for="{{item.specifications}}" wx:for-item="spec" wx:key="petSize">
+            <text>{{spec.petSizeLabel}}</text>
+            <text class="addon-card__spec-value">{{spec.priceLabel}} · {{spec.durationLabel}}</text>
+          </view>
+        </view>
+      </view>
+    </view>
+    <view class="catalog-note">所有金额均为当前服务标价，预约前即可确定对应规格。</view>
+  </block>
+</view>

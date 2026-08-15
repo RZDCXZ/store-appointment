@@ -3,7 +3,9 @@
     "pages/home/index",
     "pages/appointments/index",
     "pages/messages/index",
-    "pages/profile/index"
+    "pages/profile/index",
+    "pages/services/index",
+    "pages/service-detail/index"
   ],
   "window": {
     "backgroundColor": "#F6F1E7",

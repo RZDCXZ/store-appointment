@@ -1,4 +1,5 @@
 import { restoreCustomerSession } from "./services/customer-session";
+import type { RongguangApp } from "./types/customer";
 
 App({
   globalData: {
@@ -7,6 +8,6 @@ App({
     customerSessionStatus: "missing",
   },
   onLaunch() {
-    restoreCustomerSession();
+    restoreCustomerSession(this.globalData as RongguangApp["globalData"]);
   },
 });

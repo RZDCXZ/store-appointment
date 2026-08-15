@@ -22,7 +22,18 @@ const requiredFiles = [
   "miniprogram/pages/profile/index.ts",
   "miniprogram/pages/profile/index.wxml",
   "miniprogram/pages/profile/index.wxss",
+  "miniprogram/pages/services/index.json",
+  "miniprogram/pages/services/index.ts",
+  "miniprogram/pages/services/index.wxml",
+  "miniprogram/pages/services/index.wxss",
+  "miniprogram/pages/service-detail/index.json",
+  "miniprogram/pages/service-detail/index.ts",
+  "miniprogram/pages/service-detail/index.wxml",
+  "miniprogram/pages/service-detail/index.wxss",
   "miniprogram/templates/customer-auth-prompt.wxml",
+  "miniprogram/assets/brand/pet-tuanzi-shiba.png",
+  "miniprogram/assets/brand/pet-lizi-golden.png",
+  "miniprogram/assets/brand/pet-bohe-british-shorthair.png",
   "miniprogram/assets/promises/employee.png",
   "miniprogram/assets/promises/price.png",
   "miniprogram/assets/promises/checkin.png",
@@ -39,10 +50,12 @@ export async function verifyProject() {
     "pages/appointments/index",
     "pages/messages/index",
     "pages/profile/index",
+    "pages/services/index",
+    "pages/service-detail/index",
   ];
 
   if (!requiredPages.every((page) => appConfig.pages?.includes(page))) {
-    throw new Error("miniprogram/app.json 必须登记四个顾客 tab 页面。");
+    throw new Error("miniprogram/app.json 必须登记四个顾客 tab 与两个服务目录页面。");
   }
 
   console.info(`原生小程序项目结构检查通过：${requiredPages.join("、")}`);
