@@ -1,23 +1,79 @@
 import { useState } from "react";
 import { NavLink, Outlet, useLocation, useNavigate } from "react-router-dom";
+import {
+  backofficeNavigation,
+  type BackofficeNavigationKey,
+  type BackofficeRole,
+} from "@rongguang/contracts";
 
 import type { BackofficeAccount } from "./api";
 import { useAuth } from "./auth-context";
+import { formatShanghaiDemoTime } from "./demo-time";
 
-const managerNavigation = [
-  { to: "/manager/workbench", label: "工作台", icon: "▦" },
-  { to: "/manager/appointments", label: "预约", icon: "□" },
-  { to: "/manager/schedule", label: "排班", icon: "◷" },
-  { to: "/manager/services", label: "服务", icon: "◇" },
-  { to: "/manager/customers", label: "顾客", icon: "○" },
-  { to: "/manager/business", label: "经营", icon: "⌁" },
-  { to: "/manager/system", label: "系统", icon: "☷" },
-];
+function navigationPath(role: BackofficeRole, key: BackofficeNavigationKey): string {
+  return `/${role}/${key}`;
+}
 
-const staffNavigation = [
-  { to: "/staff/today", label: "今日工作", icon: "▦" },
-  { to: "/staff/appointments", label: "我的预约", icon: "□" },
-];
+function NavigationIcon({ name }: { name: BackofficeNavigationKey }): React.JSX.Element {
+  const shapes: Record<BackofficeNavigationKey, React.JSX.Element> = {
+    workbench: (
+      <>
+        <rect x="3" y="3" width="7" height="7" rx="1" />
+        <rect x="14" y="3" width="7" height="7" rx="1" />
+        <rect x="3" y="14" width="7" height="7" rx="1" />
+        <rect x="14" y="14" width="7" height="7" rx="1" />
+      </>
+    ),
+    today: (
+      <>
+        <path d="m3 11 9-8 9 8" />
+        <path d="M5 10v11h14V10M9 21v-7h6v7" />
+      </>
+    ),
+    appointments: (
+      <>
+        <path d="M6 2v4M18 2v4M3 9h18" />
+        <rect x="3" y="4" width="18" height="17" rx="2" />
+        <path d="m8 15 2 2 5-5" />
+      </>
+    ),
+    schedule: (
+      <>
+        <circle cx="12" cy="12" r="9" />
+        <path d="M12 7v5l3 2" />
+      </>
+    ),
+    services: (
+      <>
+        <path d="m4 19 6-6M14 9l6-6M14 3l6 6" />
+        <circle cx="6" cy="6" r="3" />
+        <circle cx="18" cy="18" r="3" />
+        <path d="m8 8 8 8" />
+      </>
+    ),
+    customers: (
+      <>
+        <circle cx="9" cy="8" r="3" />
+        <path d="M3 20c0-3.3 2.7-6 6-6s6 2.7 6 6M16 5a3 3 0 0 1 0 6M17 14c2 .7 4 2.8 4 5" />
+      </>
+    ),
+    business: <path d="M4 20V10M10 20V4M16 20v-7M22 20H2" />,
+    system: (
+      <>
+        <path d="M4 6h10M18 6h2M4 12h2M10 12h10M4 18h8M16 18h4" />
+        <circle cx="16" cy="6" r="2" />
+        <circle cx="8" cy="12" r="2" />
+        <circle cx="14" cy="18" r="2" />
+      </>
+    ),
+  };
+
+  return (
+    <svg className="nav-item__icon" viewBox="0 0 24 24" aria-hidden="true">
+      {shapes[name]}
+    </svg>
+  );
+}
 
 export interface BackofficeOutletContext {
   account: BackofficeAccount;
@@ -28,8 +84,12 @@ export function BackofficeLayout({ account }: { account: BackofficeAccount }): R
   const navigate = useNavigate();
   const location = useLocation();
   const [logoutError, setLogoutError] = useState("");
-  const navigation = account.role === "manager" ? managerNavigation : staffNavigation;
+  const navigation = backofficeNavigation[account.role].map((item) => ({
+    ...item,
+    to: navigationPath(account.role, item.key),
+  }));
   const roleLabel = account.role === "manager" ? "店长后台" : "员工工作台";
+  const demoTime = formatShanghaiDemoTime(import.meta.env.VITE_DEMO_NOW);
 
   async function logout(): Promise<void> {
     setLogoutError("");
@@ -61,9 +121,7 @@ export function BackofficeLayout({ account }: { account: BackofficeAccount }): R
                   className={({ isActive }) => `nav-item${isActive ? " nav-item--active" : ""}`}
                   to={item.to}
                 >
-                  <span className="nav-item__icon" aria-hidden="true">
-                    {item.icon}
-                  </span>
+                  <NavigationIcon name={item.key} />
                   {item.label}
                 </NavLink>
               </li>
@@ -94,6 +152,7 @@ export function BackofficeLayout({ account }: { account: BackofficeAccount }): R
       <div className="workspace">
         <header className="demo-banner">
           <strong>本地演示模式</strong>
+          <span>{demoTime ?? "演示时间跟随当前系统时间"}</span>
           <span>身份由服务端会话确认</span>
           <span className="demo-banner__route">{location.pathname}</span>
         </header>

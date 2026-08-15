@@ -1,13 +1,7 @@
 import type { FastifyRequest } from "fastify";
+import type { BackofficeAccount } from "@rongguang/contracts";
 
-export type BackofficeRole = "manager" | "staff";
-
-export interface BackofficeIdentity {
-  id: string;
-  username: string;
-  displayName: string;
-  role: BackofficeRole;
-}
+export type BackofficeIdentity = BackofficeAccount;
 
 export interface AuthenticatedRequest extends FastifyRequest {
   backofficeIdentity: BackofficeIdentity;

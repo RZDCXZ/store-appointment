@@ -23,7 +23,7 @@ export function readSessionToken(cookieHeader: string | undefined): string | nul
 }
 
 export function createSessionCookie(token: string): string {
-  return `${backofficeSessionCookieName}=${encodeURIComponent(token)}; Path=/; HttpOnly; SameSite=Lax; Max-Age=43200`;
+  return `${backofficeSessionCookieName}=${encodeURIComponent(token)}; Path=/; HttpOnly; SameSite=Lax`;
 }
 
 export function clearSessionCookie(): string {

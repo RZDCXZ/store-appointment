@@ -28,6 +28,7 @@ function jsonResponse(body: unknown, status = 200): Response {
 describe("后台登录与角色路由", () => {
   beforeEach(() => {
     vi.stubEnv("VITE_API_BASE_URL", "http://localhost:4100");
+    vi.stubEnv("VITE_DEMO_NOW", "2026-08-13T02:50:00.000Z");
   });
 
   afterEach(() => {
@@ -64,6 +65,19 @@ describe("后台登录与角色路由", () => {
     );
   });
 
+  it("身份检查期间使用与后台布局一致的骨架屏", () => {
+    vi.spyOn(globalThis, "fetch").mockImplementation(() => new Promise(() => undefined));
+    const router = createMemoryRouter(routes, { initialEntries: ["/manager/workbench"] });
+
+    render(<RouterProvider router={router} />);
+
+    expect(screen.getByLabelText("正在确认店长后台身份")).toHaveClass(
+      "backoffice-shell",
+      "backoffice-skeleton",
+    );
+    expect(screen.getByRole("navigation", { name: "店长导航加载中" })).toBeVisible();
+  });
+
   it("店长登录后恢复目标路由且只看到店长导航", async () => {
     vi.spyOn(globalThis, "fetch")
       .mockResolvedValueOnce(jsonResponse({ code: "UNAUTHENTICATED" }, 401))
@@ -74,6 +88,7 @@ describe("后台登录与角色路由", () => {
 
     render(<RouterProvider router={router} />);
     await screen.findByRole("heading", { name: "欢迎回来" });
+    await waitFor(() => expect(screen.getByRole("button", { name: "进入管理端" })).toBeEnabled());
     fireEvent.change(screen.getByLabelText("演示密码"), {
       target: { value: "Rongguang2026!" },
     });
@@ -83,11 +98,57 @@ describe("后台登录与角色路由", () => {
     expect(
       within(screen.getByRole("navigation", { name: "店长导航" }))
         .getAllByRole("link")
-        .map((link) => link.textContent?.trim().replace(/^./, "")),
+        .map((link) => link.textContent?.trim()),
     ).toEqual(["工作台", "预约", "排班", "服务", "顾客", "经营", "系统"]);
+    expect(screen.getByText(/上海演示时间：2026年8月13日.*10:50/)).toBeVisible();
     expect(screen.queryByText("今日工作")).not.toBeInTheDocument();
     expect(router.state.location.pathname).toBe("/manager/system");
     expect(router.state.location.search).toBe("?tab=audit");
+  });
+
+  it("店长工作台保留 API 健康状态并可就地重试", async () => {
+    let healthAttempts = 0;
+    vi.spyOn(globalThis, "fetch").mockImplementation(async (input) => {
+      const url = String(input);
+
+      if (url.endsWith("/auth/session")) {
+        return jsonResponse({ account: managerAccount });
+      }
+
+      if (url.endsWith("/backoffice/manager/workbench")) {
+        return jsonResponse({ account: managerAccount, navigation: ["工作台"] });
+      }
+
+      if (url.endsWith("/health")) {
+        healthAttempts += 1;
+
+        if (healthAttempts === 1) {
+          throw new Error("API 暂时离线");
+        }
+
+        return jsonResponse({
+          database: "ready",
+          service: "rongguang-api",
+          status: "ok",
+          timestamp: "2026-08-13T02:50:00.000Z",
+        });
+      }
+
+      throw new Error(`未处理的测试请求：${url}`);
+    });
+    const router = createMemoryRouter(routes, { initialEntries: ["/manager/workbench"] });
+
+    render(<RouterProvider router={router} />);
+
+    expect(await screen.findByText("API 暂时离线")).toBeVisible();
+    fireEvent.click(screen.getByRole("button", { name: "重新检查基础服务" }));
+
+    expect(await screen.findByText("API 与数据库已就绪")).toBeVisible();
+    expect(screen.getByRole("link", { name: "查看 OpenAPI" })).toHaveAttribute(
+      "href",
+      "http://localhost:4100/docs",
+    );
+    expect(healthAttempts).toBe(2);
   });
 
   it("员工登录后进入本人落地页且只看到员工导航", async () => {
@@ -101,6 +162,7 @@ describe("后台登录与角色路由", () => {
 
     render(<RouterProvider router={router} />);
     await screen.findByRole("heading", { name: "欢迎回来" });
+    await waitFor(() => expect(screen.getByRole("button", { name: "进入管理端" })).toBeEnabled());
     fireEvent.change(screen.getByRole("combobox", { name: "演示账号" }), {
       target: { value: "linxia" },
     });
@@ -113,7 +175,7 @@ describe("后台登录与角色路由", () => {
     expect(
       within(screen.getByRole("navigation", { name: "员工导航" }))
         .getAllByRole("link")
-        .map((link) => link.textContent?.trim().replace(/^./, "")),
+        .map((link) => link.textContent?.trim()),
     ).toEqual(["今日工作", "我的预约"]);
     expect(screen.queryByText("经营")).not.toBeInTheDocument();
     expect(router.state.location.pathname).toBe("/staff/today");

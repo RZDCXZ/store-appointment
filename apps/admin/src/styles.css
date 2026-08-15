@@ -120,7 +120,7 @@ p {
 .login-brand {
   position: relative;
   min-height: 650px;
-  padding: 42px;
+  padding: 40px;
   overflow: hidden;
   background: var(--canvas);
 }
@@ -173,7 +173,7 @@ p {
 
 .login-copy {
   max-width: 510px;
-  margin-top: clamp(120px, 19vh, 210px);
+  margin-top: clamp(120px, 19vh, 208px);
 }
 
 .demo-pill,
@@ -181,7 +181,7 @@ p {
   display: inline-flex;
   min-height: 28px;
   align-items: center;
-  padding: 0 10px;
+  padding: 0 12px;
   border-radius: 999px;
   color: var(--sage-700);
   background: var(--sage-100);
@@ -191,7 +191,7 @@ p {
 
 .login-copy h2 {
   max-width: 8.8em;
-  margin: 20px 0 14px;
+  margin: 20px 0 16px;
   color: var(--sage-900);
   font-size: clamp(38px, 4.2vw, 62px);
   font-weight: 650;
@@ -229,11 +229,11 @@ p {
 }
 
 .login-form > .eyebrow {
-  margin-bottom: 10px;
+  margin-bottom: 12px;
 }
 
 .login-form h1 {
-  margin-bottom: 9px;
+  margin-bottom: 8px;
   font-size: 32px;
   letter-spacing: -0.035em;
 }
@@ -248,7 +248,7 @@ p {
 .field {
   display: grid;
   gap: 8px;
-  margin-top: 17px;
+  margin-top: 16px;
 }
 
 .field > label {
@@ -260,8 +260,8 @@ p {
 .field input,
 .field select {
   width: 100%;
-  min-height: 50px;
-  padding: 0 13px;
+  min-height: 48px;
+  padding: 0 12px;
   border: 1px solid var(--line-200);
   border-radius: 11px;
   background: var(--surface-strong);
@@ -279,7 +279,7 @@ p {
 
 .field small {
   color: var(--ink-500);
-  font-size: 11px;
+  font-size: 12px;
   line-height: 1.5;
 }
 
@@ -289,24 +289,35 @@ p {
 
 .login-submit {
   width: 100%;
-  margin-top: 22px;
+  margin-top: 24px;
 }
 
 .login-note {
   display: flex;
   align-items: flex-start;
   gap: 8px;
-  margin: 18px 0 0;
+  margin: 16px 0 0;
   color: var(--ink-500);
-  font-size: 11px;
+  font-size: 12px;
   line-height: 1.6;
+}
+
+.login-note svg {
+  width: 20px;
+  height: 20px;
+  flex: 0 0 auto;
+  fill: none;
+  stroke: currentColor;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 1.7;
 }
 
 .auth-notice {
   display: grid;
   gap: 4px;
-  margin: 14px 0;
-  padding: 12px 14px;
+  margin: 16px 0;
+  padding: 12px 16px;
   border-radius: 10px;
   color: var(--ink-700);
   font-size: 12px;
@@ -330,8 +341,9 @@ p {
 }
 
 .auth-notice button {
+  min-height: 44px;
+  padding: 0 8px;
   justify-self: start;
-  padding: 0;
   border: 0;
   color: inherit;
   background: transparent;
@@ -362,15 +374,15 @@ p {
 .brand-mark {
   display: flex;
   align-items: center;
-  gap: 11px;
+  gap: 12px;
   padding: 0 8px;
   color: var(--sage-700);
   text-decoration: none;
 }
 
 .brand-mark__glow {
-  width: 38px;
-  height: 38px;
+  width: 40px;
+  height: 40px;
   flex: 0 0 auto;
   border: 1px solid rgb(63 98 83 / 30%);
   border-radius: 50% 46% 52% 44%;
@@ -390,22 +402,22 @@ p {
 }
 
 .brand-mark small {
-  margin-top: 2px;
+  margin-top: 4px;
   color: var(--ink-600);
-  font-size: 10px;
+  font-size: 12px;
   letter-spacing: 0.1em;
 }
 
 .role-label {
-  margin: 27px 12px 9px;
+  margin: 28px 12px 8px;
   color: var(--ink-500);
-  font-size: 11px;
+  font-size: 12px;
   letter-spacing: 0.08em;
 }
 
 .sidebar nav ul {
   display: grid;
-  gap: 6px;
+  gap: 8px;
   margin: 0;
   padding: 0;
   list-style: none;
@@ -413,10 +425,10 @@ p {
 
 .nav-item {
   display: flex;
-  min-height: 46px;
+  min-height: 48px;
   align-items: center;
   gap: 12px;
-  padding: 0 13px;
+  padding: 0 12px;
   border-radius: 10px;
   color: var(--ink-700);
   font-size: 14px;
@@ -434,20 +446,21 @@ p {
 }
 
 .nav-item__icon {
-  display: grid;
-  width: 22px;
-  height: 22px;
+  width: 20px;
+  height: 20px;
   flex: 0 0 auto;
-  place-items: center;
-  font-family: ui-monospace, monospace;
-  font-size: 16px;
+  fill: none;
+  stroke: currentColor;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 1.7;
 }
 
 .identity-card {
   display: grid;
   align-items: center;
-  gap: 9px;
-  grid-template-columns: 38px minmax(0, 1fr);
+  gap: 8px;
+  grid-template-columns: 40px minmax(0, 1fr);
   margin-top: auto;
   padding: 16px 8px 8px;
   border-top: 1px solid var(--line-light);
@@ -455,8 +468,8 @@ p {
 
 .identity-avatar {
   display: grid;
-  width: 38px;
-  height: 38px;
+  width: 40px;
+  height: 40px;
   border-radius: 50%;
   color: var(--sage-700);
   background: var(--sage-100);
@@ -474,13 +487,13 @@ p {
 }
 
 .identity-card small {
-  margin-top: 3px;
+  margin-top: 4px;
   color: var(--ink-500);
-  font-size: 10px;
+  font-size: 12px;
 }
 
 .logout-button {
-  min-height: 36px;
+  min-height: 44px;
   border: 0;
   color: var(--ink-500);
   background: transparent;
@@ -495,7 +508,7 @@ p {
 .sidebar-error {
   margin: 4px 8px;
   color: var(--danger-700);
-  font-size: 10px;
+  font-size: 12px;
 }
 
 .workspace {
@@ -522,13 +535,13 @@ p {
 .demo-banner__route {
   margin-left: auto;
   font-family: ui-monospace, "SFMono-Regular", Consolas, monospace;
-  font-size: 11px;
+  font-size: 12px;
 }
 
 .page-shell {
   width: min(1240px, 100%);
   margin: 0 auto;
-  padding: 34px 32px 56px;
+  padding: 32px 32px 56px;
 }
 
 .page-heading {
@@ -536,7 +549,7 @@ p {
   align-items: flex-end;
   justify-content: space-between;
   gap: 24px;
-  padding-bottom: 22px;
+  padding-bottom: 24px;
   border-bottom: 1px solid var(--line-200);
 }
 
@@ -562,14 +575,14 @@ p {
 
 .page-heading div > span {
   display: block;
-  margin-top: 7px;
+  margin-top: 8px;
   color: var(--ink-600);
   font-size: 13px;
 }
 
 .landing-status {
   margin: 20px 0 0;
-  padding: 13px 15px;
+  padding: 12px 16px;
   border: 1px solid var(--line-200);
   border-radius: 10px;
   color: var(--ink-600);
@@ -583,6 +596,20 @@ p {
   background: var(--sage-50);
 }
 
+.landing-status--ready:has(a) {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.landing-status--ready a {
+  min-height: 44px;
+  align-content: center;
+  color: inherit;
+  font-weight: 700;
+  text-underline-offset: 4px;
+}
+
 .landing-status--error {
   display: flex;
   align-items: center;
@@ -593,6 +620,8 @@ p {
 }
 
 .landing-status button {
+  min-height: 44px;
+  padding: 0 8px;
   border: 0;
   color: inherit;
   background: transparent;
@@ -614,7 +643,7 @@ p {
 
 .welcome-panel > div:first-child {
   align-self: center;
-  padding: clamp(30px, 5vw, 64px);
+  padding: clamp(32px, 5vw, 64px);
 }
 
 .welcome-panel h2 {
@@ -646,7 +675,7 @@ p {
 .staff-welcome {
   display: flex;
   align-items: center;
-  gap: 22px;
+  gap: 24px;
   margin-top: 24px;
   padding: 28px;
   border: 1px solid var(--line-200);
@@ -674,7 +703,7 @@ p {
 
 .placeholder-panel p,
 .staff-welcome > p:last-child {
-  margin-top: 7px;
+  margin-top: 8px;
   color: var(--ink-600);
   font-size: 13px;
   line-height: 1.65;
@@ -707,7 +736,7 @@ p {
 
 .centered-state h1,
 .route-error h1 {
-  margin: 6px 0 10px;
+  margin: 8px 0 12px;
 }
 
 .centered-state > p:not(.state-code),
@@ -752,6 +781,77 @@ p {
   }
 }
 
+/* Authenticated route skeleton keeps the final layout stable while the session is checked. */
+
+.skeleton-block {
+  display: block;
+  border-radius: 8px;
+  background: linear-gradient(100deg, var(--sage-100) 20%, var(--sage-50) 40%, var(--sage-100) 60%);
+  background-size: 200% 100%;
+  animation: skeleton-shimmer 1.4s ease-in-out infinite;
+}
+
+.skeleton-brand {
+  width: 128px;
+  height: 40px;
+  margin: 0 8px;
+}
+
+.skeleton-role {
+  width: 64px;
+  height: 12px;
+  margin: 28px 12px 8px;
+}
+
+.skeleton-nav {
+  width: 100%;
+  height: 44px;
+}
+
+.skeleton-identity {
+  width: calc(100% - 16px);
+  height: 48px;
+  margin: auto 8px 44px;
+}
+
+.skeleton-banner {
+  width: min(360px, 64%);
+  height: 16px;
+}
+
+.skeleton-heading {
+  width: min(520px, 72%);
+}
+
+.skeleton-eyebrow {
+  width: 96px;
+  height: 12px;
+}
+
+.skeleton-title {
+  width: min(320px, 80%);
+  height: 40px;
+  margin-top: 16px;
+}
+
+.skeleton-copy {
+  width: 100%;
+  height: 16px;
+  margin-top: 12px;
+}
+
+.skeleton-panel {
+  width: 100%;
+  min-height: 320px;
+  margin-top: 24px;
+}
+
+@keyframes skeleton-shimmer {
+  to {
+    background-position: -200% 0;
+  }
+}
+
 @media (max-width: 800px) {
   .backoffice-shell {
     grid-template-columns: 1fr;
@@ -768,7 +868,7 @@ p {
   }
 
   .role-label {
-    margin: 16px 0 7px;
+    margin: 16px 0 8px;
   }
 
   .sidebar nav ul {
@@ -790,7 +890,7 @@ p {
 
   .demo-banner {
     justify-content: flex-start;
-    padding-inline: 18px;
+    padding-inline: 16px;
   }
 
   .demo-banner__route {
@@ -798,7 +898,7 @@ p {
   }
 
   .page-shell {
-    padding: 26px 18px 42px;
+    padding: 24px 16px 40px;
   }
 
   .welcome-panel {
@@ -827,7 +927,7 @@ p {
   .login-panel {
     min-height: 100dvh;
     align-items: start;
-    padding: 28px 18px max(28px, env(safe-area-inset-bottom));
+    padding: 28px 16px max(28px, env(safe-area-inset-bottom));
   }
 
   .login-form {
@@ -845,7 +945,7 @@ p {
   .page-heading {
     align-items: flex-start;
     flex-direction: column;
-    gap: 14px;
+    gap: 16px;
   }
 
   .placeholder-panel {
@@ -862,13 +962,13 @@ p {
 
   .backoffice-shell--staff .nav-item {
     justify-content: center;
-    padding-inline: 9px;
+    padding-inline: 8px;
   }
 
   .demo-banner {
     align-items: flex-start;
     flex-direction: column;
-    gap: 3px;
+    gap: 4px;
   }
 }
 

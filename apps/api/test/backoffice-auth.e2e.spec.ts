@@ -164,6 +164,8 @@ describe("后台演示账号与角色 API 边界", () => {
       [tokenHash],
     );
 
+    await login(app, "manager");
+
     const response = await app.inject({
       method: "GET",
       url: "/auth/session",
@@ -172,5 +174,16 @@ describe("后台演示账号与角色 API 边界", () => {
 
     expect(response.statusCode).toBe(401);
     expect(response.json()).toMatchObject({ code: "SESSION_EXPIRED" });
+  });
+
+  it("未登录退出也会安全清理浏览器 Cookie", async () => {
+    const response = await app.inject({
+      method: "POST",
+      url: "/auth/logout",
+      headers: { origin: adminOrigin },
+    });
+
+    expect(response.statusCode).toBe(204);
+    expect(response.headers["set-cookie"]).toEqual(expect.stringMatching(/Max-Age=0/));
   });
 });

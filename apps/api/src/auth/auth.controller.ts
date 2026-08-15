@@ -12,6 +12,7 @@ import {
   UseGuards,
 } from "@nestjs/common";
 import { ApiOperation, ApiTags } from "@nestjs/swagger";
+import type { BackofficeAuthResponse } from "@rongguang/contracts";
 import type { FastifyReply, FastifyRequest } from "fastify";
 
 import { readSessionToken, clearSessionCookie, createSessionCookie } from "./session-cookie.js";
@@ -34,7 +35,7 @@ export class AuthController {
   async login(
     @Body() body: LoginBody,
     @Res({ passthrough: true }) reply: FastifyReply,
-  ): Promise<{ account: Awaited<ReturnType<SessionService["authenticate"]>> }> {
+  ): Promise<BackofficeAuthResponse> {
     if (
       typeof body.username !== "string" ||
       typeof body.password !== "string" ||
@@ -78,7 +79,6 @@ export class AuthController {
 
   @Post("logout")
   @HttpCode(HttpStatus.NO_CONTENT)
-  @UseGuards(SessionGuard)
   @ApiOperation({ summary: "退出当前后台会话" })
   async logout(
     @Req() request: FastifyRequest,

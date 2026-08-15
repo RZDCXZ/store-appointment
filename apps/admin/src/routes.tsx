@@ -1,14 +1,16 @@
 import { createBrowserRouter, Navigate, Outlet, type RouteObject } from "react-router-dom";
 
 import { AuthProvider } from "./auth-context";
-import {
-  ManagerWorkbenchPage,
-  PlaceholderPage,
-  StaffAppointmentsPage,
-  StaffTodayPage,
-  managerPages,
-} from "./backoffice-pages";
 import { LoginPage } from "./login-page";
+import { ManagerAppointmentsPage } from "./pages/manager/appointments-page";
+import { ManagerBusinessPage } from "./pages/manager/business-page";
+import { ManagerCustomersPage } from "./pages/manager/customers-page";
+import { ManagerSchedulePage } from "./pages/manager/schedule-page";
+import { ManagerServicesPage } from "./pages/manager/services-page";
+import { ManagerSystemPage } from "./pages/manager/system-page";
+import { ManagerWorkbenchPage } from "./pages/manager/workbench-page";
+import { StaffAppointmentsPage } from "./pages/staff/appointments-page";
+import { StaffTodayPage } from "./pages/staff/today-page";
 import { RoleBoundary, RootRedirect } from "./protected-route";
 
 function AppRoot(): React.JSX.Element {
@@ -42,15 +44,12 @@ export const routes: RouteObject[] = [
         children: [
           { index: true, element: <Navigate to="workbench" replace /> },
           { path: "workbench", element: <ManagerWorkbenchPage /> },
-          {
-            path: "appointments",
-            element: <PlaceholderPage copy={managerPages.appointments} />,
-          },
-          { path: "schedule", element: <PlaceholderPage copy={managerPages.schedule} /> },
-          { path: "services", element: <PlaceholderPage copy={managerPages.services} /> },
-          { path: "customers", element: <PlaceholderPage copy={managerPages.customers} /> },
-          { path: "business", element: <PlaceholderPage copy={managerPages.business} /> },
-          { path: "system", element: <PlaceholderPage copy={managerPages.system} /> },
+          { path: "appointments", element: <ManagerAppointmentsPage /> },
+          { path: "schedule", element: <ManagerSchedulePage /> },
+          { path: "services", element: <ManagerServicesPage /> },
+          { path: "customers", element: <ManagerCustomersPage /> },
+          { path: "business", element: <ManagerBusinessPage /> },
+          { path: "system", element: <ManagerSystemPage /> },
         ],
       },
       {

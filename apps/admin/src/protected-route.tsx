@@ -2,6 +2,7 @@ import { Navigate, useLocation } from "react-router-dom";
 
 import type { BackofficeRole } from "./api";
 import { BackofficeLayout } from "./backoffice-layout";
+import { BackofficeLoadingSkeleton, SessionCheckingState, SessionErrorState } from "./auth-state";
 import { useAuth } from "./auth-context";
 
 export function RoleBoundary({ role }: { role: BackofficeRole }): React.JSX.Element {
@@ -9,25 +10,11 @@ export function RoleBoundary({ role }: { role: BackofficeRole }): React.JSX.Elem
   const location = useLocation();
 
   if (auth.state.kind === "checking") {
-    return (
-      <main className="centered-state" aria-live="polite">
-        <span className="loading-mark" aria-hidden="true" />
-        <h1>正在确认后台身份</h1>
-      </main>
-    );
+    return <BackofficeLoadingSkeleton role={role} />;
   }
 
   if (auth.state.kind === "error") {
-    return (
-      <main className="centered-state" role="alert">
-        <p className="state-code">连接失败</p>
-        <h1>暂时无法确认登录状态</h1>
-        <p>{auth.state.message}</p>
-        <button className="primary-button" type="button" onClick={auth.retry}>
-          重新检查
-        </button>
-      </main>
-    );
+    return <SessionErrorState message={auth.state.message} retry={auth.retry} />;
   }
 
   if (auth.state.kind === "anonymous") {
@@ -78,25 +65,11 @@ export function RootRedirect(): React.JSX.Element {
   }
 
   if (auth.state.kind === "checking") {
-    return (
-      <main className="centered-state" aria-live="polite">
-        <span className="loading-mark" aria-hidden="true" />
-        <h1>正在确认后台身份</h1>
-      </main>
-    );
+    return <SessionCheckingState />;
   }
 
   if (auth.state.kind === "error") {
-    return (
-      <main className="centered-state" role="alert">
-        <p className="state-code">连接失败</p>
-        <h1>暂时无法确认登录状态</h1>
-        <p>{auth.state.message}</p>
-        <button className="primary-button" type="button" onClick={auth.retry}>
-          重新检查
-        </button>
-      </main>
-    );
+    return <SessionErrorState message={auth.state.message} retry={auth.retry} />;
   }
 
   return <Navigate to="/login" replace />;

@@ -1,11 +1,12 @@
 import { createHash, randomBytes } from "node:crypto";
 
 import { Inject, Injectable } from "@nestjs/common";
+import type { BackofficeRole } from "@rongguang/contracts";
 
 import { getSessionTtlSeconds } from "../config/environment.js";
 import { DatabaseService } from "../database/database.service.js";
 import { hashPassword, verifyPassword } from "./password.js";
-import type { BackofficeIdentity, BackofficeRole, SessionResolution } from "./auth.types.js";
+import type { BackofficeIdentity, SessionResolution } from "./auth.types.js";
 
 interface IdentityRow {
   id: string;
@@ -63,7 +64,9 @@ export class SessionService {
   async create(accountId: string): Promise<string> {
     const token = randomBytes(32).toString("base64url");
 
-    await this.database.pool.query("DELETE FROM backoffice_sessions WHERE expires_at <= now()");
+    await this.database.pool.query(
+      "DELETE FROM backoffice_sessions WHERE expires_at <= now() - interval '7 days'",
+    );
     await this.database.pool.query(
       `
         INSERT INTO backoffice_sessions (token_hash, account_id, expires_at)

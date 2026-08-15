@@ -35,6 +35,7 @@ export function LoginPage(): React.JSX.Element {
   const [submitting, setSubmitting] = useState(false);
   const passwordRef = useRef<HTMLInputElement>(null);
   const selectedAccount = demoAccounts.find((account) => account.username === username);
+  const checkingSession = auth.state.kind === "checking";
   const expired =
     searchParams.get("reason") === "expired" ||
     (auth.state.kind === "anonymous" && auth.state.reason === "expired");
@@ -131,6 +132,7 @@ export function LoginPage(): React.JSX.Element {
               id="demo-account"
               name="username"
               value={username}
+              disabled={checkingSession}
               onChange={(event) => setUsername(event.target.value)}
             >
               {demoAccounts.map((account) => (
@@ -151,6 +153,7 @@ export function LoginPage(): React.JSX.Element {
               name="password"
               value={password}
               autoComplete="current-password"
+              disabled={checkingSession}
               aria-invalid={passwordError ? "true" : undefined}
               aria-describedby={passwordError ? "password-error" : undefined}
               onChange={(event) => setPassword(event.target.value)}
@@ -170,12 +173,19 @@ export function LoginPage(): React.JSX.Element {
             </div>
           ) : null}
 
-          <button className="primary-button login-submit" type="submit" disabled={submitting}>
-            {submitting ? "正在登录…" : "进入管理端"}
+          <button
+            className="primary-button login-submit"
+            type="submit"
+            disabled={checkingSession || submitting}
+          >
+            {checkingSession ? "正在检查会话…" : submitting ? "正在登录…" : "进入管理端"}
           </button>
 
           <p className="login-note">
-            <span aria-hidden="true">⌾</span>
+            <svg viewBox="0 0 24 24" aria-hidden="true">
+              <path d="M12 3 5 6v5c0 4.6 2.8 8.1 7 10 4.2-1.9 7-5.4 7-10V6l-7-3Z" />
+              <path d="m9 12 2 2 4-5" />
+            </svg>
             演示账号不会绕过界面权限；会话保存在 HttpOnly Cookie 中。
           </p>
         </form>

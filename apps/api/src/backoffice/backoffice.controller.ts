@@ -9,13 +9,11 @@ import {
   UseGuards,
 } from "@nestjs/common";
 import { ApiOperation, ApiTags } from "@nestjs/swagger";
+import { backofficeNavigation, type BackofficeLandingResponse } from "@rongguang/contracts";
 
-import type { AuthenticatedRequest, BackofficeIdentity } from "../auth/auth.types.js";
+import type { AuthenticatedRequest } from "../auth/auth.types.js";
 import { SessionGuard } from "../auth/session.guard.js";
 import { SessionService } from "../auth/session.service.js";
-
-const managerNavigation = ["工作台", "预约", "排班", "服务", "顾客", "经营", "系统"];
-const staffNavigation = ["今日工作", "我的预约"];
 
 function forbidden(): never {
   throw new HttpException(
@@ -32,15 +30,15 @@ export class BackofficeController {
 
   @Get("manager/workbench")
   @ApiOperation({ summary: "读取店长工作台身份与导航" })
-  managerWorkbench(@Req() request: AuthenticatedRequest): {
-    account: BackofficeIdentity;
-    navigation: string[];
-  } {
+  managerWorkbench(@Req() request: AuthenticatedRequest): BackofficeLandingResponse {
     if (request.backofficeIdentity.role !== "manager") {
       forbidden();
     }
 
-    return { account: request.backofficeIdentity, navigation: managerNavigation };
+    return {
+      account: request.backofficeIdentity,
+      navigation: backofficeNavigation.manager.map((item) => item.label),
+    };
   }
 
   @Get("staff/:staffId/today")
@@ -48,7 +46,7 @@ export class BackofficeController {
   async staffToday(
     @Param("staffId") staffId: string,
     @Req() request: AuthenticatedRequest,
-  ): Promise<{ account: BackofficeIdentity; navigation: string[] }> {
+  ): Promise<BackofficeLandingResponse> {
     const identity = request.backofficeIdentity;
 
     if (identity.role !== "manager" && identity.id !== staffId) {
@@ -64,6 +62,9 @@ export class BackofficeController {
       );
     }
 
-    return { account, navigation: staffNavigation };
+    return {
+      account,
+      navigation: backofficeNavigation.staff.map((item) => item.label),
+    };
   }
 }

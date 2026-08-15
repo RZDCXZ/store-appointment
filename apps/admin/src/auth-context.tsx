@@ -1,4 +1,4 @@
-import { createContext, useContext, useEffect, useMemo, useState } from "react";
+import { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
 
 import { apiFetch, type BackofficeAccount, readApiError } from "./api";
 
@@ -60,26 +60,29 @@ export function AuthProvider({ children }: { children: React.ReactNode }): React
     return () => abortController.abort();
   }, [attempt]);
 
+  const retry = useCallback(() => {
+    setState({ kind: "checking" });
+    setAttempt((current) => current + 1);
+  }, []);
+  const setAccount = useCallback((account: BackofficeAccount) => {
+    setState({ kind: "authenticated", account });
+  }, []);
+  const markExpired = useCallback(() => {
+    setState({ kind: "anonymous", reason: "expired" });
+  }, []);
+  const signOut = useCallback(async () => {
+    const response = await apiFetch("/auth/logout", { method: "POST" });
+
+    if (!response.ok && response.status !== 401) {
+      throw await readApiError(response);
+    }
+
+    setState({ kind: "anonymous" });
+  }, []);
+
   const value = useMemo<AuthContextValue>(
-    () => ({
-      state,
-      retry: () => {
-        setState({ kind: "checking" });
-        setAttempt((current) => current + 1);
-      },
-      setAccount: (account) => setState({ kind: "authenticated", account }),
-      markExpired: () => setState({ kind: "anonymous", reason: "expired" }),
-      signOut: async () => {
-        const response = await apiFetch("/auth/logout", { method: "POST" });
-
-        if (!response.ok && response.status !== 401) {
-          throw await readApiError(response);
-        }
-
-        setState({ kind: "anonymous" });
-      },
-    }),
-    [state],
+    () => ({ state, retry, setAccount, markExpired, signOut }),
+    [markExpired, retry, setAccount, signOut, state],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

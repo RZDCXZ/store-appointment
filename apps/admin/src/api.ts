@@ -1,16 +1,6 @@
-export type BackofficeRole = "manager" | "staff";
+export type { BackofficeAccount, BackofficeRole } from "@rongguang/contracts";
 
-export interface BackofficeAccount {
-  id: string;
-  username: string;
-  displayName: string;
-  role: BackofficeRole;
-}
-
-export interface ApiErrorBody {
-  code?: string;
-  message?: string;
-}
+import type { ApiErrorResponse } from "@rongguang/contracts";
 
 export class ApiError extends Error {
   constructor(
@@ -33,10 +23,10 @@ export async function apiFetch(path: string, init?: RequestInit): Promise<Respon
 }
 
 export async function readApiError(response: Response): Promise<ApiError> {
-  let body: ApiErrorBody = {};
+  let body: Partial<ApiErrorResponse> = {};
 
   try {
-    body = (await response.json()) as ApiErrorBody;
+    body = (await response.json()) as Partial<ApiErrorResponse>;
   } catch {
     // A non-JSON upstream response is reported with a stable recoverable message below.
   }
