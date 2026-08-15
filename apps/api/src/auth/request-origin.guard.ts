@@ -16,7 +16,10 @@ export class RequestOriginGuard implements CanActivate {
   canActivate(context: ExecutionContext): boolean {
     const request = context.switchToHttp().getRequest<FastifyRequest>();
 
-    if (safeMethods.has(request.method)) {
+    const protectsCookieSession =
+      request.url.startsWith("/auth/") || request.url.startsWith("/backoffice/");
+
+    if (safeMethods.has(request.method) || !protectsCookieSession) {
       return true;
     }
 

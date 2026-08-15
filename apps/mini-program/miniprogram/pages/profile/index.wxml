@@ -1,0 +1,89 @@
+<view class="profile-screen page-screen">
+  <view wx:if="{{currentCustomer}}" class="profile-hero">
+    <view class="profile-avatar">{{currentCustomer.avatarInitial}}</view>
+    <view class="profile-summary">
+      <text class="profile-summary__eyebrow">演示顾客</text>
+      <text class="profile-summary__name">{{currentCustomer.displayName}}</text>
+      <text class="profile-summary__phone">{{currentCustomer.phoneMasked}}</text>
+    </view>
+    <button class="text-button" bindtap="openSelector">切换</button>
+  </view>
+
+  <view wx:else class="profile-hero profile-hero--empty">
+    <view class="profile-avatar">茸</view>
+    <view class="profile-summary">
+      <text class="profile-summary__eyebrow">本地体验</text>
+      <text class="profile-summary__name">选择演示顾客</text>
+      <text class="profile-summary__phone">不调用微信真实登录</text>
+    </view>
+  </view>
+
+  <view class="demo-banner">
+    <view class="demo-banner__mark">i</view>
+    <view class="demo-banner__copy">
+      <text class="demo-banner__title">演示身份</text>
+      <text class="demo-banner__body">这是预置顾客切换，不是微信真实登录；API 会签发短期 Bearer 会话。</text>
+    </view>
+    <button class="text-button" bindtap="openSelector">切换</button>
+  </view>
+
+  <view wx:if="{{authState === 'expired'}}" class="expired-note">
+    <text class="expired-note__title">上一个演示会话已失效</text>
+    <text class="expired-note__body">选择新身份后，会回到之前保留的 tab 页面。</text>
+  </view>
+
+  <view wx:if="{{selectorOpen}}" class="selector-section">
+    <view class="selector-heading">
+      <view>
+        <text class="selector-heading__title">选择一个故事</text>
+        <text class="selector-heading__body">三位顾客分别预留不同预约场景</text>
+      </view>
+      <button wx:if="{{currentCustomer}}" class="text-button" bindtap="closeSelector">收起</button>
+    </view>
+
+    <view wx:if="{{loadingChoices}}" class="selector-loading">正在读取演示顾客…</view>
+    <view wx:else class="choice-list">
+      <button
+        wx:for="{{choices}}"
+        wx:key="key"
+        class="choice-card {{currentCustomer && currentCustomer.displayName === item.displayName ? 'choice-card--selected' : ''}}"
+        data-key="{{item.key}}"
+        bindtap="selectCustomer"
+        loading="{{switchingKey === item.key}}"
+        disabled="{{!!switchingKey}}"
+      >
+        <view class="choice-card__avatar">{{item.avatarInitial}}</view>
+        <view class="choice-card__copy">
+          <text class="choice-card__name">{{item.displayName}}</text>
+          <text class="choice-card__story">{{item.story}}</text>
+          <text class="choice-card__phone">{{item.phoneMasked}}</text>
+        </view>
+        <text class="choice-card__action">选择 ›</text>
+      </button>
+    </view>
+    <button wx:if="{{errorMessage && !loadingChoices}}" class="secondary-button" bindtap="loadChoices">重新加载</button>
+  </view>
+
+  <view wx:if="{{errorMessage}}" class="error-note">{{errorMessage}}</view>
+
+  <view wx:if="{{currentCustomer}}" class="profile-menu surface-card">
+    <view class="profile-menu__row">
+      <text>当前演示故事</text>
+      <text class="profile-menu__detail">{{currentCustomer.story}}</text>
+    </view>
+    <view class="profile-menu__row">
+      <text>顾客资料</text>
+      <text class="profile-menu__detail">姓名、手机号</text>
+    </view>
+    <view class="profile-menu__row">
+      <text>数据边界</text>
+      <text class="profile-menu__detail">仅本人资料</text>
+    </view>
+  </view>
+
+  <view class="store-card">
+    <text class="store-card__title">茸光宠物洗护</text>
+    <text>上海市徐汇区暖茸路 18 号</text>
+    <text>周二至周日 09:30–19:00</text>
+  </view>
+</view>

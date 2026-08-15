@@ -1,0 +1,32 @@
+<view class="page-screen">
+  <view class="page-heading">
+    <view>
+      <text class="page-heading__brand">茸光</text>
+      <text class="page-heading__title">预约记录</text>
+      <text class="page-heading__subtitle">未来预约与历史预约</text>
+    </view>
+    <button class="identity-pill" bindtap="chooseCustomer">{{customer ? customer.displayName : '演示身份'}}</button>
+  </view>
+
+  <view wx:if="{{authState === 'active' || authState === 'unavailable'}}">
+    <view class="demo-mark">演示模式 · {{customer.story}}</view>
+    <view class="story-card surface-card">
+      <text class="story-card__label">当前顾客</text>
+      <text class="story-card__title">{{customer.displayName}}</text>
+      <text class="story-card__body">{{customer.phoneMasked}} · 只会按当前 Bearer 会话读取本人预约。</text>
+    </view>
+    <view class="empty-panel surface-card">
+      <text class="empty-panel__mark">约</text>
+      <text class="empty-panel__title">预约页面已独立就绪</text>
+      <text class="empty-panel__body">后续预约数据会在这里按未来与历史分段展示，刷新后仍由当前会话恢复身份。</text>
+      <text wx:if="{{connectionMessage}}" class="connection-note">{{connectionMessage}}</text>
+    </view>
+  </view>
+
+  <view wx:elif="{{authState !== 'loading'}}" class="auth-prompt auth-prompt--expired surface-card">
+    <text class="auth-prompt__eyebrow">演示身份</text>
+    <text class="auth-prompt__title">{{authState === 'expired' ? '会话已失效' : '尚未选择顾客'}}</text>
+    <text class="auth-prompt__body">当前预约记录路径已保留。重新选择演示顾客后会恢复到这个 tab。</text>
+    <button class="primary-button" bindtap="chooseCustomer">重新选择演示顾客</button>
+  </view>
+</view>

@@ -1,0 +1,5 @@
+.connection-note {
+  margin-top: 20rpx;
+  color: #9a5d1f;
+  font-size: 23rpx;
+}

@@ -34,6 +34,18 @@ export function getSessionTtlSeconds(): number {
   return value;
 }
 
+export function getMiniappSessionTtlSeconds(): number {
+  const value = Number(process.env.MINIAPP_SESSION_TTL_SECONDS ?? "1800");
+
+  if (!Number.isInteger(value) || value < 60 || value > 3_600) {
+    throw new Error(
+      `MINIAPP_SESSION_TTL_SECONDS 必须是 60 到 3600 之间的整数，当前值为“${process.env.MINIAPP_SESSION_TTL_SECONDS}”。`,
+    );
+  }
+
+  return value;
+}
+
 export function redactDatabaseUrl(databaseUrl: string): string {
   try {
     const url = new URL(databaseUrl);

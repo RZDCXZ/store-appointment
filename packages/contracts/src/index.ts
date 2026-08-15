@@ -69,3 +69,27 @@ export interface ApiErrorResponse {
   code: string;
   message: string;
 }
+
+export interface DemoCustomerChoice {
+  key: string;
+  displayName: string;
+  phoneMasked: string;
+  story: "正常预约" | "已有未来预约" | "取消或爽约历史";
+  avatarInitial: string;
+}
+
+export type MiniappCustomerProfile = Omit<DemoCustomerChoice, "key">;
+
+export interface DemoCustomerChoicesResponse {
+  customers: DemoCustomerChoice[];
+}
+
+export interface MiniappSessionResponse {
+  accessToken: string;
+  expiresAt: string;
+  customer: MiniappCustomerProfile;
+}
+
+export interface MiniappProfileResponse {
+  customer: MiniappCustomerProfile;
+}

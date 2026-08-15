@@ -1,0 +1,14 @@
+.notice-band {
+  margin-bottom: 24rpx;
+  padding: 20rpx 24rpx;
+  border-radius: 20rpx;
+  color: #376e91;
+  background: rgba(55, 110, 145, 0.08);
+  font-size: 23rpx;
+}
+
+.connection-note {
+  margin-top: 20rpx;
+  color: #9a5d1f;
+  font-size: 23rpx;
+}

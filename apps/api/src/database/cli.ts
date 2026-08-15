@@ -110,12 +110,65 @@ async function seed(client: PoolClient): Promise<void> {
     );
   }
 
-  console.info("种子已写入：茸光本地演示元数据与后台账号");
+  const demoCustomers = [
+    {
+      id: "customer-xu-lan",
+      key: "xu-lan",
+      displayName: "许岚",
+      phone: "13874212608",
+      story: "正常预约",
+      sortOrder: 1,
+    },
+    {
+      id: "customer-cheng-mo",
+      key: "cheng-mo",
+      displayName: "程墨",
+      phone: "13951870341",
+      story: "已有未来预约",
+      sortOrder: 2,
+    },
+    {
+      id: "customer-lu-yao",
+      key: "lu-yao",
+      displayName: "陆遥",
+      phone: "13690247519",
+      story: "取消或爽约历史",
+      sortOrder: 3,
+    },
+  ] as const;
+
+  for (const customer of demoCustomers) {
+    await client.query(
+      `
+        INSERT INTO customers (id, display_name, phone)
+        VALUES ($1, $2, $3)
+        ON CONFLICT (id) DO UPDATE
+        SET display_name = excluded.display_name,
+            phone = excluded.phone
+      `,
+      [customer.id, customer.displayName, customer.phone],
+    );
+    await client.query(
+      `
+        INSERT INTO demo_customer_profiles (customer_id, demo_key, story, sort_order)
+        VALUES ($1, $2, $3, $4)
+        ON CONFLICT (customer_id) DO UPDATE
+        SET demo_key = excluded.demo_key,
+            story = excluded.story,
+            sort_order = excluded.sort_order
+      `,
+      [customer.id, customer.key, customer.story, customer.sortOrder],
+    );
+  }
+
+  console.info("种子已写入：茸光本地演示元数据、后台账号与快捷顾客");
 }
 
 async function reset(client: PoolClient): Promise<void> {
   await withTransaction(client, async () => {
-    await client.query("TRUNCATE TABLE app_metadata, backoffice_sessions, backoffice_accounts");
+    await client.query(
+      "TRUNCATE TABLE app_metadata, customer_sessions, demo_customer_profiles, customers, backoffice_sessions, backoffice_accounts",
+    );
     await seed(client);
   });
   console.info("本地演示数据已重置");

@@ -12,6 +12,9 @@
         <text class="wordmark__title">茸光</text>
         <text class="wordmark__subtitle">— 宠物洗护 —</text>
       </view>
+      <button class="hero__identity" bindtap="chooseCustomer">
+        {{customer ? '演示顾客 · ' + customer.displayName : '选择演示顾客'}} ›
+      </button>
       <view class="opening">
         <text>{{businessHours}}</text>
         <text class="opening__date">{{demoTime}}</text>
@@ -20,23 +23,38 @@
     </view>
   </view>
 
-  <view class="readiness-card">
+  <view wx:if="{{authState === 'active' || authState === 'unavailable'}}" class="readiness-card">
     <view class="readiness-card__topline">
-      <view class="readiness-card__dot"></view>
-      <text>原生小程序骨架已就绪</text>
+      <view class="readiness-card__avatar">{{customer.avatarInitial}}</view>
+      <view class="readiness-card__identity">
+        <text>{{customer.displayName}}</text>
+        <text class="readiness-card__story">{{customer.story}}</text>
+      </view>
+      <text class="readiness-card__status">会话有效</text>
     </view>
     <text class="readiness-card__body">
-      这里是茸光后续预约页面的品牌壳层。真实微信登录与订阅消息尚未接入，不会伪装成可用能力。
+      当前页面会使用服务端签发的短期 Bearer 会话读取本人资料，不接受客户端声明顾客 ID 或角色。
     </text>
+    <text wx:if="{{connectionMessage}}" class="readiness-card__warning">{{connectionMessage}} 已保留当前身份，可稍后重试。</text>
     <view class="readiness-card__divider"></view>
     <view class="readiness-card__row">
-      <text>当前页面路径</text>
-      <text class="readiness-card__code">pages/home/index</text>
+      <text>演示模式</text>
+      <text class="readiness-card__code">不是微信真实登录</text>
     </view>
   </view>
 
+  <view wx:elif="{{authState !== 'loading'}}" class="readiness-card readiness-card--auth">
+    <text class="readiness-card__auth-title">
+      {{authState === 'expired' ? '演示会话已失效' : '先选择一位演示顾客'}}
+    </text>
+    <text class="readiness-card__body">
+      {{authState === 'expired' ? '之前的页面位置已经保留，重新选择后可回到这里。' : '这是本地演示身份切换，不会调用微信真实登录。'}}
+    </text>
+    <button class="primary-button" bindtap="chooseCustomer">重新选择演示顾客</button>
+  </view>
+
   <view class="local-boundary">
-    <text class="local-boundary__label">真机联调提示</text>
+    <text class="local-boundary__label">本地演示边界</text>
     <text>手机不能访问电脑的 localhost，请使用同一局域网中的电脑 IP：</text>
     <text class="local-boundary__code">{{apiPath}}</text>
   </view>

@@ -1,0 +1,33 @@
+<view class="page-screen">
+  <view class="page-heading">
+    <view>
+      <text class="page-heading__brand">茸光</text>
+      <text class="page-heading__title">消息</text>
+      <text class="page-heading__subtitle">确认、变更与到店提醒</text>
+    </view>
+    <button class="identity-pill" bindtap="chooseCustomer">{{customer ? customer.displayName : '演示身份'}}</button>
+  </view>
+
+  <view class="notice-band">模拟消息 · 不会真实发送微信通知</view>
+
+  <view wx:if="{{authState === 'active' || authState === 'unavailable'}}">
+    <view class="story-card surface-card">
+      <text class="story-card__label">当前演示故事</text>
+      <text class="story-card__title">{{customer.story}}</text>
+      <text class="story-card__body">消息读取将始终跟随 {{customer.displayName}} 的服务端会话范围。</text>
+    </view>
+    <view class="empty-panel surface-card">
+      <text class="empty-panel__mark">信</text>
+      <text class="empty-panel__title">暂无模拟消息</text>
+      <text class="empty-panel__body">预约确认、改期、取消和开始前提醒会出现在这个独立页面。</text>
+      <text wx:if="{{connectionMessage}}" class="connection-note">{{connectionMessage}}</text>
+    </view>
+  </view>
+
+  <view wx:elif="{{authState !== 'loading'}}" class="auth-prompt auth-prompt--expired surface-card">
+    <text class="auth-prompt__eyebrow">演示身份</text>
+    <text class="auth-prompt__title">{{authState === 'expired' ? '会话已失效' : '尚未选择顾客'}}</text>
+    <text class="auth-prompt__body">当前消息路径已保留。重新选择演示顾客后会恢复到这个 tab。</text>
+    <button class="primary-button" bindtap="chooseCustomer">重新选择演示顾客</button>
+  </view>
+</view>

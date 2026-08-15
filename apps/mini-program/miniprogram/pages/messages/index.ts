@@ -3,15 +3,12 @@ import type { CustomerProfile } from "../../types/customer";
 
 Page({
   data: {
-    apiPath: "http://局域网电脑IP:3000",
-    businessHours: "设计样例营业 · 09:30–19:00",
-    demoTime: "2026年8月13日 周四 10:50",
     authState: "loading" as "active" | "expired" | "missing" | "unavailable" | "loading",
     customer: null as CustomerProfile | null,
     connectionMessage: "",
   },
   async onShow() {
-    const context = await loadCustomerContext("/pages/home/index");
+    const context = await loadCustomerContext("/pages/messages/index");
     this.setData({
       authState: context.kind,
       customer: "customer" in context ? context.customer : null,
@@ -19,7 +16,7 @@ Page({
     });
   },
   chooseCustomer() {
-    rememberRecoveryPath("/pages/home/index");
+    rememberRecoveryPath("/pages/messages/index");
     wx.switchTab({ url: "/pages/profile/index" });
   },
 });

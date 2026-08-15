@@ -1,0 +1,274 @@
+.profile-screen {
+  padding-top: 42rpx;
+}
+
+.profile-hero {
+  display: grid;
+  grid-template-columns: 112rpx 1fr auto;
+  gap: 22rpx;
+  align-items: center;
+}
+
+.profile-hero--empty {
+  grid-template-columns: 112rpx 1fr;
+}
+
+.profile-avatar,
+.choice-card__avatar {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  color: #fff;
+  background: #3f6253;
+  font-family: serif;
+  font-weight: 600;
+}
+
+.profile-avatar {
+  width: 112rpx;
+  height: 112rpx;
+  font-size: 48rpx;
+}
+
+.profile-summary {
+  display: flex;
+  flex-direction: column;
+}
+
+.profile-summary__eyebrow {
+  color: #6f8f7e;
+  font-size: 22rpx;
+}
+
+.profile-summary__name {
+  margin-top: 5rpx;
+  font-size: 44rpx;
+  font-weight: 700;
+}
+
+.profile-summary__phone {
+  margin-top: 4rpx;
+  color: #61706a;
+  font-size: 24rpx;
+}
+
+.text-button {
+  min-width: 88rpx;
+  min-height: 80rpx;
+  margin: 0;
+  padding: 0 12rpx;
+  color: #376e91;
+  background: transparent;
+  font-size: 25rpx;
+  line-height: 80rpx;
+}
+
+.demo-banner {
+  display: grid;
+  grid-template-columns: 48rpx 1fr auto;
+  gap: 18rpx;
+  align-items: center;
+  margin-top: 34rpx;
+  padding: 24rpx;
+  border-radius: 22rpx;
+  background: rgba(55, 110, 145, 0.08);
+}
+
+.demo-banner__mark {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 44rpx;
+  height: 44rpx;
+  border: 2rpx solid #376e91;
+  border-radius: 50%;
+  color: #376e91;
+  font-family: serif;
+  font-weight: 700;
+}
+
+.demo-banner__copy {
+  display: flex;
+  flex-direction: column;
+}
+
+.demo-banner__title {
+  color: #376e91;
+  font-size: 25rpx;
+  font-weight: 700;
+}
+
+.demo-banner__body {
+  margin-top: 5rpx;
+  color: #61706a;
+  font-size: 21rpx;
+  line-height: 1.55;
+}
+
+.expired-note {
+  display: flex;
+  flex-direction: column;
+  margin-top: 22rpx;
+  padding: 22rpx 24rpx;
+  border-radius: 20rpx;
+  background: #f9e2dc;
+}
+
+.expired-note__title {
+  color: #8b4c41;
+  font-weight: 700;
+}
+
+.expired-note__body {
+  margin-top: 6rpx;
+  color: #61706a;
+  font-size: 23rpx;
+}
+
+.selector-section {
+  margin-top: 34rpx;
+}
+
+.selector-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20rpx;
+}
+
+.selector-heading__title,
+.selector-heading__body {
+  display: block;
+}
+
+.selector-heading__title {
+  font-size: 34rpx;
+  font-weight: 700;
+}
+
+.selector-heading__body {
+  margin-top: 6rpx;
+  color: #61706a;
+  font-size: 22rpx;
+}
+
+.selector-loading {
+  margin-top: 20rpx;
+  padding: 34rpx;
+  border-radius: 24rpx;
+  color: #61706a;
+  background: #fffcf7;
+  text-align: center;
+}
+
+.choice-list {
+  display: grid;
+  gap: 18rpx;
+  margin-top: 20rpx;
+}
+
+.choice-card {
+  display: grid;
+  grid-template-columns: 84rpx 1fr auto;
+  gap: 20rpx;
+  align-items: center;
+  min-height: 142rpx;
+  margin: 0;
+  padding: 22rpx 24rpx;
+  border: 1rpx solid #ddd7cb;
+  border-radius: 26rpx;
+  background: #fffcf7;
+  text-align: left;
+}
+
+.choice-card--selected {
+  border-color: #6f8f7e;
+  background: #f3f7f3;
+}
+
+.choice-card__avatar {
+  width: 82rpx;
+  height: 82rpx;
+  font-size: 34rpx;
+}
+
+.choice-card__copy {
+  display: flex;
+  flex-direction: column;
+}
+
+.choice-card__name {
+  color: #24312c;
+  font-size: 30rpx;
+  font-weight: 700;
+}
+
+.choice-card__story {
+  margin-top: 5rpx;
+  color: #3f6253;
+  font-size: 23rpx;
+}
+
+.choice-card__phone {
+  margin-top: 4rpx;
+  color: #61706a;
+  font-size: 21rpx;
+}
+
+.choice-card__action {
+  color: #3f6253;
+  font-size: 23rpx;
+}
+
+.error-note {
+  margin-top: 20rpx;
+  padding: 20rpx 22rpx;
+  border-radius: 18rpx;
+  color: #a84444;
+  background: #f9e2dc;
+  font-size: 23rpx;
+}
+
+.profile-menu {
+  margin-top: 34rpx;
+  overflow: hidden;
+}
+
+.profile-menu__row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  min-height: 96rpx;
+  padding: 0 26rpx;
+  border-bottom: 1rpx solid #ddd7cb;
+  font-size: 27rpx;
+}
+
+.profile-menu__row:last-child {
+  border-bottom: 0;
+}
+
+.profile-menu__detail {
+  color: #61706a;
+  font-size: 23rpx;
+}
+
+.store-card {
+  display: flex;
+  flex-direction: column;
+  gap: 5rpx;
+  margin-top: 32rpx;
+  padding: 28rpx;
+  border-radius: 24rpx;
+  color: #61706a;
+  background: rgba(255, 252, 247, 0.68);
+  font-size: 23rpx;
+}
+
+.store-card__title {
+  margin-bottom: 5rpx;
+  color: #24312c;
+  font-size: 27rpx;
+  font-weight: 700;
+}

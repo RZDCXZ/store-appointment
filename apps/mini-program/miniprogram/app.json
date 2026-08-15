@@ -1,11 +1,48 @@
 {
-  "pages": ["pages/home/index"],
+  "pages": [
+    "pages/home/index",
+    "pages/appointments/index",
+    "pages/messages/index",
+    "pages/profile/index"
+  ],
   "window": {
     "backgroundColor": "#F6F1E7",
     "backgroundTextStyle": "dark",
     "navigationBarBackgroundColor": "#F6F1E7",
     "navigationBarTextStyle": "black",
     "navigationBarTitleText": "茸光宠物洗护"
+  },
+  "tabBar": {
+    "color": "#61706A",
+    "selectedColor": "#3F6253",
+    "backgroundColor": "#FFFCF7",
+    "borderStyle": "black",
+    "list": [
+      {
+        "pagePath": "pages/home/index",
+        "text": "首页",
+        "iconPath": "assets/tabbar/home.png",
+        "selectedIconPath": "assets/tabbar/home-selected.png"
+      },
+      {
+        "pagePath": "pages/appointments/index",
+        "text": "预约记录",
+        "iconPath": "assets/tabbar/appointments.png",
+        "selectedIconPath": "assets/tabbar/appointments-selected.png"
+      },
+      {
+        "pagePath": "pages/messages/index",
+        "text": "消息",
+        "iconPath": "assets/tabbar/messages.png",
+        "selectedIconPath": "assets/tabbar/messages-selected.png"
+      },
+      {
+        "pagePath": "pages/profile/index",
+        "text": "我的",
+        "iconPath": "assets/tabbar/profile.png",
+        "selectedIconPath": "assets/tabbar/profile-selected.png"
+      }
+    ]
   },
   "sitemapLocation": "sitemap.json",
   "style": "v2"

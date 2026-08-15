@@ -48,6 +48,24 @@
   color: #3f6253;
 }
 
+.hero__identity {
+  position: absolute;
+  top: 58rpx;
+  right: 32rpx;
+  min-height: 68rpx;
+  margin: 0;
+  padding: 0 20rpx;
+  border-radius: 999rpx;
+  color: #24312c;
+  background: rgba(255, 252, 247, 0.78);
+  font-size: 24rpx;
+  line-height: 68rpx;
+}
+
+.hero__identity::after {
+  border: 0;
+}
+
 .wordmark__title {
   font-family: serif;
   font-size: 92rpx;
@@ -110,13 +128,56 @@
   font-weight: 600;
 }
 
-.readiness-card__dot {
-  width: 16rpx;
-  height: 16rpx;
-  margin-right: 18rpx;
-  border: 6rpx solid #e4ece6;
+.readiness-card__avatar {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex: none;
+  width: 72rpx;
+  height: 72rpx;
   border-radius: 50%;
   background: #3f6253;
+  color: #fff;
+  font-family: serif;
+}
+
+.readiness-card__identity {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  margin-left: 18rpx;
+}
+
+.readiness-card__story {
+  margin-top: 5rpx;
+  color: #61706a;
+  font-size: 22rpx;
+  font-weight: 400;
+}
+
+.readiness-card__status {
+  padding: 8rpx 14rpx;
+  border-radius: 999rpx;
+  color: #3f6253;
+  background: #e4ece6;
+  font-size: 20rpx;
+}
+
+.readiness-card--auth {
+  padding: 34rpx;
+}
+
+.readiness-card__auth-title {
+  font-size: 34rpx;
+  font-weight: 700;
+}
+
+.readiness-card__warning {
+  display: block;
+  margin-top: 16rpx;
+  color: #9a5d1f;
+  font-size: 24rpx;
+  line-height: 1.55;
 }
 
 .readiness-card__body {
