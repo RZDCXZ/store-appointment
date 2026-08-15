@@ -1,0 +1,12 @@
+<template name="customer-auth-prompt">
+  <view class="auth-prompt auth-prompt--expired surface-card">
+    <text class="auth-prompt__eyebrow">演示身份</text>
+    <text class="auth-prompt__title">
+      {{authState === 'expired' ? '会话已失效' : '尚未选择顾客'}}
+    </text>
+    <text class="auth-prompt__body">
+      {{contextLabel}}已保留。重新选择演示顾客后会恢复到这个 tab。
+    </text>
+    <button class="primary-button" bindtap="chooseCustomer">重新选择演示顾客</button>
+  </view>
+</template>

@@ -14,7 +14,17 @@ Page({
   },
   primaryAction() {
     if (this.data.customer) {
-      wx.switchTab({ url: "/pages/appointments/index" });
+      wx.showModal({
+        title: "演示身份已准备好",
+        content: "新建预约将在后续流程开放；当前可以先查看这个顾客的预约记录入口。",
+        confirmText: "查看记录",
+        cancelText: "留在首页",
+        success(result) {
+          if (result.confirm) {
+            wx.switchTab({ url: "/pages/appointments/index" });
+          }
+        },
+      });
       return;
     }
 

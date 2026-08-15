@@ -1,3 +1,5 @@
+<import src="../../templates/customer-auth-prompt.wxml" />
+
 <view class="page-screen">
   <view class="page-heading">
     <view>
@@ -24,10 +26,9 @@
     </view>
   </view>
 
-  <view wx:elif="{{authState !== 'loading'}}" class="auth-prompt auth-prompt--expired surface-card">
-    <text class="auth-prompt__eyebrow">演示身份</text>
-    <text class="auth-prompt__title">{{authState === 'expired' ? '会话已失效' : '尚未选择顾客'}}</text>
-    <text class="auth-prompt__body">当前消息路径已保留。重新选择演示顾客后会恢复到这个 tab。</text>
-    <button class="primary-button" bindtap="chooseCustomer">重新选择演示顾客</button>
-  </view>
+  <template
+    wx:elif="{{authState !== 'loading'}}"
+    is="customer-auth-prompt"
+    data="{{authState: authState, contextLabel: '当前消息路径'}}"
+  />
 </view>

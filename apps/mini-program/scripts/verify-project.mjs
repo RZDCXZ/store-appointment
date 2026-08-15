@@ -22,6 +22,10 @@ const requiredFiles = [
   "miniprogram/pages/profile/index.ts",
   "miniprogram/pages/profile/index.wxml",
   "miniprogram/pages/profile/index.wxss",
+  "miniprogram/templates/customer-auth-prompt.wxml",
+  "miniprogram/assets/promises/employee.png",
+  "miniprogram/assets/promises/price.png",
+  "miniprogram/assets/promises/checkin.png",
 ];
 
 export async function verifyProject() {

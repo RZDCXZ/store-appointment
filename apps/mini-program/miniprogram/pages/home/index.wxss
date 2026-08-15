@@ -281,16 +281,10 @@
   border-right: 0;
 }
 
-.service-promises__mark {
-  display: flex;
-  align-items: center;
-  justify-content: center;
+.service-promises__icon {
+  display: block;
   width: 56rpx;
   height: 56rpx;
-  border: 1rpx solid #6f8f7e;
-  border-radius: 50%;
-  color: #3f6253;
-  font-size: 28rpx;
 }
 
 .local-boundary {

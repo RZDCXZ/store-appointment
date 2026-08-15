@@ -21,7 +21,7 @@
         <text class="opening__demo-label">上海演示时间</text>
       </view>
       <button class="hero__cta" bindtap="primaryAction">
-        {{customer ? '查看我的预约记录' : '选择顾客开始体验'}}
+        为宠物预约洗护
         <text>›</text>
       </button>
     </view>
@@ -60,9 +60,18 @@
   <view class="service-promises">
     <text class="service-promises__title">安心预约洗护</text>
     <view class="service-promises__list">
-      <view><text class="service-promises__mark">人</text><text>确定员工</text></view>
-      <view><text class="service-promises__mark">价</text><text>价格透明</text></view>
-      <view><text class="service-promises__mark">码</text><text>到店核销</text></view>
+      <view>
+        <image class="service-promises__icon" src="/assets/promises/employee.png" mode="aspectFit" />
+        <text>确定员工</text>
+      </view>
+      <view>
+        <image class="service-promises__icon" src="/assets/promises/price.png" mode="aspectFit" />
+        <text>价格透明</text>
+      </view>
+      <view>
+        <image class="service-promises__icon" src="/assets/promises/checkin.png" mode="aspectFit" />
+        <text>到店核销</text>
+      </view>
     </view>
   </view>
 
