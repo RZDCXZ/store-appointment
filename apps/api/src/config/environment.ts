@@ -22,6 +22,18 @@ export function getAdminOrigin(): string {
   return process.env.ADMIN_ORIGIN ?? "http://localhost:5173";
 }
 
+export function getSessionTtlSeconds(): number {
+  const value = Number(process.env.BACKOFFICE_SESSION_TTL_SECONDS ?? "28800");
+
+  if (!Number.isInteger(value) || value < 60 || value > 86_400) {
+    throw new Error(
+      `BACKOFFICE_SESSION_TTL_SECONDS 必须是 60 到 86400 之间的整数，当前值为“${process.env.BACKOFFICE_SESSION_TTL_SECONDS}”。`,
+    );
+  }
+
+  return value;
+}
+
 export function redactDatabaseUrl(databaseUrl: string): string {
   try {
     const url = new URL(databaseUrl);

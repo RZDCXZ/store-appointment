@@ -2,7 +2,7 @@
 
 “茸光宠物洗护”是一个公开源码、仅承诺本地运行的单门店作品集案例。正式应用由三部分组成：原生 TypeScript 微信小程序、React/Vite 响应式后台，以及 NestJS/Fastify REST API。PostgreSQL 是唯一的 Docker 服务，Node 应用在宿主机保留热更新。
 
-当前完成 ticket 01 的可启动骨架，不包含预约业务。真实微信登录、订阅消息、支付和生产运维不在本地演示能力内。
+当前完成 ticket 01 的可启动骨架与 ticket 02 的后台演示账号、Cookie 会话及角色路由，不包含预约业务。真实微信登录、订阅消息、支付和生产运维不在本地演示能力内。
 
 ## 环境要求
 
@@ -38,9 +38,23 @@ corepack pnpm demo:up
 
 启动后可访问：
 
-- 后台：<http://localhost:5173/manager/workbench>
+- 后台登录：<http://localhost:5173/login>
 - API 健康检查：<http://localhost:3000/health>
 - OpenAPI：<http://localhost:3000/docs>
+
+### 后台演示账号
+
+所有后台账号使用统一演示密码 `Rongguang2026!`：
+
+| 身份 | 姓名 | 账号       |
+| ---- | ---- | ---------- |
+| 店长 | 沈青 | `manager`  |
+| 员工 | 林夏 | `linxia`   |
+| 员工 | 陈嘉 | `chenjia`  |
+| 员工 | 周宁 | `zhouning` |
+| 员工 | 赵航 | `zhaohang` |
+
+密码公开只为本地作品集演示；数据库保存带独立盐的 `scrypt` 哈希，不保存明文。登录后 API 签发不透明的 HttpOnly、SameSite=Lax Cookie 会话；所有写请求必须来自 `ADMIN_ORIGIN`。店长落地页为 `/manager/workbench`，员工落地页为 `/staff/today`。未登录直达受保护 URL 时，登录成功后会恢复原目标；角色不匹配会显示明确无权限结果。
 
 启动失败会返回非零退出码，并提示检查 Docker、端口与环境配置；PostgreSQL 细节可用 `docker compose logs postgres` 查看。停止前台 Node 服务后，数据库仍保留；需要停止数据库时运行 `docker compose down`。
 

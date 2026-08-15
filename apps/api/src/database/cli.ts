@@ -4,6 +4,7 @@ import { readdir, readFile } from "node:fs/promises";
 import { Pool, type PoolClient } from "pg";
 
 import { getDatabaseUrl, redactDatabaseUrl } from "../config/environment.js";
+import { hashPassword } from "../auth/password.js";
 
 const migrationsDirectory = new URL("../../database/migrations/", import.meta.url);
 
@@ -83,12 +84,38 @@ async function seed(client: PoolClient): Promise<void> {
     );
   }
 
-  console.info("种子已写入：茸光本地演示元数据");
+  const demoAccounts = [
+    { id: "manager", username: "manager", displayName: "沈青", role: "manager" },
+    { id: "linxia", username: "linxia", displayName: "林夏", role: "staff" },
+    { id: "chenjia", username: "chenjia", displayName: "陈嘉", role: "staff" },
+    { id: "zhouning", username: "zhouning", displayName: "周宁", role: "staff" },
+    { id: "zhaohang", username: "zhaohang", displayName: "赵航", role: "staff" },
+  ] as const;
+
+  for (const account of demoAccounts) {
+    const passwordHash = await hashPassword("Rongguang2026!");
+
+    await client.query(
+      `
+        INSERT INTO backoffice_accounts (id, username, display_name, role, password_hash)
+        VALUES ($1, $2, $3, $4, $5)
+        ON CONFLICT (id) DO UPDATE
+        SET username = excluded.username,
+            display_name = excluded.display_name,
+            role = excluded.role,
+            password_hash = excluded.password_hash,
+            active = true
+      `,
+      [account.id, account.username, account.displayName, account.role, passwordHash],
+    );
+  }
+
+  console.info("种子已写入：茸光本地演示元数据与后台账号");
 }
 
 async function reset(client: PoolClient): Promise<void> {
   await withTransaction(client, async () => {
-    await client.query("TRUNCATE TABLE app_metadata");
+    await client.query("TRUNCATE TABLE app_metadata, backoffice_sessions, backoffice_accounts");
     await seed(client);
   });
   console.info("本地演示数据已重置");

@@ -12,6 +12,7 @@
         "ADMIN_ORIGIN",
         "API_HOST",
         "API_PORT",
+        "BACKOFFICE_SESSION_TTL_SECONDS",
         "DATABASE_URL",
         "DEMO_NOW",
         "VITE_API_BASE_URL",
