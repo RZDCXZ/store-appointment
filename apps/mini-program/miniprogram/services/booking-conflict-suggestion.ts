@@ -1,10 +1,10 @@
 import type { BookingConflictSuggestion } from "@rongguang/contracts";
 
-function validLabel(value: unknown): value is string {
+export function isValidBookingConflictLabel(value: unknown): value is string {
   return typeof value === "string" && value.length > 0 && value.length <= 160;
 }
 
-function validInstant(value: unknown): value is string {
+export function isValidBookingConflictInstant(value: unknown): value is string {
   return typeof value === "string" && Number.isFinite(Date.parse(value));
 }
 
@@ -18,11 +18,11 @@ function parseBookingConflictSuggestion(value: unknown): BookingConflictSuggesti
   if (
     typeof suggestion.date !== "string" ||
     !/^\d{4}-\d{2}-\d{2}$/.test(suggestion.date) ||
-    !validInstant(suggestion.startsAt) ||
-    !validInstant(suggestion.endsAt) ||
+    !isValidBookingConflictInstant(suggestion.startsAt) ||
+    !isValidBookingConflictInstant(suggestion.endsAt) ||
     Date.parse(suggestion.endsAt) <= Date.parse(suggestion.startsAt) ||
-    !validLabel(staff?.id) ||
-    !validLabel(staff.displayName)
+    !isValidBookingConflictLabel(staff?.id) ||
+    !isValidBookingConflictLabel(staff.displayName)
   ) {
     return null;
   }

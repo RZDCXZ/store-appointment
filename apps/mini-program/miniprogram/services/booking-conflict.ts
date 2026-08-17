@@ -1,6 +1,10 @@
 import type { BookingConflictSuggestion } from "@rongguang/contracts";
 
-import { parseBookingConflictSuggestions } from "./booking-conflict-suggestion";
+import {
+  isValidBookingConflictInstant,
+  isValidBookingConflictLabel,
+  parseBookingConflictSuggestions,
+} from "./booking-conflict-suggestion";
 
 export interface BookingConflictContext {
   requestedStartsAt: string;
@@ -29,24 +33,16 @@ const localStorage: BookingConflictStorage = {
   },
 };
 
-function validLabel(value: unknown): value is string {
-  return typeof value === "string" && value.length > 0 && value.length <= 160;
-}
-
-function validInstant(value: unknown): value is string {
-  return typeof value === "string" && Number.isFinite(Date.parse(value));
-}
-
 function parseContext(value: unknown): (BookingConflictContext & { version: 1 }) | null {
   if (!value || typeof value !== "object") return null;
   const context = value as Partial<BookingConflictContext> & { version?: unknown };
   const suggestions = parseBookingConflictSuggestions(context.suggestions);
   if (
     context.version !== 1 ||
-    !validInstant(context.requestedStartsAt) ||
-    !validLabel(context.petLabel) ||
-    !validLabel(context.serviceLabel) ||
-    !validLabel(context.staffPreferenceLabel) ||
+    !isValidBookingConflictInstant(context.requestedStartsAt) ||
+    !isValidBookingConflictLabel(context.petLabel) ||
+    !isValidBookingConflictLabel(context.serviceLabel) ||
+    !isValidBookingConflictLabel(context.staffPreferenceLabel) ||
     !Array.isArray(context.suggestions) ||
     suggestions.length !== context.suggestions.length
   ) {

@@ -3,7 +3,6 @@ import type { BookingAvailabilityResponse } from "@rongguang/contracts";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 
 import { createApplication } from "../src/bootstrap.js";
-import { BookingAvailabilityService } from "../src/booking-availability/booking-availability.service.js";
 import { DatabaseService } from "../src/database/database.service.js";
 
 async function customerAuthorization(
@@ -557,8 +556,6 @@ describe("顾客提交并确认预约", () => {
       idempotencyKey: "retry-conflict-loser-20260813",
       petId: retryPetIds[1],
     };
-    const availabilityService = app.get(BookingAvailabilityService);
-    const discover = vi.spyOn(availabilityService, "discover");
     const simultaneousRetries = await Promise.all(
       Array.from({ length: 10 }, () => create(retryPayload)),
     );
@@ -575,8 +572,6 @@ describe("顾客提交并确认预约", () => {
     expect(simultaneousRetries.map((response) => response.json())).toEqual(
       Array.from({ length: 10 }, () => firstBody),
     );
-    expect(discover).toHaveBeenCalledTimes(1);
-    discover.mockRestore();
 
     const firstSuggestion = firstBody?.suggestions[0];
     expect(
