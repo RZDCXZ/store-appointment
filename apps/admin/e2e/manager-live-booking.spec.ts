@@ -50,6 +50,10 @@ test("顾客创建预约后，店长经 SSE 回源看到同一事实并保持路
   await login(page, "manager");
   await expect(page.getByRole("heading", { name: "今日工作台" })).toBeVisible();
   await expect(page.getByText("实时更新已连接")).toBeVisible();
+  await page.goto("/manager/workbench");
+  await expect(page.getByRole("heading", { name: "今日工作台" })).toBeVisible();
+  await page.reload();
+  await expect(page.getByRole("heading", { name: "今日工作台" })).toBeVisible();
 
   const bookingId = await createCustomerBooking(request);
 

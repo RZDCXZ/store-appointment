@@ -1867,6 +1867,7 @@ img.identity-avatar {
 
 .manager-calendar-block {
   z-index: 5;
+  pointer-events: none;
   padding: 7px;
   border: 1px solid #df9f95;
   color: var(--danger-700);

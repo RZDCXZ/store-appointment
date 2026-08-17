@@ -1,17 +1,9 @@
 import { Link, useParams } from "react-router-dom";
 import { ChevronLeftIcon, ClockIcon, PersonIcon, ReaderIcon } from "@radix-ui/react-icons";
-import type { ManagerBookingDetailResponse, ManagerBookingStatus } from "@rongguang/contracts";
+import type { ManagerBookingDetailResponse } from "@rongguang/contracts";
 
+import { managerBookingStatusLabels } from "../../manager-booking-presentation";
 import { useManagerResource } from "../../manager-live-resource";
-
-const statusLabels: Record<ManagerBookingStatus, string> = {
-  confirmed: "已确认",
-  checked_in: "已到店",
-  completed: "已完成",
-  cancelled: "已取消",
-  no_show: "已爽约",
-  terminated: "已终止",
-};
 
 function formatDateTime(value: string): string {
   return new Intl.DateTimeFormat("zh-CN", {
@@ -68,7 +60,7 @@ export function ManagerAppointmentDetailPage(): React.JSX.Element {
             </Link>
             <div>
               <span className={`manager-booking-status manager-booking-status--${booking.status}`}>
-                {statusLabels[booking.status]}
+                {managerBookingStatusLabels[booking.status]}
               </span>
               <h1>{booking.pet.name}的预约</h1>
               <p>预约编号 {booking.id}</p>

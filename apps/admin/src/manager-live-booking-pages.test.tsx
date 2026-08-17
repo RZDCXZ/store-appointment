@@ -71,7 +71,20 @@ function staffDay(
       },
     ],
     bookings: id === "chenjia" ? [booking] : [],
-    blocks: [],
+    blocks:
+      id === "chenjia"
+        ? [
+            {
+              id: "pending-time-off",
+              kind: "time_off",
+              status: "pending",
+              startsAt: "15:30",
+              endsAt: "16:00",
+              reason: "待处理停班",
+              affectedBookingCount: 1,
+            },
+          ]
+        : [],
     capacity: {
       publishedMinutes: 450,
       occupiedMinutes: id === "chenjia" ? 105 : 0,
@@ -270,6 +283,7 @@ describe("店长即时预约页面", () => {
     expect(screen.getAllByText("休息").length).toBeGreaterThan(0);
     expect(screen.getByText("周转 15 分钟")).toBeInTheDocument();
     expect(screen.getByText("已确认")).toBeInTheDocument();
+    expect(screen.getByText(/影响 1 笔预约/)).toBeInTheDocument();
     expect(screen.getByRole("link", { name: /薄荷.*猫咪洗护/ })).toHaveAttribute(
       "href",
       "/manager/appointments/booking-live",

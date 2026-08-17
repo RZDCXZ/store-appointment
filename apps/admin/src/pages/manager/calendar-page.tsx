@@ -3,36 +3,21 @@ import { ChevronLeftIcon, ChevronRightIcon, ClockIcon, ReloadIcon } from "@radix
 import {
   getShanghaiLocalDate,
   type ManagerBookingFact,
-  type ManagerBookingStatus,
   type ManagerCalendarBlock,
   type ManagerCalendarResponse,
   type ManagerStaffDay,
 } from "@rongguang/contracts";
 
+import {
+  clockMinutes,
+  formatShanghaiClock,
+  managerBookingStatusLabels,
+} from "../../manager-booking-presentation";
 import { useManagerResource } from "../../manager-live-resource";
 
 const calendarStartsAt = 9 * 60 + 30;
 const calendarEndsAt = 19 * 60;
 const calendarMinutes = calendarEndsAt - calendarStartsAt;
-
-const statusLabels: Record<ManagerBookingStatus, string> = {
-  confirmed: "已确认",
-  checked_in: "已到店",
-  completed: "已完成",
-  cancelled: "已取消",
-  no_show: "已爽约",
-  terminated: "已终止",
-};
-
-function clockMinutes(value: string): number {
-  const [hour = 0, minute = 0] = value.split(":").map(Number);
-  return hour * 60 + minute;
-}
-
-function localClock(value: string): string {
-  const local = new Date(Date.parse(value) + 8 * 60 * 60_000);
-  return `${String(local.getUTCHours()).padStart(2, "0")}:${String(local.getUTCMinutes()).padStart(2, "0")}`;
-}
 
 function verticalPosition(startsAt: number, endsAt: number): React.CSSProperties {
   const start = Math.max(calendarStartsAt, startsAt);
@@ -115,16 +100,17 @@ function CalendarBlock({ block }: { block: ManagerCalendarBlock }) {
     >
       <strong>{block.kind === "time_off" ? "停班" : "临时闭店"}</strong>
       <small>
-        {block.startsAt}–{block.endsAt} · {block.status === "pending" ? "待处理" : "已生效"}
+        {block.startsAt}–{block.endsAt} · {block.status === "pending" ? "待处理" : "已生效"} · 影响{" "}
+        {block.affectedBookingCount} 笔预约
       </small>
     </div>
   );
 }
 
 function CalendarBooking({ booking }: { booking: ManagerBookingFact }) {
-  const startsAt = clockMinutes(localClock(booking.startsAt));
-  const endsAt = clockMinutes(localClock(booking.endsAt));
-  const turnoverEndsAt = clockMinutes(localClock(booking.turnoverEndsAt));
+  const startsAt = clockMinutes(formatShanghaiClock(booking.startsAt));
+  const endsAt = clockMinutes(formatShanghaiClock(booking.endsAt));
+  const turnoverEndsAt = clockMinutes(formatShanghaiClock(booking.turnoverEndsAt));
 
   return (
     <>
@@ -132,15 +118,15 @@ function CalendarBooking({ booking }: { booking: ManagerBookingFact }) {
         className={`manager-calendar-booking manager-booking--${booking.status}`}
         style={verticalPosition(startsAt, endsAt)}
         to={`/manager/appointments/${booking.id}`}
-        aria-label={`${booking.pet.name} ${booking.primaryService.name} ${localClock(booking.startsAt)} 至 ${localClock(booking.endsAt)} ${statusLabels[booking.status]}`}
+        aria-label={`${booking.pet.name} ${booking.primaryService.name} ${formatShanghaiClock(booking.startsAt)} 至 ${formatShanghaiClock(booking.endsAt)} ${managerBookingStatusLabels[booking.status]}`}
       >
         <strong>
-          {localClock(booking.startsAt)}–{localClock(booking.endsAt)}
+          {formatShanghaiClock(booking.startsAt)}–{formatShanghaiClock(booking.endsAt)}
         </strong>
         <span>
           {booking.pet.name} · {booking.primaryService.name}
         </span>
-        <small>{statusLabels[booking.status]}</small>
+        <small>{managerBookingStatusLabels[booking.status]}</small>
       </Link>
       <span className="manager-calendar-turnover" style={verticalPosition(endsAt, turnoverEndsAt)}>
         周转 {booking.turnoverMinutes} 分钟

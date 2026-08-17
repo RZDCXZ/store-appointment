@@ -58,9 +58,14 @@ interface FailedNotificationRow {
   pet_name_snapshot: string;
 }
 
+interface ClockInterval {
+  startsAt: number;
+  endsAt: number;
+}
+
 interface BookingRead {
   fact: ManagerBookingFact;
-  occupancyMinutes: number;
+  occupancy: ClockInterval;
 }
 
 const bookingSelect = `
@@ -121,9 +126,10 @@ function bookingRead(row: BookingRow): BookingRead {
       serviceDurationMinutes: row.service_duration_minutes,
       turnoverMinutes: row.turnover_minutes,
     },
-    occupancyMinutes: Math.round(
-      (row.occupancy_ends_at.getTime() - row.occupancy_starts_at.getTime()) / 60_000,
-    ),
+    occupancy: {
+      startsAt: localClockMinutes(row.occupancy_starts_at.toISOString()),
+      endsAt: localClockMinutes(row.occupancy_ends_at.toISOString()),
+    },
   };
 }
 
@@ -137,23 +143,75 @@ function localClockMinutes(value: string): number {
   return local.getUTCHours() * 60 + local.getUTCMinutes();
 }
 
-function publishedMinutes(shifts: ManagerStaffDay["shifts"]): number {
-  return shifts.reduce((total, shift) => {
-    const shiftMinutes = clockMinutes(shift.endsAt) - clockMinutes(shift.startsAt);
-    const breakMinutes = shift.breaks.reduce(
-      (sum, shiftBreak) =>
-        sum + clockMinutes(shiftBreak.endsAt) - clockMinutes(shiftBreak.startsAt),
-      0,
-    );
-    return total + shiftMinutes - breakMinutes;
-  }, 0);
+function mergeIntervals(intervals: ClockInterval[]): ClockInterval[] {
+  const sorted = intervals
+    .filter((interval) => interval.endsAt > interval.startsAt)
+    .sort((left, right) => left.startsAt - right.startsAt);
+  const merged: ClockInterval[] = [];
+
+  for (const interval of sorted) {
+    const previous = merged.at(-1);
+    if (!previous || interval.startsAt > previous.endsAt) {
+      merged.push({ ...interval });
+      continue;
+    }
+    previous.endsAt = Math.max(previous.endsAt, interval.endsAt);
+  }
+  return merged;
 }
 
-function capacitySummary(published: number, occupied: number): ManagerCapacitySummary {
+function workingIntervals(shifts: ManagerStaffDay["shifts"]): ClockInterval[] {
+  const intervals = shifts.flatMap((shift) => {
+    const shiftStartsAt = clockMinutes(shift.startsAt);
+    const shiftEndsAt = clockMinutes(shift.endsAt);
+    const breaks = mergeIntervals(
+      shift.breaks.map((shiftBreak) => ({
+        startsAt: Math.max(shiftStartsAt, clockMinutes(shiftBreak.startsAt)),
+        endsAt: Math.min(shiftEndsAt, clockMinutes(shiftBreak.endsAt)),
+      })),
+    );
+    const available: ClockInterval[] = [];
+    let cursor = shiftStartsAt;
+
+    for (const shiftBreak of breaks) {
+      if (shiftBreak.startsAt > cursor) {
+        available.push({ startsAt: cursor, endsAt: shiftBreak.startsAt });
+      }
+      cursor = Math.max(cursor, shiftBreak.endsAt);
+    }
+    if (cursor < shiftEndsAt) available.push({ startsAt: cursor, endsAt: shiftEndsAt });
+    return available;
+  });
+  return mergeIntervals(intervals);
+}
+
+function intervalMinutes(intervals: ClockInterval[]): number {
+  return intervals.reduce((total, interval) => total + interval.endsAt - interval.startsAt, 0);
+}
+
+function unavailableMinutes(working: ClockInterval[], unavailable: ClockInterval[]): number {
+  const intersections = working.flatMap((window) =>
+    unavailable.map((interval) => ({
+      startsAt: Math.max(window.startsAt, interval.startsAt),
+      endsAt: Math.min(window.endsAt, interval.endsAt),
+    })),
+  );
+  return intervalMinutes(mergeIntervals(intersections));
+}
+
+function capacitySummary(
+  shifts: ManagerStaffDay["shifts"],
+  bookingIntervals: ClockInterval[],
+  capacityBlocks: ClockInterval[],
+): ManagerCapacitySummary {
+  const working = workingIntervals(shifts);
+  const published = intervalMinutes(working);
+  const occupied = unavailableMinutes(working, bookingIntervals);
+  const unavailable = unavailableMinutes(working, [...bookingIntervals, ...capacityBlocks]);
   return {
     publishedMinutes: published,
     occupiedMinutes: occupied,
-    remainingMinutes: Math.max(0, published - occupied),
+    remainingMinutes: Math.max(0, published - unavailable),
   };
 }
 
@@ -220,10 +278,14 @@ export class ManagerLiveBookingService {
 
     const staffDays = schedule.staffDays.map<ManagerStaffDay>((day) => {
       const dayBookingReads = bookingReads.filter((item) => item.fact.staff.id === day.staff.id);
-      const published = publishedMinutes(day.shifts);
-      const occupied = dayBookingReads
+      const dayBlocks = blocks.filter((block) => !block.staffId || block.staffId === day.staff.id);
+      const bookingIntervals = dayBookingReads
         .filter((item) => !["cancelled", "no_show"].includes(item.fact.status))
-        .reduce((total, item) => total + item.occupancyMinutes, 0);
+        .map((item) => item.occupancy);
+      const blockIntervals = dayBlocks.map((block) => ({
+        startsAt: clockMinutes(block.startsAt),
+        endsAt: clockMinutes(block.endsAt),
+      }));
 
       return {
         ...day,
@@ -232,9 +294,8 @@ export class ManagerLiveBookingService {
           avatarPath: `/assets/brand/staff-${day.staff.id}.png`,
         },
         bookings: dayBookingReads.map((item) => item.fact),
-        blocks: blocks
-          .filter((block) => !block.staffId || block.staffId === day.staff.id)
-          .map(({ id, kind, status, startsAt, endsAt, reason, affectedBookingCount }) => ({
+        blocks: dayBlocks.map(
+          ({ id, kind, status, startsAt, endsAt, reason, affectedBookingCount }) => ({
             id,
             kind,
             status,
@@ -242,8 +303,9 @@ export class ManagerLiveBookingService {
             endsAt,
             reason,
             affectedBookingCount,
-          })),
-        capacity: capacitySummary(published, occupied),
+          }),
+        ),
+        capacity: capacitySummary(day.shifts, bookingIntervals, blockIntervals),
       };
     });
     const totalPublished = staffDays.reduce(
@@ -251,6 +313,10 @@ export class ManagerLiveBookingService {
       0,
     );
     const totalOccupied = staffDays.reduce((total, day) => total + day.capacity.occupiedMinutes, 0);
+    const totalRemaining = staffDays.reduce(
+      (total, day) => total + day.capacity.remainingMinutes,
+      0,
+    );
 
     return {
       timeZone: schedule.timeZone,
@@ -259,7 +325,11 @@ export class ManagerLiveBookingService {
       window: schedule.window,
       businessHours: schedule.businessHours,
       staffDays,
-      capacity: capacitySummary(totalPublished, totalOccupied),
+      capacity: {
+        publishedMinutes: totalPublished,
+        occupiedMinutes: totalOccupied,
+        remainingMinutes: totalRemaining,
+      },
     };
   }
 

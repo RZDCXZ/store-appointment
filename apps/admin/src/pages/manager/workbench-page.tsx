@@ -15,11 +15,15 @@ import {
 } from "@radix-ui/react-icons";
 import type {
   ManagerBookingFact,
-  ManagerBookingStatus,
   ManagerStaffDay,
   ManagerWorkbenchResponse,
 } from "@rongguang/contracts";
 
+import {
+  clockMinutes,
+  formatShanghaiClock,
+  managerBookingStatusLabels,
+} from "../../manager-booking-presentation";
 import { useManagerResource } from "../../manager-live-resource";
 import { HealthStatus } from "../../page-components";
 
@@ -28,36 +32,16 @@ const dayEndsAt = 19 * 60;
 const dayMinutes = dayEndsAt - dayStartsAt;
 
 const statusMetadata: Array<{
-  status: ManagerBookingStatus;
-  label: string;
+  status: keyof typeof managerBookingStatusLabels;
   icon: ComponentType;
 }> = [
-  { status: "confirmed", label: "已确认", icon: CalendarIcon },
-  { status: "checked_in", label: "已到店", icon: HomeIcon },
-  { status: "completed", label: "已完成", icon: CheckCircledIcon },
-  { status: "cancelled", label: "已取消", icon: CrossCircledIcon },
-  { status: "no_show", label: "已爽约", icon: StopwatchIcon },
-  { status: "terminated", label: "已终止", icon: Cross2Icon },
+  { status: "confirmed", icon: CalendarIcon },
+  { status: "checked_in", icon: HomeIcon },
+  { status: "completed", icon: CheckCircledIcon },
+  { status: "cancelled", icon: CrossCircledIcon },
+  { status: "no_show", icon: StopwatchIcon },
+  { status: "terminated", icon: Cross2Icon },
 ];
-
-const statusLabels: Record<ManagerBookingStatus, string> = {
-  confirmed: "已确认",
-  checked_in: "已到店",
-  completed: "已完成",
-  cancelled: "已取消",
-  no_show: "已爽约",
-  terminated: "已终止",
-};
-
-function clockMinutes(value: string): number {
-  const [hour = 0, minute = 0] = value.split(":").map(Number);
-  return hour * 60 + minute;
-}
-
-function localClock(value: string): string {
-  const local = new Date(Date.parse(value) + 8 * 60 * 60_000);
-  return `${String(local.getUTCHours()).padStart(2, "0")}:${String(local.getUTCMinutes()).padStart(2, "0")}`;
-}
 
 function trackPosition(startsAt: number, endsAt: number): React.CSSProperties {
   const start = Math.max(dayStartsAt, startsAt);
@@ -182,11 +166,14 @@ function StatusPanel({ summary }: { summary: ManagerWorkbenchResponse["statusSum
         <span>以当前预约事实统计</span>
       </header>
       <div className="manager-status-grid">
-        {statusMetadata.map(({ status, label, icon: Icon }) => (
-          <article aria-label={`${label} ${summary[status]} 笔`} key={status}>
+        {statusMetadata.map(({ status, icon: Icon }) => (
+          <article
+            aria-label={`${managerBookingStatusLabels[status]} ${summary[status]} 笔`}
+            key={status}
+          >
             <Icon />
             <strong>{summary[status]}</strong>
-            <span>{label}</span>
+            <span>{managerBookingStatusLabels[status]}</span>
           </article>
         ))}
       </div>
@@ -199,18 +186,18 @@ function TimelineBooking({ booking }: { booking: ManagerBookingFact }) {
     <Link
       className={`manager-timeline-booking manager-booking--${booking.status}`}
       style={trackPosition(
-        clockMinutes(localClock(booking.startsAt)),
-        clockMinutes(localClock(booking.turnoverEndsAt)),
+        clockMinutes(formatShanghaiClock(booking.startsAt)),
+        clockMinutes(formatShanghaiClock(booking.turnoverEndsAt)),
       )}
       to={`/manager/appointments/${booking.id}`}
-      aria-label={`${booking.pet.name} ${localClock(booking.startsAt)} 至 ${localClock(booking.endsAt)} ${statusLabels[booking.status]}`}
+      aria-label={`${booking.pet.name} ${formatShanghaiClock(booking.startsAt)} 至 ${formatShanghaiClock(booking.endsAt)} ${managerBookingStatusLabels[booking.status]}`}
     >
       {booking.pet.photoPath ? <img src={booking.pet.photoPath} alt="" /> : null}
       <span>
         <strong>{booking.pet.name}</strong>
         <small>
-          {localClock(booking.startsAt)}–{localClock(booking.endsAt)} ·{" "}
-          {statusLabels[booking.status]}
+          {formatShanghaiClock(booking.startsAt)}–{formatShanghaiClock(booking.endsAt)} ·{" "}
+          {managerBookingStatusLabels[booking.status]}
         </small>
       </span>
     </Link>
@@ -274,7 +261,7 @@ function StaffTimelineRow({ day }: { day: ManagerStaffDay }) {
 
 function WorkbenchTimeline({ data }: { data: ManagerWorkbenchResponse }) {
   const timeLabels = Array.from({ length: 20 }, (_, index) => clockLabel(dayStartsAt + index * 30));
-  const nowMinutes = clockMinutes(localClock(data.demoNow));
+  const nowMinutes = clockMinutes(formatShanghaiClock(data.demoNow));
 
   return (
     <section className="manager-panel manager-timeline-panel">
@@ -317,7 +304,7 @@ function WorkbenchTimeline({ data }: { data: ManagerWorkbenchResponse }) {
             className="manager-now-line"
             style={{ left: `calc(158px + ${trackPosition(nowMinutes, nowMinutes).left})` }}
           >
-            <span>{localClock(data.demoNow)}</span>
+            <span>{formatShanghaiClock(data.demoNow)}</span>
           </i>
         ) : null}
         {data.staffDays.map((day) => (

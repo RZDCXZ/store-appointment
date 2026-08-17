@@ -98,6 +98,7 @@ describe("店长工作台即时看到预约", () => {
   let customerToken: string;
   let bookingId: string;
   const createdBookingIds: string[] = [];
+  const createdCapacityBlockIds = ["manager-live-active-block", "manager-live-pending-block"];
 
   beforeAll(async () => {
     vi.stubEnv("DEMO_NOW", "2026-08-13T02:50:00.000Z");
@@ -121,11 +122,27 @@ describe("店长工作台即时看到预约", () => {
     await database.pool.query("DELETE FROM bookings WHERE id = ANY($1::text[])", [
       createdBookingIds,
     ]);
+    await database.pool.query("DELETE FROM staff_time_off_intervals WHERE id = ANY($1::text[])", [
+      createdCapacityBlockIds,
+    ]);
     await app.close();
     vi.unstubAllEnvs();
   });
 
   it("在工作台、四员工日历和可恢复详情入口读取同一笔事实与当前容量", async () => {
+    await database.pool.query(
+      `
+        INSERT INTO staff_time_off_intervals (
+          id, staff_id, local_date, starts_at, ends_at, status, reason
+        )
+        VALUES
+          ('manager-live-active-block', 'chenjia', '2026-08-13', '12:00', '13:00',
+           'active', '已生效停班'),
+          ('manager-live-pending-block', 'chenjia', '2026-08-13', '15:30', '16:00',
+           'pending', '待处理停班')
+        ON CONFLICT (id) DO NOTHING
+      `,
+    );
     const workbench = await app.inject({
       method: "GET",
       url: "/backoffice/manager/workbench",
@@ -173,6 +190,17 @@ describe("店长工作台即时看到预约", () => {
     expect(calendarBody.staffDays).toHaveLength(4);
     expect(calendarBody.staffDays[1]).toMatchObject({
       staff: { id: "chenjia", displayName: "陈嘉" },
+      capacity: {
+        publishedMinutes: 450,
+        occupiedMinutes: 105,
+        remainingMinutes: 285,
+      },
+      blocks: expect.arrayContaining([
+        expect.objectContaining({
+          id: "manager-live-pending-block",
+          affectedBookingCount: 1,
+        }),
+      ]),
     });
     expect(calendarBody.staffDays[1].shifts[0]).toMatchObject({
       startsAt: "10:30",
