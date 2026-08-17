@@ -226,6 +226,27 @@ describe("店长工作台即时看到预约", () => {
         staff: { id: "chenjia", displayName: "陈嘉" },
       },
     });
+
+    await database.pool.query("UPDATE bookings SET status = 'cancelled' WHERE id = $1", [
+      bookingId,
+    ]);
+    try {
+      const cancelledCalendar = await app.inject({
+        method: "GET",
+        url: "/backoffice/manager/calendar?date=2026-08-13",
+        headers: { cookie: managerCookie },
+      });
+      const cancelledBlock = cancelledCalendar
+        .json()
+        .staffDays[1].blocks.find(
+          (block: { id: string }) => block.id === "manager-live-pending-block",
+        );
+      expect(cancelledBlock).toMatchObject({ affectedBookingCount: 0 });
+    } finally {
+      await database.pool.query("UPDATE bookings SET status = 'confirmed' WHERE id = $1", [
+        bookingId,
+      ]);
+    }
   });
 
   it("顾客成功创建预约后通过 SSE 只发送刷新提示而不发送最终事实", async () => {

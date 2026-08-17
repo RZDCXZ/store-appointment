@@ -249,6 +249,7 @@ export class ManagerLiveBookingService {
     const blocks = blockRows.map((row) => {
       const affected = bookings.filter(
         (booking) =>
+          !["cancelled", "no_show"].includes(booking.status) &&
           (!row.staff_id || booking.staff.id === row.staff_id) &&
           affectsBooking(
             {
