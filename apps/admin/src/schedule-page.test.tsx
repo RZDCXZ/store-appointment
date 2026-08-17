@@ -87,12 +87,12 @@ function scheduleFixture() {
         exception: null,
         shifts: [
           {
-            startsAt: "09:30",
-            endsAt: "18:00",
-            breaks: [{ startsAt: "12:00", endsAt: "12:45" }],
+            startsAt: "10:30",
+            endsAt: "19:00",
+            breaks: [{ startsAt: "14:00", endsAt: "15:00" }],
             capacity: [
-              { startsAt: "09:30", endsAt: "12:00" },
-              { startsAt: "12:45", endsAt: "18:00" },
+              { startsAt: "10:30", endsAt: "14:00" },
+              { startsAt: "15:00", endsAt: "19:00" },
             ],
           },
         ],
@@ -164,6 +164,8 @@ describe("MG-09 已发布排班页面", () => {
     expect(screen.getByText("班次 11:00–19:00")).toBeVisible();
     expect(screen.getByText("休息 15:00–15:30")).toBeVisible();
     expect(screen.getAllByText("无排班")).toHaveLength(2);
+    expect(screen.getByText("8月13日 周四 至 8月26日 周三")).toBeVisible();
+    expect(screen.queryByText("2026-08-13 至 2026-08-26")).not.toBeInTheDocument();
     expect(router.state.location.pathname).toBe("/manager/schedule/published");
     expect(new URLSearchParams(router.state.location.search).get("date")).toBe("2026-08-15");
 
@@ -194,7 +196,7 @@ describe("MG-09 已发布排班页面", () => {
     expect(screen.getAllByTestId("schedule-staff-skeleton")).toHaveLength(4);
   });
 
-  it("空草稿使用独立路由并说明未发布内容不产生容量", async () => {
+  it("空草稿在已发布页面说明未发布内容不产生容量", async () => {
     vi.spyOn(globalThis, "fetch").mockImplementation(async (input) => {
       const url = String(input);
 
@@ -210,15 +212,20 @@ describe("MG-09 已发布排班页面", () => {
       throw new Error(`未处理的测试请求：${url}`);
     });
     const router = createMemoryRouter(routes, {
-      initialEntries: ["/manager/schedule/draft"],
+      initialEntries: ["/manager/schedule/published?date=2026-08-13"],
     });
 
     render(<RouterProvider router={router} />);
 
-    expect(await screen.findByRole("heading", { name: "14 天排班草稿" })).toBeVisible();
-    expect(await screen.findByRole("heading", { name: "当前没有待发布草稿" })).toBeVisible();
-    expect(screen.getByText(/未发布草稿不产生可预约容量/)).toBeVisible();
-    expect(router.state.location.pathname).toBe("/manager/schedule/draft");
+    expect(await screen.findByRole("heading", { name: "已发布排班" })).toBeVisible();
+    expect(
+      await screen.findByText(
+        (_, element) =>
+          element?.classList.contains("schedule-draft-boundary") === true &&
+          element.textContent?.replace(/\s/g, "") === "14天草稿：当前为空·未发布不形成容量",
+      ),
+    ).toBeVisible();
+    expect(router.state.location.pathname).toBe("/manager/schedule/published");
   });
 
   it("局部刷新失败时保留最近成功读取的数据并允许重试", async () => {

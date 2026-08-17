@@ -5,12 +5,8 @@ import { LoginPage } from "./login-page";
 import { ManagerAppointmentsPage } from "./pages/manager/appointments-page";
 import { ManagerBusinessPage } from "./pages/manager/business-page";
 import { ManagerCustomersPage } from "./pages/manager/customers-page";
-import {
-  ManagerScheduleDraftPage,
-  ManagerSchedulePage,
-  ManagerScheduleTemplatePage,
-  ScheduleIndexRedirect,
-} from "./pages/manager/schedule-page";
+import { ScheduleIndexRedirect } from "./pages/manager/schedule-index-redirect";
+import { ManagerSchedulePage } from "./pages/manager/schedule-page";
 import { ManagerServicesPage } from "./pages/manager/services-page";
 import { ManagerSystemPage } from "./pages/manager/system-page";
 import { ManagerWorkbenchPage } from "./pages/manager/workbench-page";
@@ -55,8 +51,6 @@ export const routes: RouteObject[] = [
             children: [
               { index: true, element: <ScheduleIndexRedirect /> },
               { path: "published", element: <ManagerSchedulePage /> },
-              { path: "draft", element: <ManagerScheduleDraftPage /> },
-              { path: "template", element: <ManagerScheduleTemplatePage /> },
             ],
           },
           { path: "services", element: <ManagerServicesPage /> },

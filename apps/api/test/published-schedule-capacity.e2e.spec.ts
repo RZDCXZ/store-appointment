@@ -148,13 +148,76 @@ describe("已发布排班形成可预约容量", () => {
       {
         startsAt: "09:30",
         endsAt: "18:00",
-        breaks: [{ startsAt: "12:30", endsAt: "13:15" }],
+        breaks: [{ startsAt: "13:00", endsAt: "14:00" }],
         capacity: [
-          { startsAt: "09:30", endsAt: "12:30" },
-          { startsAt: "13:15", endsAt: "18:00" },
+          { startsAt: "09:30", endsAt: "13:00" },
+          { startsAt: "14:00", endsAt: "18:00" },
         ],
       },
     ]);
+  });
+
+  it("确定性基础数据遵循四名员工各自的工作日、班次与休息规则", async () => {
+    const response = await app.inject({
+      method: "GET",
+      url: "/backoffice/manager/schedule?date=2026-08-13",
+      headers: { cookie: managerCookie },
+    });
+    const staffShifts = Object.fromEntries(
+      response
+        .json()
+        .staffDays.map((day: { staff: { id: string }; shifts: unknown[] }) => [
+          day.staff.id,
+          day.shifts,
+        ]),
+    );
+
+    expect(staffShifts).toEqual({
+      linxia: [
+        {
+          startsAt: "09:30",
+          endsAt: "18:00",
+          breaks: [{ startsAt: "13:00", endsAt: "14:00" }],
+          capacity: [
+            { startsAt: "09:30", endsAt: "13:00" },
+            { startsAt: "14:00", endsAt: "18:00" },
+          ],
+        },
+      ],
+      chenjia: [
+        {
+          startsAt: "10:30",
+          endsAt: "19:00",
+          breaks: [{ startsAt: "14:00", endsAt: "15:00" }],
+          capacity: [
+            { startsAt: "10:30", endsAt: "14:00" },
+            { startsAt: "15:00", endsAt: "19:00" },
+          ],
+        },
+      ],
+      zhouning: [
+        {
+          startsAt: "09:30",
+          endsAt: "18:00",
+          breaks: [{ startsAt: "12:30", endsAt: "13:30" }],
+          capacity: [
+            { startsAt: "09:30", endsAt: "12:30" },
+            { startsAt: "13:30", endsAt: "18:00" },
+          ],
+        },
+      ],
+      zhaohang: [
+        {
+          startsAt: "10:30",
+          endsAt: "19:00",
+          breaks: [{ startsAt: "14:30", endsAt: "15:30" }],
+          capacity: [
+            { startsAt: "10:30", endsAt: "14:30" },
+            { startsAt: "15:30", endsAt: "19:00" },
+          ],
+        },
+      ],
+    });
   });
 
   it("具体日期例外覆盖周模板的常规班次与休息", async () => {
@@ -250,14 +313,16 @@ describe("已发布排班形成可预约容量", () => {
       expect(response.json()).toMatchObject({ code: "OUTSIDE_SCHEDULE_WINDOW" });
     }
 
-    const invalidResponse = await app.inject({
-      method: "GET",
-      url: "/backoffice/manager/schedule?date=2026-02-30",
-      headers: { cookie: managerCookie },
-    });
+    for (const date of ["2026-02-30", "2026-99-99"]) {
+      const invalidResponse = await app.inject({
+        method: "GET",
+        url: `/backoffice/manager/schedule?date=${date}`,
+        headers: { cookie: managerCookie },
+      });
 
-    expect(invalidResponse.statusCode).toBe(400);
-    expect(invalidResponse.json()).toMatchObject({ code: "INVALID_SCHEDULE_DATE" });
+      expect(invalidResponse.statusCode).toBe(400);
+      expect(invalidResponse.json()).toMatchObject({ code: "INVALID_SCHEDULE_DATE" });
+    }
   });
 
   it("未登录与员工身份都不能读取完整门店容量", async () => {

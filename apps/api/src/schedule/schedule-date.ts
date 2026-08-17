@@ -1,3 +1,5 @@
+export { getShanghaiLocalDate } from "@rongguang/contracts";
+
 const localDatePattern = /^\d{4}-\d{2}-\d{2}$/;
 
 function asUtcDate(localDate: string): Date {
@@ -9,7 +11,9 @@ export function isLocalDate(value: string): boolean {
     return false;
   }
 
-  return asUtcDate(value).toISOString().slice(0, 10) === value;
+  const date = asUtcDate(value);
+
+  return !Number.isNaN(date.getTime()) && date.toISOString().slice(0, 10) === value;
 }
 
 export function addLocalDays(localDate: string, amount: number): string {
@@ -21,16 +25,4 @@ export function addLocalDays(localDate: string, amount: number): string {
 
 export function getLocalWeekday(localDate: string): number {
   return asUtcDate(localDate).getUTCDay();
-}
-
-export function getShanghaiLocalDate(instant: string): string {
-  const parts = new Intl.DateTimeFormat("en-CA", {
-    day: "2-digit",
-    month: "2-digit",
-    timeZone: "Asia/Shanghai",
-    year: "numeric",
-  }).formatToParts(new Date(instant));
-  const values = new Map(parts.map((part) => [part.type, part.value]));
-
-  return `${values.get("year")}-${values.get("month")}-${values.get("day")}`;
 }

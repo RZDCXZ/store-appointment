@@ -982,36 +982,10 @@ p {
   }
 }
 
-/* MG-08 / MG-09 schedule boundaries and published capacity */
+/* MG-09 published schedule capacity */
 
 .schedule-page {
   width: min(1320px, 100%);
-}
-
-.schedule-section-nav {
-  display: inline-flex;
-  gap: 4px;
-  margin-top: 20px;
-  padding: 4px;
-  border: 1px solid var(--line-200);
-  border-radius: 12px;
-  background: var(--surface);
-}
-
-.schedule-section-nav a {
-  min-height: 40px;
-  padding: 0 16px;
-  align-content: center;
-  border-radius: 8px;
-  color: var(--ink-600);
-  font-size: 13px;
-  font-weight: 700;
-  text-decoration: none;
-}
-
-.schedule-section-nav a.active {
-  color: var(--sage-700);
-  background: var(--sage-100);
 }
 
 .schedule-loading,
@@ -1054,7 +1028,7 @@ p {
 
 .schedule-toolbar > div span {
   color: var(--ink-500);
-  font-size: 11px;
+  font-size: 12px;
 }
 
 .schedule-toolbar > div strong {
@@ -1135,7 +1109,7 @@ p {
 .schedule-date-link span,
 .schedule-date-link small {
   color: var(--ink-500);
-  font-size: 11px;
+  font-size: 12px;
 }
 
 .schedule-date-link strong {
@@ -1187,7 +1161,7 @@ p {
 
 .schedule-business-hours span {
   color: var(--ink-600);
-  font-size: 11px;
+  font-size: 12px;
 }
 
 .schedule-business-hours--closed {
@@ -1204,7 +1178,7 @@ p {
   padding: 10px 14px;
   border-block: 1px solid var(--line-light);
   color: var(--ink-600);
-  font-size: 11px;
+  font-size: 12px;
 }
 
 .schedule-legend span {
@@ -1257,18 +1231,7 @@ p {
   gap: 9px;
   padding: 14px;
   border-bottom: 1px solid var(--line-light);
-  grid-template-columns: 38px minmax(0, 1fr) auto;
-}
-
-.schedule-staff-avatar {
-  display: grid;
-  width: 38px;
-  height: 38px;
-  border-radius: 50%;
-  color: var(--sage-700);
-  background: var(--sage-100);
-  font-weight: 800;
-  place-items: center;
+  grid-template-columns: minmax(0, 1fr) auto;
 }
 
 .schedule-staff-card header strong,
@@ -1279,7 +1242,7 @@ p {
 .schedule-staff-card header small {
   margin-top: 3px;
   color: var(--ink-500);
-  font-size: 10px;
+  font-size: 12px;
 }
 
 .schedule-status {
@@ -1287,7 +1250,7 @@ p {
   border-radius: 999px;
   color: var(--ink-600);
   background: #ece9e3;
-  font-size: 10px;
+  font-size: 12px;
   font-weight: 700;
 }
 
@@ -1311,7 +1274,7 @@ p {
   border-radius: 6px;
   color: var(--ink-600);
   background: #f3f1ed;
-  font-size: 9px;
+  font-size: 12px;
 }
 
 .schedule-exception {
@@ -1323,7 +1286,7 @@ p {
   border-radius: 9px;
   color: var(--warning);
   background: var(--warning-bg);
-  font-size: 11px;
+  font-size: 12px;
 }
 
 .schedule-exception span {
@@ -1363,14 +1326,14 @@ p {
   border-radius: 6px;
   color: var(--warning);
   background: var(--warning-bg);
-  font-size: 10px;
+  font-size: 12px;
   font-weight: 700;
 }
 
 .schedule-no-break {
   margin: 10px 0 0;
   color: var(--ink-500);
-  font-size: 10px;
+  font-size: 12px;
 }
 
 .schedule-capacity {
@@ -1379,7 +1342,7 @@ p {
   margin-top: 12px;
   padding-top: 10px;
   border-top: 1px dashed var(--sage-200);
-  font-size: 10px;
+  font-size: 12px;
 }
 
 .schedule-capacity span {
@@ -1400,7 +1363,7 @@ p {
 
 .schedule-no-shift p {
   margin: 8px 0 0;
-  font-size: 11px;
+  font-size: 12px;
   line-height: 1.6;
 }
 
@@ -1424,24 +1387,6 @@ p {
 .schedule-state--error {
   border-color: #e8c0bb;
   background: var(--danger-bg);
-}
-
-.schedule-state--empty {
-  display: flex;
-  min-height: 310px;
-  align-items: center;
-  justify-content: center;
-  gap: 28px;
-}
-
-.schedule-empty-mark {
-  color: var(--sage-200);
-  font-size: 86px;
-  font-weight: 800;
-}
-
-.schedule-state--empty .primary-button {
-  margin-top: 8px;
 }
 
 @media (max-width: 1100px) {

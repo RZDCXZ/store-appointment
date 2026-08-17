@@ -262,6 +262,24 @@ export interface ScheduleTimeInterval {
   endsAt: string;
 }
 
+export function getShanghaiLocalDate(instant: string | Date): string {
+  const date = instant instanceof Date ? instant : new Date(instant);
+
+  if (Number.isNaN(date.getTime())) {
+    throw new Error("无法把无效时刻转换为上海本地日期。");
+  }
+
+  const parts = new Intl.DateTimeFormat("en-CA", {
+    day: "2-digit",
+    month: "2-digit",
+    timeZone: "Asia/Shanghai",
+    year: "numeric",
+  }).formatToParts(date);
+  const values = new Map(parts.map((part) => [part.type, part.value]));
+
+  return `${values.get("year")}-${values.get("month")}-${values.get("day")}`;
+}
+
 export interface PublishedScheduleShift extends ScheduleTimeInterval {
   breaks: ScheduleTimeInterval[];
   capacity: ScheduleTimeInterval[];

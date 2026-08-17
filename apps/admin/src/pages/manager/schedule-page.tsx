@@ -1,10 +1,11 @@
 import { useEffect, useState } from "react";
-import { Link, Navigate, NavLink, useLocation, useSearchParams } from "react-router-dom";
-import type {
-  ManagerPublishedScheduleResponse,
-  PublishedScheduleStaffDay,
-  ScheduleBusinessHours,
-  StaffSkillId,
+import { Link, useSearchParams } from "react-router-dom";
+import {
+  getShanghaiLocalDate,
+  type ManagerPublishedScheduleResponse,
+  type PublishedScheduleStaffDay,
+  type ScheduleBusinessHours,
+  type StaffSkillId,
 } from "@rongguang/contracts";
 
 import { apiFetch, readApiError } from "../../api";
@@ -31,20 +32,11 @@ interface ScheduleRequestState {
 }
 
 function scheduleDateFromDemoNow(value: string | undefined): string {
-  const instant = value ? new Date(value) : new Date();
-  const safeInstant = Number.isNaN(instant.getTime()) ? new Date() : instant;
-  const parts = Object.fromEntries(
-    new Intl.DateTimeFormat("en-CA", {
-      day: "2-digit",
-      month: "2-digit",
-      timeZone: "Asia/Shanghai",
-      year: "numeric",
-    })
-      .formatToParts(safeInstant)
-      .map(({ type, value: partValue }) => [type, partValue]),
-  );
-
-  return `${parts.year}-${parts.month}-${parts.day}`;
+  try {
+    return getShanghaiLocalDate(value ?? new Date());
+  } catch {
+    return getShanghaiLocalDate(new Date());
+  }
 }
 
 function dateParts(date: string): { day: string; month: string; weekday: string } {
@@ -129,16 +121,6 @@ function usePublishedSchedule(date: string): ScheduleRequestState & { refresh: (
   }, [attempt, date, markExpired]);
 
   return { ...state, refresh: () => setAttempt((current) => current + 1) };
-}
-
-function ScheduleSectionNavigation({ date }: { date: string }): React.JSX.Element {
-  return (
-    <nav className="schedule-section-nav" aria-label="排班对象">
-      <NavLink to="/manager/schedule/template">排班模板</NavLink>
-      <NavLink to="/manager/schedule/draft">14 天草稿</NavLink>
-      <NavLink to={`/manager/schedule/published?date=${date}`}>已发布排班</NavLink>
-    </nav>
-  );
 }
 
 function ScheduleLoading(): React.JSX.Element {
@@ -261,9 +243,6 @@ function StaffScheduleCard({ day }: { day: PublishedScheduleStaffDay }): React.J
   return (
     <article className="schedule-staff-card">
       <header>
-        <span className="schedule-staff-avatar" aria-hidden="true">
-          {day.staff.displayName.slice(0, 1)}
-        </span>
         <span>
           <strong>{day.staff.displayName}</strong>
           <small>员工 {String(day.staff.employeeNumber).padStart(2, "0")}</small>
@@ -347,8 +326,6 @@ export function ManagerSchedulePage(): React.JSX.Element {
         }}
         badge="店长权限"
       />
-      <ScheduleSectionNavigation date={selectedDate} />
-
       {state.forbidden ? <InPageForbidden /> : null}
       {state.loading ? <ScheduleLoading /> : null}
       {!state.loading && !state.forbidden && !state.data && state.error ? (
@@ -361,7 +338,8 @@ export function ManagerSchedulePage(): React.JSX.Element {
             <div>
               <span>已发布窗口</span>
               <strong>
-                {state.data.window.startsOn} 至 {state.data.window.endsOn}
+                {formatScheduleDate(state.data.window.startsOn)} 至{" "}
+                {formatScheduleDate(state.data.window.endsOn)}
               </strong>
             </div>
             <span className="schedule-draft-boundary">
@@ -420,75 +398,4 @@ export function ManagerSchedulePage(): React.JSX.Element {
       ) : null}
     </main>
   );
-}
-
-export function ManagerScheduleDraftPage(): React.JSX.Element {
-  const selectedDate = scheduleDateFromDemoNow(import.meta.env.VITE_DEMO_NOW);
-  const state = usePublishedSchedule(selectedDate);
-
-  return (
-    <main className="page-shell schedule-page">
-      <PageHeading
-        copy={{
-          eyebrow: "MG-08 · 店长排班",
-          title: "14 天排班草稿",
-          description: "预览尚未发布的具体日期安排；草稿与顾客可预约容量严格分开",
-        }}
-        badge="店长权限"
-      />
-      <ScheduleSectionNavigation date={selectedDate} />
-      {state.loading ? <ScheduleLoading /> : null}
-      {state.forbidden ? <InPageForbidden /> : null}
-      {!state.loading && !state.forbidden && !state.data && state.error ? (
-        <InitialScheduleError message={state.error} retry={state.refresh} />
-      ) : null}
-      {state.data && !state.forbidden && state.data.draftDayCount === 0 ? (
-        <section className="schedule-state schedule-state--empty">
-          <span className="schedule-empty-mark" aria-hidden="true">
-            14
-          </span>
-          <div>
-            <p className="eyebrow">草稿为空</p>
-            <h2>当前没有待发布草稿</h2>
-            <p>未发布草稿不产生可预约容量；已发布排班仍可在独立页面按日期查看。</p>
-            <Link
-              className="primary-button"
-              to={`/manager/schedule/published?date=${selectedDate}`}
-            >
-              查看已发布排班
-            </Link>
-          </div>
-        </section>
-      ) : null}
-    </main>
-  );
-}
-
-export function ManagerScheduleTemplatePage(): React.JSX.Element {
-  const selectedDate = scheduleDateFromDemoNow(import.meta.env.VITE_DEMO_NOW);
-
-  return (
-    <main className="page-shell schedule-page">
-      <PageHeading
-        copy={{
-          eyebrow: "MG-08 · 店长排班",
-          title: "排班模板",
-          description: "每周重复规则用于生成草稿，本身不向顾客提供可预约容量",
-        }}
-        badge="店长权限"
-      />
-      <ScheduleSectionNavigation date={selectedDate} />
-      <section className="schedule-state schedule-state--boundary">
-        <p className="eyebrow">容量边界</p>
-        <h2>模板不是已发布排班</h2>
-        <p>本 ticket 已建立模板数据模型；模板编辑与生成草稿操作不在 MG-09 的查看范围内。</p>
-      </section>
-    </main>
-  );
-}
-
-export function ScheduleIndexRedirect(): React.JSX.Element {
-  const location = useLocation();
-
-  return <Navigate to={`published${location.search}`} replace />;
 }
