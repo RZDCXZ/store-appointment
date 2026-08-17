@@ -13,6 +13,7 @@
     "pages/booking-service/index",
     "pages/booking-staff/index",
     "pages/booking-time/index",
+    "pages/booking-conflict/index",
     "pages/booking-confirm/index",
     "pages/booking-success/index"
   ],

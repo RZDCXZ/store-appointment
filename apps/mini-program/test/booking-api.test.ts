@@ -11,6 +11,7 @@ import {
   type BookingDraftStorage,
 } from "../miniprogram/services/booking-draft";
 import type { CustomerApiRequestClient } from "../miniprogram/services/customer-api";
+import { CustomerApiError } from "../miniprogram/services/customer-api";
 
 function memoryStorage(): BookingDraftStorage {
   let value: unknown;
@@ -75,8 +76,57 @@ describe("预约创建客户端", () => {
       primaryServiceId: "dog-basic-care",
       addonIds: ["oral-care"],
       staffId: "zhaohang",
+      staffPreference: { kind: "fastest" },
       startsAt: "2026-08-26T05:00:00.000Z",
     });
     expect(request.mock.calls[1]?.[0].data).toEqual(request.mock.calls[0]?.[0].data);
+  });
+
+  it("把结构合法的统一冲突建议暴露给页面", async () => {
+    const storage = memoryStorage();
+    chooseBookingPet("pet-tuanzi", storage);
+    chooseBookingService("dog-basic-care", ["oral-care"], storage);
+    chooseBookingStaff({ kind: "fastest" }, storage);
+    chooseBookingTime(
+      {
+        date: "2026-08-26",
+        startsAt: "2026-08-26T05:00:00.000Z",
+        endsAt: "2026-08-26T06:15:00.000Z",
+        assignedStaffId: "zhaohang",
+      },
+      storage,
+    );
+    const suggestions = [
+      {
+        date: "2026-08-26",
+        startsAt: "2026-08-26T07:00:00.000Z",
+        endsAt: "2026-08-26T08:15:00.000Z",
+        staff: { id: "zhaohang", displayName: "赵航" },
+      },
+    ];
+    const client: CustomerApiRequestClient = {
+      request(options) {
+        options.success({
+          statusCode: 409,
+          data: {
+            code: "BOOKING_TIME_CONFLICT",
+            message: "刚刚有人选走了这个时段。",
+            suggestions,
+          },
+        });
+      },
+    };
+
+    await expect(
+      createConfirmedBooking(readBookingDraft(storage), {
+        storage,
+        generateIdempotencyKey: () => "booking-conflict-key",
+        client,
+        context: { apiBaseUrl: "http://api.test", accessToken: "token" },
+      }),
+    ).rejects.toMatchObject({
+      code: "BOOKING_TIME_CONFLICT",
+      suggestions,
+    } satisfies Partial<CustomerApiError>);
   });
 });

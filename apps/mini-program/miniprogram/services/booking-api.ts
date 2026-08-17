@@ -25,6 +25,7 @@ interface CreateBookingOptions {
 function completeDraft(draft: BookingDraft): asserts draft is BookingDraft & {
   petId: string;
   primaryServiceId: string;
+  staffPreference: NonNullable<BookingDraft["staffPreference"]>;
   selectedTime: NonNullable<BookingDraft["selectedTime"]>;
 } {
   if (!draft.petId || !draft.primaryServiceId || !draft.staffPreference || !draft.selectedTime) {
@@ -47,6 +48,7 @@ export function createConfirmedBooking(
     primaryServiceId: draft.primaryServiceId,
     addonIds: [...draft.addonIds],
     staffId: draft.selectedTime.assignedStaffId,
+    staffPreference: { ...draft.staffPreference },
     startsAt: draft.selectedTime.startsAt,
   };
 

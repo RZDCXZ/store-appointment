@@ -1,0 +1,14 @@
+<view class="booking-page conflict-page">
+  <view class="booking-progress"><text>预约步骤 4/5</text><view class="booking-progress__track"><text class="booking-progress__value" style="width:80%"></text></view></view>
+  <view wx:if="{{pageState === 'loading'}}" class="booking-state"><text class="booking-state__mark">茸</text><text class="booking-state__title">正在恢复冲突建议</text></view>
+  <view wx:elif="{{pageState === 'auth'}}" class="booking-state"><text class="booking-state__mark">顾</text><text class="booking-state__title">请重新选择演示顾客</text><button class="primary-button" bindtap="chooseCustomer">选择演示顾客</button></view>
+  <view wx:elif="{{pageState === 'recovery'}}" class="booking-state"><text class="booking-state__mark">←</text><text class="booking-state__title">请重新选择时段</text><text class="booking-state__body">{{recoveryMessage}}</text><button class="primary-button" bindtap="recover">返回时段选择</button></view>
+  <block wx:else>
+    <view class="conflict-alert"><text class="conflict-alert__mark">!</text><view><text class="conflict-alert__title">刚刚有人选走了这个时段</text><text class="conflict-alert__body">之前填写的内容已为你保留，建议不会自动替换选择。</text></view></view>
+    <view class="preserved-summary"><text>{{petLabel}}</text><text>{{serviceLabel}}</text><text>{{staffPreferenceLabel}}</text><text>{{requestedTimeLabel}}</text></view>
+    <view class="booking-section-heading"><text>相近可约建议</text><text wx:if="{{suggestions.length}}">{{suggestions.length}} 个</text></view>
+    <view wx:if="{{pageState === 'empty'}}" class="booking-inline-empty">暂时没有相近可约安排。你的宠物、服务、增项和员工偏好仍已保留，请查看其他日期。</view>
+    <view wx:else class="suggestion-list"><button wx:for="{{suggestions}}" wx:key="startsAt" data-start="{{item.startsAt}}" bindtap="selectSuggestion" class="suggestion-card {{item.nearest ? 'suggestion-card--nearest' : ''}}"><view><text class="suggestion-card__date">{{item.dateLabel}}</text><text class="suggestion-card__time">{{item.timeLabel}}</text><text class="suggestion-card__staff">{{item.staffLabel}} · 可完成全部服务</text></view><text class="suggestion-card__action">{{item.nearest ? '最近 · 选择这个时段' : '选择这个时段'}}　›</text></button></view>
+    <button class="secondary-button" bindtap="chooseOtherDate">查看其他日期</button>
+  </block>
+</view>

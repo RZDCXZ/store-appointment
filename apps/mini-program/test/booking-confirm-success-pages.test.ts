@@ -16,6 +16,10 @@ const mocks = vi.hoisted(() => ({
   loadCustomerContext: vi.fn(),
   openCustomerSelector: vi.fn(),
   readBookingDraft: vi.fn(),
+  writeBookingConflict: vi.fn(),
+}));
+vi.mock("../miniprogram/services/booking-conflict", () => ({
+  writeBookingConflict: mocks.writeBookingConflict,
 }));
 
 vi.mock("../miniprogram/services/booking-api", () => ({
@@ -31,6 +35,7 @@ vi.mock("../miniprogram/services/booking-draft", () => ({
     service: "/pages/booking-service/index",
     staff: "/pages/booking-staff/index",
     time: "/pages/booking-time/index",
+    conflict: "/pages/booking-conflict/index",
     confirm: "/pages/booking-confirm/index",
   },
   clearBookingDraft: mocks.clearBookingDraft,
@@ -217,23 +222,45 @@ describe("MP-10 确认与 MP-11 成功页面", () => {
     });
   });
 
-  it("普通提交冲突保留草稿并给出准确的下一步", async () => {
+  it("时段冲突保留草稿与员工偏好，并把实时建议交给 MP-12", async () => {
     const confirm = definitions[0] as ConfirmPageDefinition;
     const instance = pageInstance(confirm);
-    instance.data.pageState = "ready";
+    await confirm.loadConfirmation.call(instance);
     mocks.createConfirmedBooking.mockRejectedValue(
-      new CustomerApiError(409, "STAFF_TIME_CONFLICT", "这个员工的时段刚被占用。"),
+      Object.assign(
+        new CustomerApiError(409, "BOOKING_TIME_CONFLICT", "刚刚有人选走了这个时段。"),
+        {
+          suggestions: [
+            {
+              date: "2026-08-26",
+              startsAt: "2026-08-26T07:00:00.000Z",
+              endsAt: "2026-08-26T08:15:00.000Z",
+              staff: { id: "zhaohang", displayName: "赵航" },
+            },
+          ],
+        },
+      ),
     );
 
     await confirm.submitBooking.call(instance);
 
     expect(mocks.clearBookingDraft).not.toHaveBeenCalled();
-    expect(instance.data).toMatchObject({
-      pageState: "ready",
-      submitting: false,
-      submissionError: "这个员工的时段刚被占用。",
-      submissionActionPath: "/pages/booking-time/index",
-      submissionActionLabel: "重新选择时段",
+    expect(mocks.writeBookingConflict).toHaveBeenCalledWith({
+      requestedStartsAt: "2026-08-26T05:00:00.000Z",
+      petLabel: "团子 · 犬 · 8.4kg · 小型",
+      serviceLabel: "犬基础洗护 + 口腔清洁",
+      staffPreferenceLabel: "最快可约",
+      suggestions: [
+        {
+          date: "2026-08-26",
+          startsAt: "2026-08-26T07:00:00.000Z",
+          endsAt: "2026-08-26T08:15:00.000Z",
+          staff: { id: "zhaohang", displayName: "赵航" },
+        },
+      ],
+    });
+    expect(wx.redirectTo).toHaveBeenCalledWith({
+      url: "/pages/booking-conflict/index",
     });
   });
 });

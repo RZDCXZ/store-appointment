@@ -4,6 +4,7 @@ import { HttpException, HttpStatus, Inject, Injectable } from "@nestjs/common";
 import { quoteBookingSelection } from "@rongguang/contracts";
 import type {
   BookingDetailResponse,
+  BookingConflictSuggestion,
   BookingSelectionLine,
   BookingSelectionQuote,
   ConfirmedBooking,
@@ -18,6 +19,7 @@ import {
   bookingWindowFor,
   earliestCustomerCandidate,
 } from "../booking-availability/availability.js";
+import { BookingAvailabilityService } from "../booking-availability/booking-availability.service.js";
 import { getBookingCodeSecret, getDemoNow } from "../config/environment.js";
 import { DatabaseService } from "../database/database.service.js";
 import { getShanghaiLocalDate } from "../schedule/schedule-date.js";
@@ -67,7 +69,16 @@ interface BookingRow {
 
 interface IdempotencyRow {
   request_digest: string;
-  booking_id: string;
+  booking_id: string | null;
+  response_status: number | null;
+  response_body: unknown | null;
+}
+
+interface BookingConflictBody {
+  code: "BOOKING_TIME_CONFLICT";
+  message: string;
+  nextStep: "conflict";
+  suggestions: BookingConflictSuggestion[];
 }
 
 interface DatabaseError {
@@ -111,6 +122,29 @@ function parseCreateInput(body: unknown): CreateBookingInput {
   if (typeof input.startsAt !== "string" || !Number.isFinite(Date.parse(input.startsAt))) {
     fieldErrors.startsAt = "请选择有效的预约开始时间。";
   }
+  const staffPreference = (() => {
+    if (input.staffPreference === undefined) {
+      return { kind: "specified", staffId: input.staffId } as const;
+    }
+    if (!input.staffPreference || typeof input.staffPreference !== "object") {
+      fieldErrors.staffPreference = "请选择有效的员工偏好。";
+      return null;
+    }
+    const preference = input.staffPreference as Record<string, unknown>;
+    if (preference.kind === "fastest") {
+      return { kind: "fastest" } as const;
+    }
+    if (
+      preference.kind === "specified" &&
+      typeof preference.staffId === "string" &&
+      idPattern.test(preference.staffId) &&
+      preference.staffId === input.staffId
+    ) {
+      return { kind: "specified", staffId: preference.staffId } as const;
+    }
+    fieldErrors.staffPreference = "指定员工偏好必须与本次分配员工一致。";
+    return null;
+  })();
   if (Object.keys(fieldErrors).length > 0) {
     validationError(fieldErrors);
   }
@@ -121,6 +155,7 @@ function parseCreateInput(body: unknown): CreateBookingInput {
     primaryServiceId: input.primaryServiceId as string,
     addonIds: [...(input.addonIds as string[])].sort(),
     staffId: input.staffId as string,
+    staffPreference: staffPreference as CreateBookingInput["staffPreference"],
     startsAt: new Date(input.startsAt as string).toISOString(),
   };
 }
@@ -209,12 +244,15 @@ export class BookingService {
   constructor(
     @Inject(DatabaseService) private readonly database: DatabaseService,
     @Inject(ServiceCatalogService) private readonly catalog: ServiceCatalogService,
+    @Inject(BookingAvailabilityService)
+    private readonly availability: BookingAvailabilityService,
   ) {}
 
   async createConfirmed(customerId: string, body: unknown): Promise<CreateBookingResponse> {
     const input = parseCreateInput(body);
     const digest = requestDigest(input);
     const client = await this.database.pool.connect();
+    let clientReleased = false;
 
     try {
       await client.query("BEGIN TRANSACTION ISOLATION LEVEL READ COMMITTED");
@@ -223,7 +261,7 @@ export class BookingService {
       ]);
       const existing = await client.query<IdempotencyRow>(
         `
-          SELECT request_digest, booking_id
+          SELECT request_digest, booking_id, response_status, response_body
           FROM booking_idempotency_keys
           WHERE customer_id = $1
             AND command_type = 'create_booking'
@@ -240,6 +278,17 @@ export class BookingService {
             "这个幂等键已经用于另一份预约草稿，请重新提交。",
             HttpStatus.CONFLICT,
           );
+        }
+        if (!previous.booking_id) {
+          if (
+            previous.response_status &&
+            previous.response_body &&
+            typeof previous.response_body === "object"
+          ) {
+            await client.query("COMMIT");
+            throw new HttpException(previous.response_body, previous.response_status);
+          }
+          throw new Error("预约幂等结果缺少成功预约或失败响应。");
         }
         const booking = await this.findBooking(client, customerId, previous.booking_id);
         await client.query("COMMIT");
@@ -369,36 +418,140 @@ export class BookingService {
       return { booking, verificationCode: code };
     } catch (error) {
       await client.query("ROLLBACK").catch(() => undefined);
-      if (error instanceof HttpException) throw error;
       const databaseError = error as DatabaseError;
-      if (databaseError.code === "23P01") {
-        if (databaseError.constraint === "bookings_pet_service_exclusion") {
+      if (
+        this.isBookingTimeConflict(error) ||
+        databaseError.code === "23P01" ||
+        databaseError.code === "40001" ||
+        databaseError.code === "40P01"
+      ) {
+        client.release();
+        clientReleased = true;
+        await this.throwBookingTimeConflict(customerId, input, digest);
+      }
+      if (error instanceof HttpException) throw error;
+      throw error;
+    } finally {
+      if (!clientReleased) {
+        client.release();
+      }
+    }
+  }
+
+  private isBookingTimeConflict(error: unknown): boolean {
+    if (!(error instanceof HttpException)) return false;
+    const response = error.getResponse();
+    if (!response || typeof response !== "object") return false;
+    const code = (response as { code?: unknown }).code;
+    return code === "STAFF_TIME_CONFLICT" || code === "PET_TIME_CONFLICT";
+  }
+
+  private async throwBookingTimeConflict(
+    customerId: string,
+    input: CreateBookingInput,
+    digest: string,
+  ): Promise<never> {
+    const availability = await this.availability.discover({
+      customerId,
+      petId: input.petId,
+      primaryServiceId: input.primaryServiceId,
+      addonIds: input.addonIds.join(","),
+      staffId:
+        input.staffPreference.kind === "specified" ? input.staffPreference.staffId : undefined,
+    });
+    const requestedStart = Date.parse(input.startsAt);
+    const nearbySuggestions: BookingConflictSuggestion[] = availability.days
+      .flatMap((day) =>
+        day.slots.map((slot) => ({
+          date: day.date,
+          startsAt: slot.startsAt,
+          endsAt: slot.endsAt,
+          staff: {
+            id: slot.staff.id,
+            displayName: slot.staff.displayName,
+          },
+        })),
+      )
+      .filter((suggestion) => suggestion.startsAt !== input.startsAt)
+      .sort((left, right) => {
+        const distance =
+          Math.abs(Date.parse(left.startsAt) - requestedStart) -
+          Math.abs(Date.parse(right.startsAt) - requestedStart);
+        return distance || left.startsAt.localeCompare(right.startsAt);
+      })
+      .slice(0, 5);
+    const suggestions = nearbySuggestions.length >= 3 ? nearbySuggestions : [];
+
+    const proposed: BookingConflictBody = {
+      code: "BOOKING_TIME_CONFLICT",
+      message: "刚刚有人选走了这个时段，请选择相近可用安排。",
+      nextStep: "conflict",
+      suggestions,
+    };
+    const client = await this.database.pool.connect();
+    let response = proposed;
+
+    try {
+      await client.query("BEGIN");
+      await client.query("SELECT pg_advisory_xact_lock(hashtextextended($1, 0))", [
+        `${customerId}:create_booking:${input.idempotencyKey}`,
+      ]);
+      const existing = await client.query<IdempotencyRow>(
+        `
+          SELECT request_digest, booking_id, response_status, response_body
+          FROM booking_idempotency_keys
+          WHERE customer_id = $1
+            AND command_type = 'create_booking'
+            AND idempotency_key = $2
+        `,
+        [customerId, input.idempotencyKey],
+      );
+      const previous = existing.rows[0];
+
+      if (previous) {
+        if (previous.request_digest !== digest) {
           businessError(
-            "PET_TIME_CONFLICT",
-            "这只宠物在所选时间已有预约，请选择其他时段。",
+            "IDEMPOTENCY_KEY_REUSED",
+            "这个幂等键已经用于另一份预约草稿，请重新提交。",
             HttpStatus.CONFLICT,
-            { nextStep: "time" },
           );
         }
-        businessError(
-          "STAFF_TIME_CONFLICT",
-          "这个员工的时段刚被占用，请选择相近时段。",
-          HttpStatus.CONFLICT,
-          { nextStep: "time" },
+        if (
+          previous.response_status !== HttpStatus.CONFLICT ||
+          !previous.response_body ||
+          typeof previous.response_body !== "object"
+        ) {
+          throw new Error("冲突命令的幂等结果不是可重放的失败响应。");
+        }
+        response = previous.response_body as BookingConflictBody;
+      } else {
+        await client.query(
+          `
+            INSERT INTO booking_idempotency_keys (
+              customer_id, command_type, idempotency_key, request_digest,
+              booking_id, response_status, response_body, created_at
+            )
+            VALUES ($1, 'create_booking', $2, $3, NULL, $4, $5::jsonb, $6)
+          `,
+          [
+            customerId,
+            input.idempotencyKey,
+            digest,
+            HttpStatus.CONFLICT,
+            JSON.stringify(proposed),
+            getDemoNow(),
+          ],
         );
       }
-      if (databaseError.code === "40001") {
-        businessError(
-          "SLOT_NO_LONGER_AVAILABLE",
-          "所选时段的容量刚刚发生变化，请重新选择。",
-          HttpStatus.CONFLICT,
-          { nextStep: "time" },
-        );
-      }
+      await client.query("COMMIT");
+    } catch (error) {
+      await client.query("ROLLBACK").catch(() => undefined);
       throw error;
     } finally {
       client.release();
     }
+
+    throw new HttpException(response, HttpStatus.CONFLICT);
   }
 
   async detail(customerId: string, bookingId: string): Promise<BookingDetailResponse> {

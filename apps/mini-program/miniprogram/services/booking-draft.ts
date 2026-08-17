@@ -3,6 +3,7 @@ export const bookingFlowPaths = {
   service: "/pages/booking-service/index",
   staff: "/pages/booking-staff/index",
   time: "/pages/booking-time/index",
+  conflict: "/pages/booking-conflict/index",
   confirm: "/pages/booking-confirm/index",
 } as const;
 

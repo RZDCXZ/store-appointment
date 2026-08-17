@@ -28,6 +28,7 @@
 | MP-09     | 日期与时段     | 微信小程序 | `pages/booking-time/index`                  | `apps/mini-program/miniprogram/pages/booking-time/`        | 已完成 | 14 日真实时段、直达恢复、过期日期与刷新草稿测试           |
 | MP-10     | 确认预约       | 微信小程序 | `pages/booking-confirm/index`               | `apps/mini-program/miniprogram/pages/booking-confirm/`     | 已完成 | 持久草稿直达、服务端事实复核、提交冲突恢复测试            |
 | MP-11     | 预约成功       | 微信小程序 | `pages/booking-success/index?id=:bookingId` | `apps/mini-program/miniprogram/pages/booking-success/`     | 已完成 | 按预约身份直达与刷新，重新读取服务端预约快照              |
+| MP-12     | 时段冲突与建议 | 微信小程序 | `pages/booking-conflict/index`              | `apps/mini-program/miniprogram/pages/booking-conflict/`    | 已完成 | 持久草稿与冲突上下文直达、刷新、无建议恢复和交互测试      |
 | MP-13     | 预约记录       | 微信小程序 | `pages/appointments/index`                  | `apps/mini-program/miniprogram/pages/appointments/`        | 骨架   | `app.json` tab 登记 + 项目契约测试                        |
 | MP-16     | 消息           | 微信小程序 | `pages/messages/index`                      | `apps/mini-program/miniprogram/pages/messages/`            | 骨架   | `app.json` tab 登记 + 项目契约测试                        |
 | MP-17     | 我的           | 微信小程序 | `pages/profile/index`                       | `apps/mini-program/miniprogram/pages/profile/`             | 已完成 | `app.json` tab 登记 + 会话恢复                            |

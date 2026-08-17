@@ -448,7 +448,18 @@ export interface CreateBookingInput {
   primaryServiceId: string;
   addonIds: string[];
   staffId: string;
+  staffPreference: { kind: "fastest" } | { kind: "specified"; staffId: string };
   startsAt: string;
+}
+
+export interface BookingConflictSuggestion {
+  date: string;
+  startsAt: string;
+  endsAt: string;
+  staff: {
+    id: string;
+    displayName: string;
+  };
 }
 
 export interface ConfirmedBooking {

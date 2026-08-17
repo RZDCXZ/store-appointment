@@ -10,6 +10,7 @@ import type {
   RongguangApp,
   StoredCustomerSession,
 } from "../types/customer";
+import { clearBookingConflict } from "./booking-conflict";
 import { clearBookingDraft } from "./booking-draft";
 
 const SESSION_STORAGE_KEY = "rongguang.customer-session";
@@ -29,6 +30,7 @@ const recoverablePagePaths = new Set([
   "/pages/booking-service/index",
   "/pages/booking-staff/index",
   "/pages/booking-time/index",
+  "/pages/booking-conflict/index",
   "/pages/booking-confirm/index",
   "/pages/booking-success/index",
 ]);
@@ -247,6 +249,7 @@ export async function switchDemoCustomer(customerKey: string): Promise<CustomerP
   });
   if (previousCustomerKey !== session.customerKey) {
     clearBookingDraft();
+    clearBookingConflict();
   }
   persistSession(session);
   return session.customer;

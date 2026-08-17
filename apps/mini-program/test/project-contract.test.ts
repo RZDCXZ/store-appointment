@@ -133,4 +133,18 @@ describe("原生小程序项目契约", () => {
       ),
     );
   });
+
+  it("MP-12 时段冲突是可直接打开并恢复冲突上下文的独立页面", async () => {
+    const appConfig = JSON.parse(
+      await readFile(new URL("../miniprogram/app.json", import.meta.url), "utf8"),
+    ) as { pages: string[] };
+    const conflictPage = "pages/booking-conflict/index";
+
+    expect(appConfig.pages).toContain(conflictPage);
+    await Promise.all(
+      ["ts", "json", "wxml", "wxss"].map((extension) =>
+        access(new URL(`../miniprogram/${conflictPage}.${extension}`, import.meta.url)),
+      ),
+    );
+  });
 });

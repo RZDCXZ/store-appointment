@@ -1,0 +1,130 @@
+@import "../../styles/booking-flow.wxss";
+
+.conflict-page {
+  padding-bottom: calc(env(safe-area-inset-bottom) + 44rpx);
+}
+
+.conflict-alert {
+  display: flex;
+  gap: 20rpx;
+  margin-top: 34rpx;
+  padding: 28rpx;
+  border-radius: 28rpx;
+  color: #7d4038;
+  background: #f9e2dc;
+}
+
+.conflict-alert__mark {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 48rpx;
+  height: 48rpx;
+  flex: none;
+  border: 3rpx solid currentColor;
+  border-radius: 50%;
+  font-weight: 800;
+}
+
+.conflict-alert__title,
+.conflict-alert__body,
+.suggestion-card text {
+  display: block;
+}
+
+.conflict-alert__title {
+  font-size: 34rpx;
+  font-weight: 700;
+}
+
+.conflict-alert__body {
+  margin-top: 10rpx;
+  font-size: 25rpx;
+  line-height: 1.55;
+}
+
+.preserved-summary {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12rpx;
+  margin-top: 22rpx;
+}
+
+.preserved-summary text {
+  padding: 12rpx 18rpx;
+  border: 1rpx solid #ddd7cb;
+  border-radius: 999rpx;
+  background: #fffcf7;
+  font-size: 23rpx;
+}
+
+.suggestion-list {
+  display: flex;
+  flex-direction: column;
+  gap: 16rpx;
+  margin-top: 18rpx;
+}
+
+.suggestion-card {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 18rpx;
+  align-items: center;
+  box-sizing: border-box;
+  width: 100%;
+  min-height: 164rpx;
+  margin: 0;
+  padding: 24rpx;
+  border: 1rpx solid #ddd7cb;
+  border-radius: 24rpx;
+  color: #24312c;
+  background: #fffcf7;
+  text-align: left;
+}
+
+.suggestion-card::after,
+.secondary-button::after {
+  border: 0;
+}
+
+.suggestion-card--nearest {
+  border: 3rpx solid #3f6253;
+  background: #f4f8f4;
+}
+
+.suggestion-card__date,
+.suggestion-card__staff {
+  color: #61706a;
+  font-size: 24rpx;
+}
+
+.suggestion-card__time {
+  margin-top: 7rpx;
+  font-size: 34rpx;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+.suggestion-card__staff {
+  margin-top: 7rpx;
+}
+
+.suggestion-card__action {
+  max-width: 176rpx;
+  color: #3f6253;
+  font-size: 23rpx;
+  font-weight: 700;
+  text-align: right;
+}
+
+.secondary-button {
+  width: 100%;
+  min-height: 92rpx;
+  margin-top: 28rpx;
+  border: 1rpx solid #3f6253;
+  border-radius: 20rpx;
+  color: #3f6253;
+  background: transparent;
+  font-size: 28rpx;
+  font-weight: 700;
+}

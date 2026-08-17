@@ -2,6 +2,7 @@ import type { BookingAvailabilityResponse } from "@rongguang/contracts";
 
 import { createConfirmedBooking } from "../../services/booking-api";
 import { fetchBookingAvailability } from "../../services/booking-availability-api";
+import { writeBookingConflict } from "../../services/booking-conflict";
 import {
   bookingFlowPaths,
   clearBookingDraft,
@@ -166,6 +167,24 @@ Page({
           url: `/pages/privacy-consent/index?returnTo=${encodeURIComponent(bookingFlowPaths.confirm)}`,
         });
         return;
+      }
+      if (error instanceof CustomerApiError && error.code === "BOOKING_TIME_CONFLICT") {
+        const conflictedDraft = readBookingDraft();
+        if (conflictedDraft.selectedTime && conflictedDraft.staffPreference) {
+          writeBookingConflict({
+            requestedStartsAt: conflictedDraft.selectedTime.startsAt,
+            petLabel: this.data.petLabel,
+            serviceLabel: this.data.serviceLabel,
+            staffPreferenceLabel:
+              conflictedDraft.staffPreference.kind === "fastest"
+                ? "最快可约"
+                : `指定员工 · ${this.data.staffLabel}`,
+            suggestions: error.suggestions,
+          });
+          this.setData({ submitting: false });
+          wx.redirectTo({ url: bookingFlowPaths.conflict });
+          return;
+        }
       }
       const action = error instanceof CustomerApiError ? actionFor(error.code) : null;
       this.setData({
