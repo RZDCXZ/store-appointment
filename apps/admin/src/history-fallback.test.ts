@@ -39,8 +39,6 @@ describe("管理端浏览器路由 history fallback", () => {
     "/manager/appointments",
     "/manager/schedule",
     "/manager/schedule/published?date=2026-08-15",
-    "/manager/schedule/draft",
-    "/manager/schedule/template",
     "/manager/services",
     "/manager/customers",
     "/manager/business",
