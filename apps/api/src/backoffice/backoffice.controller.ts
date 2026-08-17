@@ -5,15 +5,30 @@ import {
   HttpStatus,
   Inject,
   Param,
+  Query,
   Req,
+  Res,
+  Sse,
   UseGuards,
 } from "@nestjs/common";
+import type { MessageEvent } from "@nestjs/common";
 import { ApiOperation, ApiTags } from "@nestjs/swagger";
-import { backofficeNavigation, type BackofficeLandingResponse } from "@rongguang/contracts";
+import {
+  backofficeNavigation,
+  type BackofficeLandingResponse,
+  type ManagerBookingDetailResponse,
+  type ManagerCalendarResponse,
+  type ManagerWorkbenchResponse,
+} from "@rongguang/contracts";
+import type { FastifyReply } from "fastify";
+import type { Observable } from "rxjs";
 
 import type { AuthenticatedRequest } from "../auth/auth.types.js";
+import { ManagerGuard } from "../auth/manager.guard.js";
 import { SessionGuard } from "../auth/session.guard.js";
 import { SessionService } from "../auth/session.service.js";
+import { LiveRefreshService } from "../live-refresh/live-refresh.service.js";
+import { ManagerLiveBookingService } from "./manager-live-booking.service.js";
 
 function forbidden(): never {
   throw new HttpException(
@@ -26,19 +41,50 @@ function forbidden(): never {
 @Controller("backoffice")
 @UseGuards(SessionGuard)
 export class BackofficeController {
-  constructor(@Inject(SessionService) private readonly sessions: SessionService) {}
+  constructor(
+    @Inject(SessionService) private readonly sessions: SessionService,
+    @Inject(ManagerLiveBookingService)
+    private readonly managerBookings: ManagerLiveBookingService,
+    @Inject(LiveRefreshService) private readonly liveRefresh: LiveRefreshService,
+  ) {}
 
   @Get("manager/workbench")
-  @ApiOperation({ summary: "读取店长工作台身份与导航" })
-  managerWorkbench(@Req() request: AuthenticatedRequest): BackofficeLandingResponse {
-    if (request.backofficeIdentity.role !== "manager") {
-      forbidden();
-    }
+  @UseGuards(ManagerGuard)
+  @ApiOperation({ summary: "读取风险优先的店长今日工作台事实与容量" })
+  managerWorkbench(
+    @Res({ passthrough: true }) reply: FastifyReply,
+  ): Promise<ManagerWorkbenchResponse> {
+    reply.header("Cache-Control", "no-store");
+    return this.managerBookings.workbench();
+  }
 
-    return {
-      account: request.backofficeIdentity,
-      navigation: backofficeNavigation.manager.map((item) => item.label),
-    };
+  @Get("manager/calendar")
+  @UseGuards(ManagerGuard)
+  @ApiOperation({ summary: "按四名员工读取日历、预约与当前门店容量" })
+  managerCalendar(
+    @Query("date") date: string | undefined,
+    @Res({ passthrough: true }) reply: FastifyReply,
+  ): Promise<ManagerCalendarResponse> {
+    reply.header("Cache-Control", "no-store");
+    return this.managerBookings.calendar(date);
+  }
+
+  @Get("manager/bookings/:bookingId")
+  @UseGuards(ManagerGuard)
+  @ApiOperation({ summary: "按可恢复详情入口读取店长可见预约事实" })
+  managerBookingDetail(
+    @Param("bookingId") bookingId: string,
+    @Res({ passthrough: true }) reply: FastifyReply,
+  ): Promise<ManagerBookingDetailResponse> {
+    reply.header("Cache-Control", "no-store");
+    return this.managerBookings.bookingDetail(bookingId);
+  }
+
+  @Sse("manager/events")
+  @UseGuards(ManagerGuard)
+  @ApiOperation({ summary: "发送仅用于回源刷新的店长 SSE 提示" })
+  managerEvents(): Observable<MessageEvent> {
+    return this.liveRefresh.managerEvents();
   }
 
   @Get("staff/:staffId/today")

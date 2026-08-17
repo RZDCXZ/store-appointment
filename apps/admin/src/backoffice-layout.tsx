@@ -130,9 +130,13 @@ export function BackofficeLayout({ account }: { account: BackofficeAccount }): R
           </ul>
         </nav>
         <div className="identity-card">
-          <span className="identity-avatar" aria-hidden="true">
-            {account.displayName.slice(0, 1)}
-          </span>
+          {account.role === "manager" ? (
+            <img className="identity-avatar" src="/assets/brand/rongguang-hero-shiba.png" alt="" />
+          ) : (
+            <span className="identity-avatar" aria-hidden="true">
+              {account.displayName.slice(0, 1)}
+            </span>
+          )}
           <span>
             <strong>{account.displayName}</strong>
             <small>

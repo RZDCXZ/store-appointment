@@ -8,6 +8,8 @@
 **/coverage/
 **/dist/
 **/node_modules/
+**/playwright-report/
+**/test-results/
 apps/mini-program/project.config.json
 apps/mini-program/project.private.config.json
 apps/mini-program/private.*

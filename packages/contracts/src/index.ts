@@ -1,3 +1,5 @@
+export * from "./manager-live-booking.js";
+
 export interface HealthResponse {
   service: "rongguang-api";
   status: "ok";

@@ -116,7 +116,22 @@ describe("后台登录与角色路由", () => {
       }
 
       if (url.endsWith("/backoffice/manager/workbench")) {
-        return jsonResponse({ account: managerAccount, navigation: ["工作台"] });
+        return jsonResponse({
+          timeZone: "Asia/Shanghai",
+          demoNow: "2026-08-13T02:50:00.000Z",
+          localDate: "2026-08-13",
+          risks: [],
+          statusSummary: {
+            confirmed: 0,
+            checked_in: 0,
+            completed: 0,
+            cancelled: 0,
+            no_show: 0,
+            terminated: 0,
+          },
+          staffDays: [],
+          capacity: { publishedMinutes: 0, occupiedMinutes: 0, remainingMinutes: 0 },
+        });
       }
 
       if (url.endsWith("/health")) {
