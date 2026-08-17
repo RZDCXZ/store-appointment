@@ -96,4 +96,25 @@ describe("原生小程序项目契约", () => {
       ),
     );
   });
+
+  it("MP-06 至 MP-09 是可直接打开并从持久草稿恢复的独立原生页面", async () => {
+    const appConfig = JSON.parse(
+      await readFile(new URL("../miniprogram/app.json", import.meta.url), "utf8"),
+    ) as { pages: string[] };
+    const bookingPages = [
+      "pages/booking-pet/index",
+      "pages/booking-service/index",
+      "pages/booking-staff/index",
+      "pages/booking-time/index",
+    ];
+
+    expect(appConfig.pages).toEqual(expect.arrayContaining(bookingPages));
+    await Promise.all(
+      bookingPages.flatMap((page) =>
+        ["ts", "json", "wxml", "wxss"].map((extension) =>
+          access(new URL(`../miniprogram/${page}.${extension}`, import.meta.url)),
+        ),
+      ),
+    );
+  });
 });

@@ -1,0 +1,20 @@
+<view class="booking-page">
+  <view class="booking-progress"><text>预约步骤 1/4</text><view class="booking-progress__track"><text class="booking-progress__value" style="width:25%"></text></view></view>
+  <view class="booking-question"><text class="booking-question__number">01</text><text class="booking-question__title">这次为谁预约？</text><text class="booking-question__body">请选择一只在用宠物，后续服务会按种类与当前体重匹配。</text></view>
+
+  <view wx:if="{{pageState === 'loading'}}" class="booking-state"><text class="booking-state__mark">茸</text><text class="booking-state__title">正在读取宠物档案</text></view>
+  <view wx:elif="{{pageState === 'auth'}}" class="booking-state"><text class="booking-state__mark">顾</text><text class="booking-state__title">请先选择演示顾客</text><text class="booking-state__body">预约草稿会在重新选择后继续保留。</text><button class="primary-button" bindtap="chooseCustomer">选择演示顾客</button></view>
+  <view wx:elif="{{pageState === 'error'}}" class="booking-state"><text class="booking-state__mark">!</text><text class="booking-state__title">宠物档案没有加载出来</text><text class="booking-state__body">{{errorMessage}}</text><button class="primary-button" bindtap="retry">重新加载</button></view>
+  <view wx:elif="{{pageState === 'empty'}}" class="booking-state"><text class="booking-state__mark">宠</text><text class="booking-state__title">还没有在用宠物</text><text class="booking-state__body">先建立宠物档案，再继续选择服务。</text><button class="primary-button" bindtap="addPet">新建宠物档案</button></view>
+  <block wx:else>
+    <view class="booking-list">
+      <button class="booking-card {{selectedPetId === item.id ? 'booking-card--selected' : ''}}" wx:for="{{pets}}" wx:key="id" data-id="{{item.id}}" bindtap="selectPet">
+        <image class="booking-card__image" src="{{item.photoUrl}}" mode="aspectFill" />
+        <view class="booking-card__copy"><text class="booking-card__title">{{item.name}}</text><text class="booking-card__meta">{{item.profileLine}}</text><text class="booking-card__detail" wx:if="{{item.careTagsLabel}}">护理标签：{{item.careTagsLabel}}</text></view>
+        <text class="booking-card__check">✓</text>
+      </button>
+    </view>
+    <button class="booking-add" bindtap="addPet">＋ 新增宠物档案</button>
+  </block>
+</view>
+<view class="booking-footer" wx:if="{{pageState === 'ready'}}"><view class="booking-footer__summary"><text>当前选择</text><text>{{selectedPetId ? '已选择宠物' : '请选择宠物'}}</text></view><button disabled="{{!selectedPetId}}" bindtap="continueFlow">继续</button></view>

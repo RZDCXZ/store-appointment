@@ -6,5 +6,6 @@ import { ServiceCatalogService } from "./service-catalog.service.js";
 @Module({
   controllers: [ServiceCatalogController],
   providers: [ServiceCatalogService],
+  exports: [ServiceCatalogService],
 })
 export class ServiceCatalogModule {}

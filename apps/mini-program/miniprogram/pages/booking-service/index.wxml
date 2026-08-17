@@ -1,0 +1,17 @@
+<view class="booking-page">
+  <view class="booking-progress"><text>预约步骤 2/4</text><view class="booking-progress__track"><text class="booking-progress__value" style="width:50%"></text></view></view>
+  <view class="booking-question"><text class="booking-question__number">02</text><text class="booking-question__title">选择主要服务与增项</text><text class="booking-question__body">{{petSummary || '按宠物种类与体型匹配确定规格。'}}</text></view>
+  <view wx:if="{{pageState === 'recovery'}}" class="booking-state"><text class="booking-state__mark">←</text><text class="booking-state__title">还缺少前一步选择</text><text class="booking-state__body">{{recoveryMessage}}</text><button class="primary-button" bindtap="recover">返回恢复选择</button></view>
+  <view wx:elif="{{pageState === 'loading'}}" class="booking-state"><text class="booking-state__mark">茸</text><text class="booking-state__title">正在匹配服务规格</text></view>
+  <view wx:elif="{{pageState === 'auth'}}" class="booking-state"><text class="booking-state__mark">顾</text><text class="booking-state__title">请重新选择演示顾客</text><button class="primary-button" bindtap="chooseCustomer">选择演示顾客</button></view>
+  <view wx:elif="{{pageState === 'error'}}" class="booking-state"><text class="booking-state__mark">!</text><text class="booking-state__title">服务选择没有加载出来</text><text class="booking-state__body">{{errorMessage}}</text><button class="primary-button" bindtap="retry">重新加载</button></view>
+  <block wx:else>
+    <view class="booking-list">
+      <button class="booking-card booking-card--text {{selectedServiceId === item.id ? 'booking-card--selected' : ''}}" wx:for="{{services}}" wx:key="id" data-id="{{item.id}}" bindtap="selectService"><view class="booking-card__copy"><text class="booking-card__title">{{item.name}}｜{{pet.petSize === 'small' ? '小型' : pet.petSize === 'medium' ? '中型' : '大型'}}</text><text class="booking-card__meta">{{item.priceLabel}} · {{item.durationLabel}}</text></view><text class="booking-card__check">✓</text></button>
+    </view>
+    <view wx:if="{{quote}}" class="booking-summary"><text class="booking-summary__title">已匹配确定规格</text><text class="booking-summary__body">{{quote.primaryService.name}} · {{quote.serviceDurationMinutes}} 分钟 · {{totalPriceLabel}}</text></view>
+    <view wx:if="{{quote}}" class="booking-section-heading"><text>可选增项</text><text>同一员工连续完成</text></view>
+    <view class="booking-addons" wx:if="{{quote}}"><button class="booking-addon {{item.selected ? 'booking-addon--selected' : ''}}" wx:for="{{addons}}" wx:key="id" data-id="{{item.id}}" bindtap="toggleAddon"><view><text class="booking-addon__name">{{item.name}}</text><text class="booking-addon__detail">{{item.detail}}</text></view><text class="booking-addon__check">{{item.selected ? '✓' : '＋'}}</text></button></view>
+  </block>
+</view>
+<view class="booking-footer" wx:if="{{pageState === 'ready'}}"><view class="booking-footer__summary"><text>{{quote ? quote.serviceDurationMinutes + ' 分钟 · 同一员工' : '请选择主要服务'}}</text><text>{{totalPriceLabel}}</text></view><button disabled="{{!quote}}" bindtap="continueFlow">继续</button></view>

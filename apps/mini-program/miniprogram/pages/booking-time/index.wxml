@@ -1,0 +1,17 @@
+<view class="booking-page">
+  <view class="booking-progress"><text>预约步骤 4/4</text><view class="booking-progress__track"><text class="booking-progress__value" style="width:100%"></text></view></view>
+  <view class="booking-question"><text class="booking-question__number">04</text><text class="booking-question__title">选择日期与开始时间</text><text class="booking-question__body">时段已考虑营业、技能、已发布班次、休息、已有预约与 15 分钟周转。</text></view>
+  <view wx:if="{{pageState === 'recovery'}}" class="booking-state"><text class="booking-state__mark">←</text><text class="booking-state__title">还缺少前一步选择</text><text class="booking-state__body">{{recoveryMessage}}</text><button class="primary-button" bindtap="recover">返回恢复选择</button></view>
+  <view wx:elif="{{pageState === 'loading'}}" class="booking-state"><text class="booking-state__mark">茸</text><text class="booking-state__title">正在计算真实可约时段</text></view>
+  <view wx:elif="{{pageState === 'auth'}}" class="booking-state"><text class="booking-state__mark">顾</text><text class="booking-state__title">请重新选择演示顾客</text><button class="primary-button" bindtap="chooseCustomer">选择演示顾客</button></view>
+  <view wx:elif="{{pageState === 'error'}}" class="booking-state"><text class="booking-state__mark">!</text><text class="booking-state__title">可约时段没有加载出来</text><text class="booking-state__body">{{errorMessage}}</text><button class="primary-button" bindtap="retry">重新加载</button></view>
+  <block wx:else>
+    <view class="booking-summary"><text class="booking-summary__title">{{summary}}</text><text class="booking-summary__body">{{totalPriceLabel}} · 门店另预留 15 分钟交接，不计入服务时长</text></view>
+    <text wx:if="{{staleSelectionMessage}}" class="availability-banner">{{staleSelectionMessage}}</text>
+    <scroll-view class="date-scroll" scroll-x enable-flex><view class="date-row"><button class="date-chip {{item.selected ? 'date-chip--selected' : ''}} {{item.reason ? 'date-chip--unavailable' : ''}}" wx:for="{{days}}" wx:key="date" data-date="{{item.date}}" bindtap="selectDate"><text class="date-chip__date">{{item.shortDate}}</text><text class="date-chip__weekday">{{item.weekdayLabel}}</text><text wx:if="{{item.reason}}" class="date-chip__reason">{{item.reasonLabel}}</text></button></view></scroll-view>
+    <view class="booking-section-heading"><text>{{selectedDay ? selectedDay.shortDate + ' ' + selectedDay.weekdayLabel : '选择日期'}}</text><text>{{selectedDay && !selectedDay.reason ? selectedDay.slots.length + ' 个可约时段' : ''}}</text></view>
+    <view wx:if="{{selectedDay && selectedDay.reason}}" class="booking-inline-empty">{{selectedDay.reasonLabel}}。请选择其他日期继续。</view>
+    <view wx:elif="{{selectedDay}}" class="time-grid"><button class="time-slot {{item.selected ? 'time-slot--selected' : ''}}" wx:for="{{selectedDay.slots}}" wx:key="startsAt" data-start="{{item.startsAt}}" bindtap="selectTime"><text class="time-slot__time">{{item.startsAtLabel}}–{{item.endsAtLabel}}</text><text class="time-slot__staff">{{item.staff.displayName}} · 可完成全部服务</text></button></view>
+  </block>
+</view>
+<view class="booking-footer" wx:if="{{pageState === 'ready'}}"><view class="booking-footer__summary"><text>当前时段</text><text>{{selectedStartsAt ? '已保存真实时段' : '请选择时段'}}</text></view><button disabled="{{!selectedStartsAt}}" bindtap="saveTime">保存时段</button></view>

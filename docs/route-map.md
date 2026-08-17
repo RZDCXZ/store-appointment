@@ -22,6 +22,10 @@
 | MP-04     | 新建宠物       | 微信小程序 | `pages/pet-form/index`                     | `apps/mini-program/miniprogram/pages/pet-form/`            | 已完成 | 新建路径／页面生命周期测试 + 开发者工具载入（2026-08-17） |
 | MP-04     | 编辑宠物       | 微信小程序 | `pages/pet-form/index?id=:petId`           | `apps/mini-program/miniprogram/pages/pet-form/`            | 已完成 | 查询参数传入初始化 + 重新拉取档案测试（2026-08-17）       |
 | MP-05     | 隐私同意       | 微信小程序 | `pages/privacy-consent/index`              | `apps/mini-program/miniprogram/pages/privacy-consent/`     | 已完成 | 页面生命周期／返回路径恢复 + 开发者工具载入（2026-08-17） |
+| MP-06     | 预约选择宠物   | 微信小程序 | `pages/booking-pet/index`                  | `apps/mini-program/miniprogram/pages/booking-pet/`         | 已完成 | 独立页面登记、直达隐私门禁、前进栈与草稿恢复测试          |
+| MP-07     | 服务与增项     | 微信小程序 | `pages/booking-service/index`              | `apps/mini-program/miniprogram/pages/booking-service/`     | 已完成 | 缺失宠物恢复、实时组合计算、前进／返回与刷新草稿测试      |
+| MP-08     | 员工偏好       | 微信小程序 | `pages/booking-staff/index`                | `apps/mini-program/miniprogram/pages/booking-staff/`       | 已完成 | 缺失服务恢复、指定员工／最快可约与前进栈测试              |
+| MP-09     | 日期与时段     | 微信小程序 | `pages/booking-time/index`                 | `apps/mini-program/miniprogram/pages/booking-time/`        | 已完成 | 14 日真实时段、直达恢复、过期日期与刷新草稿测试           |
 | MP-13     | 预约记录       | 微信小程序 | `pages/appointments/index`                 | `apps/mini-program/miniprogram/pages/appointments/`        | 骨架   | `app.json` tab 登记 + 项目契约测试                        |
 | MP-16     | 消息           | 微信小程序 | `pages/messages/index`                     | `apps/mini-program/miniprogram/pages/messages/`            | 骨架   | `app.json` tab 登记 + 项目契约测试                        |
 | MP-17     | 我的           | 微信小程序 | `pages/profile/index`                      | `apps/mini-program/miniprogram/pages/profile/`             | 已完成 | `app.json` tab 登记 + 会话恢复                            |

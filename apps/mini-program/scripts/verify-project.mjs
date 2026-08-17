@@ -42,6 +42,15 @@ const requiredFiles = [
   "miniprogram/pages/privacy-consent/index.ts",
   "miniprogram/pages/privacy-consent/index.wxml",
   "miniprogram/pages/privacy-consent/index.wxss",
+  ...["booking-pet", "booking-service", "booking-staff", "booking-time"].flatMap((page) =>
+    ["json", "ts", "wxml", "wxss"].map(
+      (extension) => `miniprogram/pages/${page}/index.${extension}`,
+    ),
+  ),
+  "miniprogram/services/booking-availability-api.ts",
+  "miniprogram/services/booking-draft.ts",
+  "miniprogram/services/booking-presentation.ts",
+  "miniprogram/services/booking-selection.ts",
   "miniprogram/services/customer-api.ts",
   "miniprogram/services/pet-profile-api.ts",
   "miniprogram/services/pet-profile-presentation.ts",
@@ -73,10 +82,16 @@ export async function verifyProject() {
     "pages/pets/index",
     "pages/pet-form/index",
     "pages/privacy-consent/index",
+    "pages/booking-pet/index",
+    "pages/booking-service/index",
+    "pages/booking-staff/index",
+    "pages/booking-time/index",
   ];
 
   if (!requiredPages.every((page) => appConfig.pages?.includes(page))) {
-    throw new Error("miniprogram/app.json 必须登记顾客 tab、服务目录、宠物档案与隐私页面。");
+    throw new Error(
+      "miniprogram/app.json 必须登记顾客 tab、服务目录、宠物档案、隐私与预约步骤页面。",
+    );
   }
 
   console.info(`原生小程序项目结构检查通过：${requiredPages.join("、")}`);

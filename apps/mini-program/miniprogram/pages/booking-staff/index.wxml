@@ -1,0 +1,16 @@
+<view class="booking-page">
+  <view class="booking-progress"><text>预约步骤 3/4</text><view class="booking-progress__track"><text class="booking-progress__value" style="width:75%"></text></view></view>
+  <view class="booking-question"><text class="booking-question__number">03</text><text class="booking-question__title">有偏好的员工吗？</text><text class="booking-question__body">指定员工只查看该员工时段；最快可约会按最早时间、当天服务分钟数和固定员工编号确定。</text></view>
+  <view wx:if="{{pageState === 'recovery'}}" class="booking-state"><text class="booking-state__mark">←</text><text class="booking-state__title">还缺少前一步选择</text><text class="booking-state__body">{{recoveryMessage}}</text><button class="primary-button" bindtap="recover">返回恢复选择</button></view>
+  <view wx:elif="{{pageState === 'loading'}}" class="booking-state"><text class="booking-state__mark">茸</text><text class="booking-state__title">正在查询合格员工</text></view>
+  <view wx:elif="{{pageState === 'auth'}}" class="booking-state"><text class="booking-state__mark">顾</text><text class="booking-state__title">请重新选择演示顾客</text><button class="primary-button" bindtap="chooseCustomer">选择演示顾客</button></view>
+  <view wx:elif="{{pageState === 'error'}}" class="booking-state"><text class="booking-state__mark">!</text><text class="booking-state__title">员工可约情况没有加载出来</text><text class="booking-state__body">{{errorMessage}}</text><button class="primary-button" bindtap="retry">重新加载</button></view>
+  <block wx:else>
+    <view class="booking-summary"><text class="booking-summary__title">本次服务</text><text class="booking-summary__body">{{summary}} · {{totalPriceLabel}}</text></view>
+    <view class="booking-list">
+      <button class="booking-card {{preferenceKey === 'fastest' ? 'booking-card--selected' : ''}}" data-id="fastest" bindtap="selectPreference"><view class="booking-card__avatar">快</view><view class="booking-card__copy"><text class="booking-card__title">最快可约</text><text class="booking-card__meta">选择时段时确定具体员工</text><text class="booking-card__detail">优先最早时间，再按当天服务分钟数与固定员工编号</text></view><text class="booking-card__check">✓</text></button>
+      <button class="booking-card {{preferenceKey === item.id ? 'booking-card--selected' : ''}}" wx:for="{{staffOptions}}" wx:key="id" data-id="{{item.id}}" bindtap="selectPreference"><view class="booking-card__avatar">{{item.avatarInitial}}</view><view class="booking-card__copy"><text class="booking-card__title">{{item.displayName}}</text><text class="booking-card__meta">本次主要服务与全部增项均可完成</text><text class="booking-card__detail">{{item.earliestLabel}}</text></view><text class="booking-card__check">✓</text></button>
+    </view>
+  </block>
+</view>
+<view class="booking-footer" wx:if="{{pageState === 'ready'}}"><view class="booking-footer__summary"><text>员工偏好</text><text>{{preferenceKey ? '已选择' : '请选择'}}</text></view><button disabled="{{!preferenceKey}}" bindtap="continueFlow">查看时段</button></view>

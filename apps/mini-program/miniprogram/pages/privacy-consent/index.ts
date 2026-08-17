@@ -8,7 +8,14 @@ import { formatShanghaiDateTime } from "../../services/pet-profile-presentation"
 type PageState = "loading" | "ready" | "error" | "auth";
 
 function safeReturnTo(value: string | undefined): string {
-  return value === "/pages/pets/index?mode=booking" || value === "/pages/pets/index" ? value : "";
+  return value === "/pages/booking-pet/index" ||
+    value === "/pages/booking-service/index" ||
+    value === "/pages/booking-staff/index" ||
+    value === "/pages/booking-time/index" ||
+    value === "/pages/pets/index?mode=booking" ||
+    value === "/pages/pets/index"
+    ? value
+    : "";
 }
 
 Page({

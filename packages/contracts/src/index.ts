@@ -314,3 +314,70 @@ export interface ManagerPublishedScheduleResponse {
   draftDayCount: number;
   staffDays: PublishedScheduleStaffDay[];
 }
+
+export type BookingAvailabilityReason =
+  "closed" | "no_qualified_staff" | "fully_booked" | "outside_open_window";
+
+export interface BookingSelectionLine {
+  id: string;
+  name: string;
+  priceCents: number;
+  durationMinutes: number;
+}
+
+export interface BookingSelectionQuote {
+  pet: {
+    id: string;
+    name: string;
+    species: PetSpecies;
+    petSize: PetSize;
+    weightKg: number;
+  };
+  primaryService: BookingSelectionLine;
+  addons: BookingSelectionLine[];
+  totalPriceCents: number;
+  serviceDurationMinutes: number;
+  requiredSkillIds: StaffSkillId[];
+}
+
+export interface BookingAvailabilityStaff {
+  id: string;
+  displayName: string;
+  employeeNumber: number;
+  earliestSlot: {
+    startsAt: string;
+    endsAt: string;
+  } | null;
+}
+
+export interface BookingAvailableSlot {
+  startsAt: string;
+  endsAt: string;
+  turnoverEndsAt: string;
+  staff: {
+    id: string;
+    displayName: string;
+    employeeNumber: number;
+  };
+}
+
+export interface BookingAvailabilityDay {
+  date: string;
+  weekday: number;
+  reason: BookingAvailabilityReason | null;
+  reasonLabel: string;
+  slots: BookingAvailableSlot[];
+}
+
+export interface BookingAvailabilityResponse {
+  timeZone: "Asia/Shanghai";
+  demoNow: string;
+  window: {
+    startsOn: string;
+    endsOn: string;
+    earliestStartsAt: string;
+  };
+  selection: BookingSelectionQuote;
+  staffOptions: BookingAvailabilityStaff[];
+  days: BookingAvailabilityDay[];
+}

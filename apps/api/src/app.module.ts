@@ -2,6 +2,7 @@ import { Module } from "@nestjs/common";
 
 import { AuthModule } from "./auth/auth.module.js";
 import { BackofficeModule } from "./backoffice/backoffice.module.js";
+import { BookingAvailabilityModule } from "./booking-availability/booking-availability.module.js";
 import { CustomerModule } from "./customer/customer.module.js";
 import { HealthModule } from "./health/health.module.js";
 import { PetProfileModule } from "./pet-profile/pet-profile.module.js";
@@ -13,6 +14,7 @@ import { ScheduleModule } from "./schedule/schedule.module.js";
   imports: [
     AuthModule,
     BackofficeModule,
+    BookingAvailabilityModule,
     CustomerModule,
     HealthModule,
     PetProfileModule,

@@ -24,6 +24,10 @@ const recoverablePagePaths = new Set([
   "/pages/pets/index",
   "/pages/pet-form/index",
   "/pages/privacy-consent/index",
+  "/pages/booking-pet/index",
+  "/pages/booking-service/index",
+  "/pages/booking-staff/index",
+  "/pages/booking-time/index",
 ]);
 
 function isRecoverablePath(value: string): boolean {

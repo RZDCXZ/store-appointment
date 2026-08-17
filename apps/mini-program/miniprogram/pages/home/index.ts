@@ -118,7 +118,7 @@ Page({
     this.setData({ checkingBookingEntry: true, bookingEntryError: "" });
     try {
       const entry = await fetchBookingEntry();
-      const petSelectionPath = "/pages/pets/index?mode=booking";
+      const petSelectionPath = "/pages/booking-pet/index";
       wx.navigateTo({
         url: entry.canContinue
           ? petSelectionPath

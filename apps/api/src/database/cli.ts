@@ -423,18 +423,25 @@ async function seed(client: PoolClient): Promise<void> {
 
   await client.query(
     `
-      INSERT INTO bookings (id, customer_id, pet_id, starts_at, ends_at, status)
+      INSERT INTO bookings (
+        id, customer_id, pet_id, staff_id, starts_at, ends_at,
+        service_duration_minutes, status
+      )
       VALUES (
         'booking-bohe-future',
         'customer-cheng-mo',
         'pet-bohe',
+        'chenjia',
         '2026-08-14T03:00:00.000Z',
         '2026-08-14T04:30:00.000Z',
+        90,
         'confirmed'
       )
       ON CONFLICT (id) DO UPDATE
-      SET starts_at = excluded.starts_at,
+      SET staff_id = excluded.staff_id,
+          starts_at = excluded.starts_at,
           ends_at = excluded.ends_at,
+          service_duration_minutes = excluded.service_duration_minutes,
           status = excluded.status
     `,
   );

@@ -8,7 +8,11 @@
     "pages/service-detail/index",
     "pages/pets/index",
     "pages/pet-form/index",
-    "pages/privacy-consent/index"
+    "pages/privacy-consent/index",
+    "pages/booking-pet/index",
+    "pages/booking-service/index",
+    "pages/booking-staff/index",
+    "pages/booking-time/index"
   ],
   "window": {
     "backgroundColor": "#F6F1E7",
