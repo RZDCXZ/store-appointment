@@ -221,6 +221,10 @@ function affectsBooking(block: ManagerCalendarBlock, booking: ManagerBookingFact
   return startsAt < clockMinutes(block.endsAt) && endsAt > clockMinutes(block.startsAt);
 }
 
+function bookingAffectsCapacity(status: ManagerBookingStatus): boolean {
+  return status !== "cancelled" && status !== "no_show";
+}
+
 function emptyStatusSummary(): ManagerBookingStatusSummary {
   return {
     confirmed: 0,
@@ -249,7 +253,7 @@ export class ManagerLiveBookingService {
     const blocks = blockRows.map((row) => {
       const affected = bookings.filter(
         (booking) =>
-          !["cancelled", "no_show"].includes(booking.status) &&
+          bookingAffectsCapacity(booking.status) &&
           (!row.staff_id || booking.staff.id === row.staff_id) &&
           affectsBooking(
             {
@@ -281,7 +285,7 @@ export class ManagerLiveBookingService {
       const dayBookingReads = bookingReads.filter((item) => item.fact.staff.id === day.staff.id);
       const dayBlocks = blocks.filter((block) => !block.staffId || block.staffId === day.staff.id);
       const bookingIntervals = dayBookingReads
-        .filter((item) => !["cancelled", "no_show"].includes(item.fact.status))
+        .filter((item) => bookingAffectsCapacity(item.fact.status))
         .map((item) => item.occupancy);
       const blockIntervals = dayBlocks.map((block) => ({
         startsAt: clockMinutes(block.startsAt),
