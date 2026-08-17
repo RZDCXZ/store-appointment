@@ -44,6 +44,9 @@ jobs:
       - name: 安装依赖
         run: corepack pnpm install --frozen-lockfile
 
+      - name: 构建数据库命令依赖
+        run: corepack pnpm --filter '@rongguang/api^...' build
+
       - name: 迁移并写入基础种子
         run: |
           corepack pnpm db:migrate
