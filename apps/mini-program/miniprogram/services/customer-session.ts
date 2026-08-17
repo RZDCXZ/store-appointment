@@ -10,6 +10,7 @@ import type {
   RongguangApp,
   StoredCustomerSession,
 } from "../types/customer";
+import { clearBookingDraft } from "./booking-draft";
 
 const SESSION_STORAGE_KEY = "rongguang.customer-session";
 const RECOVERY_PATH_STORAGE_KEY = "rongguang.customer-recovery-path";
@@ -90,6 +91,7 @@ function isStoredSession(value: unknown): value is StoredCustomerSession {
   return (
     typeof session.accessToken === "string" &&
     typeof session.expiresAt === "string" &&
+    typeof session.customerKey === "string" &&
     isCustomerProfile(session.customer)
   );
 }
@@ -236,10 +238,14 @@ export async function fetchDemoCustomers(): Promise<DemoCustomerChoice[]> {
 }
 
 export async function switchDemoCustomer(customerKey: string): Promise<CustomerProfile> {
+  const previousCustomerKey = appState().customerSession?.customerKey ?? null;
   const session = await requestApi<MiniappSessionResponse>("/miniapp/demo-sessions", {
     method: "POST",
     data: { customerKey },
   });
+  if (previousCustomerKey !== session.customerKey) {
+    clearBookingDraft();
+  }
   persistSession(session);
   return session.customer;
 }

@@ -91,6 +91,7 @@ export interface DemoCustomerChoicesResponse {
 export interface MiniappSessionResponse {
   accessToken: string;
   expiresAt: string;
+  customerKey: string;
   customer: MiniappCustomerProfile;
 }
 

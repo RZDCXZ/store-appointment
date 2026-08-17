@@ -116,6 +116,7 @@ export class CustomerSessionService {
     return {
       accessToken: token,
       expiresAt: expiresAt.toISOString(),
+      customerKey: customer.demo_key,
       customer: toProfile(customer),
     };
   }

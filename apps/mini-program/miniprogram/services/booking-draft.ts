@@ -109,6 +109,11 @@ export function emptyBookingDraft(): BookingDraft {
   };
 }
 
+export function clearBookingDraft(storage: BookingDraftStorage = localStorage): BookingDraft {
+  storage.remove();
+  return emptyBookingDraft();
+}
+
 export function readBookingDraft(storage: BookingDraftStorage = localStorage): BookingDraft {
   const stored = storage.get();
   if (!validDraft(stored)) {

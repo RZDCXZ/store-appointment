@@ -63,9 +63,11 @@ describe("小程序演示顾客会话", () => {
     const body = switchResponse.json<{
       accessToken: string;
       expiresAt: string;
+      customerKey: string;
       customer: { displayName: string; phoneMasked: string; story: string };
     }>();
     expect(body).toMatchObject({
+      customerKey: "xu-lan",
       customer: {
         displayName: "许岚",
         phoneMasked: "138****2608",
