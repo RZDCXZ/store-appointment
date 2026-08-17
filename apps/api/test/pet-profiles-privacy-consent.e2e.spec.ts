@@ -1,8 +1,11 @@
+import { unlink } from "node:fs/promises";
+import { join } from "node:path";
+
 import type { NestFastifyApplication } from "@nestjs/platform-fastify";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 import { createApplication } from "../src/bootstrap.js";
-import { getPetUploadDirectory } from "../src/config/environment.js";
+import { getDemoNow, getPetUploadDirectory } from "../src/config/environment.js";
 import { DatabaseService } from "../src/database/database.service.js";
 
 async function customerAuthorization(
@@ -188,6 +191,24 @@ describe("宠物档案与隐私同意", () => {
       },
     });
 
+    const excessivePrecisionResponse = await app.inject({
+      method: "POST",
+      url: "/miniapp/pets",
+      headers: { authorization: xuLanAuthorization },
+      payload: {
+        name: "小数",
+        species: "cat",
+        weightKg: 8.444,
+        careTags: [],
+      },
+    });
+
+    expect(excessivePrecisionResponse.statusCode).toBe(400);
+    expect(excessivePrecisionResponse.json()).toMatchObject({
+      code: "VALIDATION_ERROR",
+      fieldErrors: { weightKg: expect.any(String) },
+    });
+
     const replacedIdResponse = await app.inject({
       method: "PUT",
       url: "/miniapp/pets/pet-tuanzi",
@@ -302,6 +323,7 @@ describe("宠物档案与隐私同意", () => {
       },
       requiresConsent: false,
     });
+    expect(consentResponse.json().consent.consentedAt).toBe(getDemoNow());
 
     const allowedEntry = await app.inject({
       method: "GET",
@@ -359,12 +381,27 @@ describe("宠物档案与隐私同意", () => {
     uploadedPhotoIds.add(photo.id);
     expect(photo).toEqual({
       id: expect.any(String),
-      photoPath: expect.stringMatching(/^\/uploads\/pets\/.+\.png$/),
+      photoPath: expect.stringMatching(/^\/miniapp\/pet-photos\/.+\/content$/),
       mimeType: "image/png",
       sizeBytes: pngBytes.length,
     });
 
-    const savedFileResponse = await app.inject({ method: "GET", url: photo.photoPath });
+    const anonymousFileResponse = await app.inject({ method: "GET", url: photo.photoPath });
+    expect(anonymousFileResponse.statusCode).toBe(401);
+
+    const otherCustomerAuthorization = await customerAuthorization(app, "cheng-mo");
+    const otherCustomerFileResponse = await app.inject({
+      method: "GET",
+      url: photo.photoPath,
+      headers: { authorization: otherCustomerAuthorization },
+    });
+    expect(otherCustomerFileResponse.statusCode).toBe(404);
+
+    const savedFileResponse = await app.inject({
+      method: "GET",
+      url: photo.photoPath,
+      headers: { authorization },
+    });
     expect(savedFileResponse.statusCode).toBe(200);
     expect(savedFileResponse.rawPayload).toEqual(pngBytes);
 
@@ -408,5 +445,3 @@ describe("宠物档案与隐私同意", () => {
     expect(oversizedResponse.json()).toMatchObject({ code: "PHOTO_TOO_LARGE" });
   });
 });
-import { unlink } from "node:fs/promises";
-import { join } from "node:path";

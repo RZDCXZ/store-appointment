@@ -90,9 +90,10 @@ function parseInput(value: unknown): PetProfileInput {
     typeof weightKg !== "number" ||
     !Number.isFinite(weightKg) ||
     weightKg < 0.1 ||
-    weightKg > 99.99
+    weightKg > 99.99 ||
+    Number(weightKg.toFixed(2)) !== weightKg
   ) {
-    fieldErrors.weightKg = "当前体重需为 0.1 至 99.99kg。";
+    fieldErrors.weightKg = "当前体重需为 0.1 至 99.99kg，最多保留两位小数。";
   }
 
   const breed = nullableString(input.breed, "breed", 50, fieldErrors);

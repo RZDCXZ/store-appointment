@@ -1,4 +1,4 @@
-import { Body, Controller, Inject, Post, Req, Res, UseGuards } from "@nestjs/common";
+import { Body, Controller, Get, Inject, Param, Post, Req, Res, UseGuards } from "@nestjs/common";
 import { ApiOperation, ApiTags } from "@nestjs/swagger";
 import type { PetPhotoUploadResponse } from "@rongguang/contracts";
 import type { FastifyReply } from "fastify";
@@ -23,5 +23,17 @@ export class PetPhotoController {
     const photo = await this.photos.upload(request.customerIdentity.id, body);
     reply.header("Cache-Control", "no-store");
     return { photo };
+  }
+
+  @Get(":photoId/content")
+  @ApiOperation({ summary: "仅向照片所属顾客返回宠物照片内容" })
+  async content(
+    @Req() request: AuthenticatedCustomerRequest,
+    @Param("photoId") photoId: string,
+    @Res() reply: FastifyReply,
+  ): Promise<void> {
+    const photo = await this.photos.read(request.customerIdentity.id, photoId);
+    reply.header("Cache-Control", "private, no-store");
+    reply.type(photo.mimeType).send(photo.bytes);
   }
 }

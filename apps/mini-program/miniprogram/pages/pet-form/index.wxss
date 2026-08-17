@@ -83,14 +83,14 @@
   font-size: 25rpx;
 }
 .photo-card__action {
-  min-height: 70rpx;
+  min-height: 88rpx;
   margin: 18rpx 0 0;
   padding: 0 20rpx;
   border-radius: 16rpx;
   color: #3f6253;
   background: #e4ece6;
   font-size: 26rpx;
-  line-height: 70rpx;
+  line-height: 88rpx;
 }
 .photo-card__action::after,
 .photo-error button::after,
@@ -116,13 +116,13 @@
 }
 .photo-error button {
   flex: none;
-  min-height: 64rpx;
+  min-height: 88rpx;
   margin: 0;
   padding: 0 12rpx;
   color: #8b4c41;
   background: transparent;
   font-size: 26rpx;
-  line-height: 64rpx;
+  line-height: 88rpx;
 }
 .form-section {
   margin-top: 24rpx;
@@ -220,7 +220,7 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  min-height: 80rpx;
+  min-height: 88rpx;
   border: 1rpx solid #d8d1c5;
   border-radius: 18rpx;
   color: #61706a;
@@ -264,13 +264,13 @@
   align-items: center;
 }
 .clear-button {
-  min-height: 80rpx;
+  min-height: 88rpx;
   margin: 0;
   padding: 0 10rpx;
   color: #61706a;
   background: transparent;
   font-size: 25rpx;
-  line-height: 80rpx;
+  line-height: 88rpx;
 }
 .care-boundary {
   display: flex;
@@ -293,7 +293,7 @@
   gap: 12rpx;
 }
 .tag-option {
-  min-height: 68rpx;
+  min-height: 88rpx;
   margin: 0;
   padding: 0 18rpx;
   border: 1rpx solid #d8d1c5;
@@ -301,7 +301,7 @@
   color: #61706a;
   background: #fff;
   font-size: 25rpx;
-  line-height: 68rpx;
+  line-height: 88rpx;
 }
 .tag-option--selected {
   border-color: #c77d6d;
@@ -342,14 +342,14 @@
   line-height: 1.55;
 }
 .danger-zone__button {
-  min-height: 76rpx;
+  min-height: 88rpx;
   margin: 20rpx 0 0;
   padding: 0 22rpx;
   border-radius: 16rpx;
   color: #8b4c41;
   background: #fff0eb;
   font-size: 27rpx;
-  line-height: 76rpx;
+  line-height: 88rpx;
 }
 .danger-zone__button--restore {
   color: #3f6253;

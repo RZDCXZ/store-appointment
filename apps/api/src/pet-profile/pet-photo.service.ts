@@ -1,11 +1,11 @@
 import { randomUUID } from "node:crypto";
-import { mkdir, unlink, writeFile } from "node:fs/promises";
+import { mkdir, readFile, unlink, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 
 import { HttpException, HttpStatus, Inject, Injectable } from "@nestjs/common";
 import type { PetPhoto } from "@rongguang/contracts";
 
-import { getPetUploadDirectory } from "../config/environment.js";
+import { getDemoNow, getPetUploadDirectory } from "../config/environment.js";
 import { DatabaseService } from "../database/database.service.js";
 
 const maximumPhotoBytes = 512 * 1024;
@@ -61,7 +61,7 @@ export class PetPhotoService {
     const id = `photo-${randomUUID()}`;
     const extension = input.mimeType === "image/png" ? "png" : "jpg";
     const storageKey = `${id}.${extension}`;
-    const photoPath = `/uploads/pets/${storageKey}`;
+    const photoPath = `/miniapp/pet-photos/${id}/content`;
     const uploadDirectory = getPetUploadDirectory();
     const filePath = join(uploadDirectory, storageKey);
     await mkdir(uploadDirectory, { recursive: true });
@@ -71,11 +71,11 @@ export class PetPhotoService {
       await this.database.pool.query(
         `
           INSERT INTO pet_photos (
-            id, customer_id, mime_type, size_bytes, storage_key, public_path
+            id, customer_id, mime_type, size_bytes, storage_key, public_path, created_at
           )
-          VALUES ($1, $2, $3, $4, $5, $6)
+          VALUES ($1, $2, $3, $4, $5, $6, $7::timestamptz)
         `,
-        [id, customerId, input.mimeType, bytes.length, storageKey, photoPath],
+        [id, customerId, input.mimeType, bytes.length, storageKey, photoPath, getDemoNow()],
       );
     } catch (error) {
       await unlink(filePath).catch(() => undefined);
@@ -83,5 +83,31 @@ export class PetPhotoService {
     }
 
     return { id, photoPath, mimeType: input.mimeType, sizeBytes: bytes.length };
+  }
+
+  async read(
+    customerId: string,
+    photoId: string,
+  ): Promise<{ bytes: Buffer; mimeType: PetPhoto["mimeType"] }> {
+    const result = await this.database.pool.query<{
+      mime_type: PetPhoto["mimeType"];
+      storage_key: string;
+    }>("SELECT mime_type, storage_key FROM pet_photos WHERE id = $1 AND customer_id = $2", [
+      photoId,
+      customerId,
+    ]);
+    const photo = result.rows[0];
+
+    if (!photo) {
+      throw new HttpException(
+        { code: "PET_PHOTO_NOT_FOUND", message: "找不到这张宠物照片，或当前顾客无权访问。" },
+        HttpStatus.NOT_FOUND,
+      );
+    }
+
+    return {
+      bytes: await readFile(join(getPetUploadDirectory(), photo.storage_key)),
+      mimeType: photo.mime_type,
+    };
   }
 }

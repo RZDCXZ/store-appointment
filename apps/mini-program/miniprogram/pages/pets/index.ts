@@ -1,14 +1,19 @@
 import type { PetProfile } from "@rongguang/contracts";
 
+import { CustomerApiError } from "../../services/customer-api";
 import { loadCustomerContext, openCustomerSelector } from "../../services/customer-session";
 import {
   archivePetProfile,
-  displayPhotoPath,
   fetchPetProfiles,
-  PetProfileApiError,
+  loadPetPhotoPath,
   restorePetProfile,
 } from "../../services/pet-profile-api";
-import { petFormPath } from "../../services/pet-profile-presentation";
+import {
+  formatShanghaiDateTime,
+  petFormPath,
+  petSizeLabel,
+} from "../../services/pet-profile-presentation";
+import { fetchBookingEntry } from "../../services/privacy-consent-api";
 
 type PageState = "loading" | "ready" | "empty" | "error" | "forbidden" | "auth";
 
@@ -20,29 +25,17 @@ interface PetCard extends PetProfile {
   futureBookingLabel: string;
 }
 
-const petSizeLabels = { small: "小型", medium: "中型", large: "大型" } as const;
-
-function formatBookingTime(value: string): string {
-  const date = new Date(value);
-  const local = new Date(date.getTime() + 8 * 60 * 60 * 1000);
-  const month = local.getUTCMonth() + 1;
-  const day = local.getUTCDate();
-  const hours = String(local.getUTCHours()).padStart(2, "0");
-  const minutes = String(local.getUTCMinutes()).padStart(2, "0");
-  return `${month}月${day}日 ${hours}:${minutes}`;
-}
-
-function toPetCard(pet: PetProfile): PetCard {
+async function toPetCard(pet: PetProfile): Promise<PetCard> {
   const speciesLabel = pet.species === "dog" ? "犬" : "猫";
-  const petSizeLabel = petSizeLabels[pet.petSize];
+  const sizeLabel = petSizeLabel(pet.petSize);
   return {
     ...pet,
-    photoUrl: displayPhotoPath(pet.photoPath),
+    photoUrl: await loadPetPhotoPath(pet.photoPath),
     speciesLabel,
-    petSizeLabel,
-    profileLine: `${speciesLabel}${pet.breed ? ` · ${pet.breed}` : ""} · ${pet.weightKg}kg · ${petSizeLabel}`,
+    petSizeLabel: sizeLabel,
+    profileLine: `${speciesLabel}${pet.breed ? ` · ${pet.breed}` : ""} · ${pet.weightKg}kg · ${sizeLabel}`,
     futureBookingLabel: pet.futureBooking
-      ? `${formatBookingTime(pet.futureBooking.startsAt)} 有预约`
+      ? `${formatShanghaiDateTime(pet.futureBooking.startsAt)} 有预约`
       : "",
   };
 }
@@ -74,6 +67,10 @@ Page({
       return;
     }
 
+    if (!(await this.ensureBookingConsent())) {
+      return;
+    }
+
     const hasData = this.data.activePets.length + this.data.archivedPets.length > 0;
     this.setData({
       authState: context.kind,
@@ -84,8 +81,10 @@ Page({
 
     try {
       const response = await fetchPetProfiles();
-      const activePets = response.active.map(toPetCard);
-      const archivedPets = response.archived.map(toPetCard);
+      const [activePets, archivedPets] = await Promise.all([
+        Promise.all(response.active.map(toPetCard)),
+        Promise.all(response.archived.map(toPetCard)),
+      ]);
       this.setData({
         activePets,
         archivedPets,
@@ -93,12 +92,38 @@ Page({
         refreshing: false,
       });
     } catch (error) {
-      const forbidden = error instanceof PetProfileApiError && error.statusCode === 403;
+      const forbidden = error instanceof CustomerApiError && error.statusCode === 403;
       this.setData({
         pageState: forbidden ? "forbidden" : hasData ? "ready" : "error",
         queryError: error instanceof Error ? error.message : "宠物档案加载失败，请重试。",
         refreshing: false,
       });
+    }
+  },
+  async ensureBookingConsent(): Promise<boolean> {
+    if (!this.data.bookingMode) {
+      return true;
+    }
+
+    try {
+      const entry = await fetchBookingEntry();
+
+      if (entry.canContinue) {
+        return true;
+      }
+
+      const returnTo = "/pages/pets/index?mode=booking";
+      wx.redirectTo({
+        url: `/pages/privacy-consent/index?returnTo=${encodeURIComponent(returnTo)}`,
+      });
+      return false;
+    } catch (error) {
+      this.setData({
+        pageState: "error",
+        queryError: error instanceof Error ? error.message : "预约入口检查失败，请稍后重试。",
+        refreshing: false,
+      });
+      return false;
     }
   },
   chooseCustomer() {
@@ -144,7 +169,7 @@ Page({
       wx.showToast({ title: "宠物已归档", icon: "success" });
     } catch (error) {
       const detail =
-        error instanceof PetProfileApiError && error.code === "PET_HAS_FUTURE_BOOKING"
+        error instanceof CustomerApiError && error.code === "PET_HAS_FUTURE_BOOKING"
           ? "请先处理卡片中标出的未来预约。"
           : "";
       this.setData({

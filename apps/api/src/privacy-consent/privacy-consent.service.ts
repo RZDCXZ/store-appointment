@@ -1,6 +1,7 @@
 import { HttpException, HttpStatus, Inject, Injectable } from "@nestjs/common";
 import type { BookingEntryResponse, PrivacyConsentStatusResponse } from "@rongguang/contracts";
 
+import { getDemoNow } from "../config/environment.js";
 import { DatabaseService } from "../database/database.service.js";
 
 interface PrivacyStatusRow {
@@ -94,11 +95,11 @@ export class PrivacyConsentService {
 
     await this.database.pool.query(
       `
-        INSERT INTO privacy_consents (customer_id, notice_version, source)
-        VALUES ($1, $2, 'miniapp_booking')
+        INSERT INTO privacy_consents (customer_id, notice_version, source, consented_at)
+        VALUES ($1, $2, 'miniapp_booking', $3::timestamptz)
         ON CONFLICT (customer_id, notice_version) DO NOTHING
       `,
-      [customerId, input.version],
+      [customerId, input.version, getDemoNow()],
     );
 
     return this.status(customerId);

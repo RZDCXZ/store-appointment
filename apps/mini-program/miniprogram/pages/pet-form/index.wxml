@@ -106,7 +106,7 @@
       <view class="field {{fieldErrors.birthDate ? 'field--error' : ''}}">
         <text class="field__label">出生日期</text>
         <view class="picker-row">
-          <picker mode="date" value="{{form.birthDate}}" end="2026-08-13" bindchange="onBirthDateChange">
+          <picker mode="date" value="{{form.birthDate}}" end="{{maximumBirthDate}}" bindchange="onBirthDateChange">
             <view class="picker-value">{{form.birthDate || '请选择（选填）'}} ›</view>
           </picker>
           <button wx:if="{{form.birthDate}}" class="clear-button" bindtap="clearBirthDate">清除</button>

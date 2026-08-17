@@ -15,6 +15,10 @@ interface PetFormPageInstance {
 
 interface PetFormPageDefinition {
   data: PetFormPageData;
+  onLoad(
+    this: PetFormPageInstance & { initialize(options: Record<string, string | undefined>): void },
+    options: Record<string, string | undefined>,
+  ): void;
   onWeightInput(this: PetFormPageInstance, event: { detail: { value: string } }): void;
   uploadPendingPhoto(this: PetFormPageInstance): Promise<void>;
 }
@@ -69,6 +73,15 @@ describe("宠物编辑页组件行为", () => {
 
     expect(instance.data.form.weightKg).toBe("10.01");
     expect(instance.data.sizeSummary).toBe("10.01kg · 中型");
+  });
+
+  it("页面生命周期把编辑路由参数交给初始化流程，以便刷新恢复", () => {
+    const initialize = vi.fn();
+    const instance = { ...pageInstance(definition), initialize };
+
+    definition.onLoad.call(instance, { id: "pet-tuanzi" });
+
+    expect(initialize).toHaveBeenCalledWith({ id: "pet-tuanzi" });
   });
 
   it("照片上传失败时保留表单和待重试文件", async () => {

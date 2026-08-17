@@ -6,20 +6,23 @@ import {
   type PetSpecies,
 } from "@rongguang/contracts";
 
+import { CustomerApiError } from "../../services/customer-api";
 import { loadCustomerContext, openCustomerSelector } from "../../services/customer-session";
 import {
   archivePetProfile,
-  displayPhotoPath,
   fetchPetProfile,
-  PetProfileApiError,
+  loadPetPhotoPath,
   restorePetProfile,
   savePetProfile,
   uploadPetPhoto,
 } from "../../services/pet-profile-api";
 import {
+  demoDateInShanghai,
+  formatShanghaiDateTime,
   readPetFormRoute,
   sizeSummaryForWeightInput,
 } from "../../services/pet-profile-presentation";
+import { fetchStorefrontCatalog } from "../../services/storefront-catalog";
 
 type PageState = "loading" | "ready" | "error" | "forbidden" | "auth";
 
@@ -72,6 +75,7 @@ Page({
     isEditing: false,
     isArchived: false,
     futureBookingLabel: "",
+    maximumBirthDate: "",
     form: { ...emptyForm },
     selectedTags: [] as string[],
     tagOptions: petCareTags.map((label) => ({ label, selected: false })),
@@ -106,19 +110,24 @@ Page({
     }
 
     this.setData({ authState: context.kind });
-    if (!petId) {
-      this.setData({ pageState: "ready" });
-      return;
-    }
 
     try {
+      const catalog = await fetchStorefrontCatalog();
+      this.setData({ maximumBirthDate: demoDateInShanghai(catalog.store.demoNow) });
+
+      if (!petId) {
+        this.setData({ pageState: "ready" });
+        return;
+      }
+
       const { pet } = await fetchPetProfile(petId);
+      const photoPreview = await loadPetPhotoPath(pet.photoPath);
       const selectedTags = [...pet.careTags];
       this.setData({
         pageState: "ready",
         isArchived: pet.archivedAt !== null,
         futureBookingLabel: pet.futureBooking
-          ? `关联预约：${new Date(pet.futureBooking.startsAt).toLocaleString("zh-CN", { timeZone: "Asia/Shanghai", hour12: false })}`
+          ? `关联预约：${formatShanghaiDateTime(pet.futureBooking.startsAt)}`
           : "",
         form: {
           name: pet.name,
@@ -137,11 +146,11 @@ Page({
         ),
         sizeSummary: sizeSummaryForWeightInput(String(pet.weightKg)) ?? "",
         photoId: pet.photoId,
-        photoPreview: displayPhotoPath(pet.photoPath),
+        photoPreview,
       });
     } catch (error) {
       const forbidden =
-        error instanceof PetProfileApiError &&
+        error instanceof CustomerApiError &&
         (error.statusCode === 403 || error.code === "PET_NOT_FOUND");
       this.setData({
         pageState: forbidden ? "forbidden" : "error",
@@ -281,7 +290,7 @@ Page({
       wx.navigateBack();
     } catch (error) {
       this.setData({
-        fieldErrors: error instanceof PetProfileApiError ? error.fieldErrors : {},
+        fieldErrors: error instanceof CustomerApiError ? error.fieldErrors : {},
         submitError: error instanceof Error ? error.message : "保存失败，表单内容已保留。",
       });
     } finally {

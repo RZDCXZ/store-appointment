@@ -1,6 +1,6 @@
 import { loadCustomerTabState, openCustomerSelector } from "../../services/customer-session";
+import { fetchBookingEntry } from "../../services/privacy-consent-api";
 import { fetchStorefrontCatalog } from "../../services/storefront-catalog";
-import { fetchBookingEntry } from "../../services/pet-profile-api";
 import {
   displayPrimaryService,
   getStoreBusinessSummary,

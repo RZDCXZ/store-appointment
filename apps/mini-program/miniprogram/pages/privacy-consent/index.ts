@@ -1,11 +1,9 @@
 import type { PrivacyConsentStatusResponse } from "@rongguang/contracts";
 
+import { CustomerApiError } from "../../services/customer-api";
 import { loadCustomerContext, openCustomerSelector } from "../../services/customer-session";
-import {
-  acceptPrivacyConsent,
-  fetchPrivacyConsent,
-  PetProfileApiError,
-} from "../../services/pet-profile-api";
+import { acceptPrivacyConsent, fetchPrivacyConsent } from "../../services/privacy-consent-api";
+import { formatShanghaiDateTime } from "../../services/pet-profile-presentation";
 
 type PageState = "loading" | "ready" | "error" | "auth";
 
@@ -19,6 +17,8 @@ Page({
     authState: "loading" as "active" | "expired" | "missing" | "unavailable" | "loading",
     returnTo: "",
     status: null as PrivacyConsentStatusResponse | null,
+    publishedAtLabel: "",
+    consentedAtLabel: "",
     accepted: false,
     submitting: false,
     errorMessage: "",
@@ -42,7 +42,13 @@ Page({
     this.setData({ authState: context.kind, pageState: "loading", errorMessage: "" });
     try {
       const status = await fetchPrivacyConsent();
-      this.setData({ status, pageState: "ready", accepted: !status.requiresConsent });
+      this.setData({
+        status,
+        publishedAtLabel: formatShanghaiDateTime(status.notice.publishedAt),
+        consentedAtLabel: status.consent ? formatShanghaiDateTime(status.consent.consentedAt) : "",
+        pageState: "ready",
+        accepted: !status.requiresConsent,
+      });
     } catch (error) {
       this.setData({
         pageState: "error",
@@ -81,14 +87,21 @@ Page({
     this.setData({ submitting: true, errorMessage: "" });
     try {
       const updated = await acceptPrivacyConsent(status.notice.version);
-      this.setData({ status: updated, accepted: true });
+      this.setData({
+        status: updated,
+        publishedAtLabel: formatShanghaiDateTime(updated.notice.publishedAt),
+        consentedAtLabel: updated.consent
+          ? formatShanghaiDateTime(updated.consent.consentedAt)
+          : "",
+        accepted: true,
+      });
       wx.showToast({ title: "隐私同意已记录", icon: "success" });
       this.continueAfterConsent();
     } catch (error) {
       this.setData({
         errorMessage: error instanceof Error ? error.message : "同意提交失败，请重试。",
       });
-      if (error instanceof PetProfileApiError && error.code === "PRIVACY_NOTICE_OUTDATED") {
+      if (error instanceof CustomerApiError && error.code === "PRIVACY_NOTICE_OUTDATED") {
         await this.loadStatus();
       }
     } finally {

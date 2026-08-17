@@ -1,7 +1,10 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  demoDateInShanghai,
+  formatShanghaiDateTime,
   petFormPath,
+  petSizeLabel,
   readPetFormRoute,
   sizeSummaryForWeightInput,
 } from "../miniprogram/services/pet-profile-presentation";
@@ -26,5 +29,11 @@ describe("宠物档案页面逻辑", () => {
       "25.01kg · 大型",
     ]);
     expect(sizeSummaryForWeightInput("not-a-number")).toBeNull();
+    expect(petSizeLabel("large")).toBe("大型");
+  });
+
+  it("以同一演示时钟生成上海日期上限和中文日期时间", () => {
+    expect(demoDateInShanghai("2026-08-13T18:30:00.000Z")).toBe("2026-08-14");
+    expect(formatShanghaiDateTime("2026-08-01T00:00:00.000Z")).toBe("2026年8月1日 08:00");
   });
 });
