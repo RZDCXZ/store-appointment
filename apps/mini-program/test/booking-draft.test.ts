@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 
 import {
   bookingFlowPaths,
+  clearBookingTime,
   chooseBookingPet,
   chooseBookingService,
   chooseBookingStaff,
@@ -13,6 +14,7 @@ import {
   type BookingDraftStorage,
 } from "../miniprogram/services/booking-draft";
 import { quoteBookingSelection } from "../miniprogram/services/booking-selection";
+import { findRestorableBookingSlot } from "../miniprogram/services/booking-presentation";
 
 function memoryStorage(initial: unknown = undefined): BookingDraftStorage {
   let value = initial;
@@ -126,6 +128,40 @@ describe("预约草稿与服务组合", () => {
       ...emptyBookingDraft(),
       petId: "pet-other",
     });
+  });
+
+  it("刷新时只恢复当前响应中仍真实存在的员工时段，并清除已经失效的时间", () => {
+    const storage = memoryStorage();
+    chooseBookingPet("pet-tuanzi", storage);
+    chooseBookingService("dog-basic-care", [], storage);
+    chooseBookingStaff({ kind: "fastest" }, storage);
+    const saved = {
+      date: "2026-08-14",
+      startsAt: "2026-08-14T01:30:00.000Z",
+      endsAt: "2026-08-14T02:30:00.000Z",
+      assignedStaffId: "linxia",
+    };
+    chooseBookingTime(saved, storage);
+    const days = [
+      {
+        date: "2026-08-14",
+        weekday: 5,
+        reason: null,
+        reasonLabel: "可预约",
+        slots: [
+          {
+            startsAt: saved.startsAt,
+            endsAt: saved.endsAt,
+            turnoverEndsAt: "2026-08-14T02:45:00.000Z",
+            staff: { id: "zhaohang", displayName: "赵航", employeeNumber: 4 },
+          },
+        ],
+      },
+    ];
+
+    expect(findRestorableBookingSlot(days, saved)).toBeNull();
+    clearBookingTime(storage);
+    expect(readBookingDraft(storage).selectedTime).toBeNull();
   });
 
   it("后续页面直接访问时给出最早缺失步骤的明确恢复路径", () => {

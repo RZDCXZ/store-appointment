@@ -425,7 +425,7 @@ async function seed(client: PoolClient): Promise<void> {
     `
       INSERT INTO bookings (
         id, customer_id, pet_id, staff_id, starts_at, ends_at,
-        service_duration_minutes, status
+        occupancy_starts_at, occupancy_ends_at, service_duration_minutes, status
       )
       VALUES (
         'booking-bohe-future',
@@ -434,6 +434,8 @@ async function seed(client: PoolClient): Promise<void> {
         'chenjia',
         '2026-08-14T03:00:00.000Z',
         '2026-08-14T04:30:00.000Z',
+        '2026-08-14T03:00:00.000Z',
+        '2026-08-14T04:45:00.000Z',
         90,
         'confirmed'
       )
@@ -441,6 +443,8 @@ async function seed(client: PoolClient): Promise<void> {
       SET staff_id = excluded.staff_id,
           starts_at = excluded.starts_at,
           ends_at = excluded.ends_at,
+          occupancy_starts_at = excluded.occupancy_starts_at,
+          occupancy_ends_at = excluded.occupancy_ends_at,
           service_duration_minutes = excluded.service_duration_minutes,
           status = excluded.status
     `,
@@ -464,7 +468,7 @@ async function seed(client: PoolClient): Promise<void> {
 async function reset(client: PoolClient): Promise<void> {
   await withTransaction(client, async () => {
     await client.query(
-      "TRUNCATE TABLE app_metadata, staff_schedule_breaks, staff_schedule_shifts, staff_schedule_days, weekly_shift_template_breaks, weekly_shift_templates, store_business_hours, staff_skills, staff_members, privacy_consents, privacy_notices, bookings, pet_care_tags, pets, pet_photos, customer_sessions, demo_customer_profiles, customers, backoffice_sessions, backoffice_accounts",
+      "TRUNCATE TABLE app_metadata, staff_time_off_intervals, store_closure_intervals, staff_schedule_breaks, staff_schedule_shifts, staff_schedule_days, weekly_shift_template_breaks, weekly_shift_templates, store_business_hours, staff_skills, staff_members, privacy_consents, privacy_notices, bookings, pet_care_tags, pets, pet_photos, customer_sessions, demo_customer_profiles, customers, backoffice_sessions, backoffice_accounts",
     );
     await seed(client);
   });

@@ -10,6 +10,5 @@ import { BookingAvailabilityService } from "./booking-availability.service.js";
   imports: [CustomerModule, DatabaseModule, ServiceCatalogModule],
   controllers: [BookingAvailabilityController],
   providers: [BookingAvailabilityService],
-  exports: [BookingAvailabilityService],
 })
 export class BookingAvailabilityModule {}

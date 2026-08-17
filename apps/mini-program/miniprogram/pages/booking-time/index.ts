@@ -3,11 +3,16 @@ import type { BookingAvailabilityResponse, BookingAvailableSlot } from "@ronggua
 import { fetchBookingAvailability } from "../../services/booking-availability-api";
 import {
   bookingFlowPaths,
+  clearBookingTime,
   chooseBookingTime,
   readBookingDraft,
   recoveryForBookingStep,
 } from "../../services/booking-draft";
-import { formatBookingDate, formatBookingTime } from "../../services/booking-presentation";
+import {
+  findRestorableBookingSlot,
+  formatBookingDate,
+  formatBookingTime,
+} from "../../services/booking-presentation";
 import { loadCustomerContext, openCustomerSelector } from "../../services/customer-session";
 import { fetchBookingEntry } from "../../services/privacy-consent-api";
 import { formatCny } from "../../services/storefront-presentation";
@@ -73,19 +78,25 @@ Page({
         return;
       }
       const response = await fetchBookingAvailability(draft);
-      const restoredDate = draft.selectedTime?.date ?? "";
+      const restoredSlot = findRestorableBookingSlot(response.days, draft.selectedTime);
+      const restoredDate = restoredSlot ? (draft.selectedTime?.date ?? "") : "";
       const staleSelectionMessage =
-        restoredDate && !response.days.some((day) => day.date === restoredDate)
-          ? "原选日期已超出开放窗口，请重新选择。"
+        draft.selectedTime && !restoredSlot
+          ? response.days.some((day) => day.date === draft.selectedTime?.date)
+            ? "原选时段已不可约，请重新选择。"
+            : "原选日期已超出开放窗口，请重新选择。"
           : "";
-      const selectedDate = response.days.some((day) => day.date === restoredDate)
+      if (draft.selectedTime && !restoredSlot) {
+        clearBookingTime();
+      }
+      const selectedDate = restoredDate
         ? restoredDate
         : (response.days.find((day) => day.reason === null)?.date ?? response.days[0]?.date ?? "");
       this.setData({
         pageState: "ready",
         response,
         selectedDate,
-        selectedStartsAt: staleSelectionMessage ? "" : (draft.selectedTime?.startsAt ?? ""),
+        selectedStartsAt: restoredSlot?.startsAt ?? "",
         staleSelectionMessage,
         summary: `${response.selection.pet.name} · ${response.selection.primaryService.name} · ${response.selection.serviceDurationMinutes} 分钟`,
         totalPriceLabel: formatCny(response.selection.totalPriceCents),
@@ -124,6 +135,7 @@ Page({
   selectDate(event: WechatMiniprogram.BaseEvent) {
     const date = event.currentTarget.dataset.date as unknown;
     if (typeof date !== "string") return;
+    clearBookingTime();
     this.setData({ selectedDate: date, selectedStartsAt: "", staleSelectionMessage: "" });
     this.refreshDays();
   },

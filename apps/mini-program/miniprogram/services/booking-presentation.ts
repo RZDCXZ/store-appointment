@@ -1,4 +1,24 @@
+import type { BookingAvailabilityDay, BookingAvailableSlot } from "@rongguang/contracts";
+
+import type { BookingDraftTime } from "./booking-draft";
+
 const weekdays = ["周日", "周一", "周二", "周三", "周四", "周五", "周六"] as const;
+
+export function findRestorableBookingSlot(
+  days: BookingAvailabilityDay[],
+  selectedTime: BookingDraftTime | null,
+): BookingAvailableSlot | null {
+  if (!selectedTime) return null;
+  const day = days.find((item) => item.date === selectedTime.date);
+  return (
+    day?.slots.find(
+      (slot) =>
+        slot.startsAt === selectedTime.startsAt &&
+        slot.endsAt === selectedTime.endsAt &&
+        slot.staff.id === selectedTime.assignedStaffId,
+    ) ?? null
+  );
+}
 
 export function formatBookingDate(localDate: string): {
   shortDate: string;

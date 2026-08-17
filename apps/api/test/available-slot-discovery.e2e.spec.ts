@@ -36,7 +36,13 @@ describe("顾客查询真实可约时段", () => {
   });
 
   afterAll(async () => {
-    await database.pool.query("DELETE FROM bookings WHERE id = 'booking-slot-pet-conflict'");
+    await database.pool.query(
+      "DELETE FROM bookings WHERE id IN ('booking-slot-pet-conflict', 'booking-exclusion-base')",
+    );
+    await database.pool.query(
+      "DELETE FROM staff_time_off_intervals WHERE id = 'time-off-slot-test'",
+    );
+    await database.pool.query("DELETE FROM store_closure_intervals WHERE id = 'closure-slot-test'");
     await database.pool.query("DELETE FROM pets WHERE id = 'pet-booking-test-cat'");
     await app.close();
     vi.unstubAllEnvs();
@@ -136,16 +142,19 @@ describe("顾客查询真实可约时段", () => {
       `
         INSERT INTO bookings (
           id, customer_id, pet_id, staff_id, starts_at, ends_at,
-          service_duration_minutes, status
+          occupancy_starts_at, occupancy_ends_at, service_duration_minutes, status
         )
         VALUES (
           'booking-slot-pet-conflict', 'customer-cheng-mo', 'pet-bohe', 'chenjia',
-          '2026-08-14T07:00:00.000Z', '2026-08-14T08:30:00.000Z', 90, 'confirmed'
+          '2026-08-14T07:00:00.000Z', '2026-08-14T08:30:00.000Z',
+          '2026-08-14T07:00:00.000Z', '2026-08-14T08:45:00.000Z', 90, 'confirmed'
         )
         ON CONFLICT (id) DO UPDATE
         SET staff_id = excluded.staff_id,
             starts_at = excluded.starts_at,
             ends_at = excluded.ends_at,
+            occupancy_starts_at = excluded.occupancy_starts_at,
+            occupancy_ends_at = excluded.occupancy_ends_at,
             service_duration_minutes = excluded.service_duration_minutes,
             status = excluded.status
       `,
@@ -181,6 +190,92 @@ describe("顾客查询真实可约时段", () => {
         (slot: { startsAt: string }) => slot.startsAt === "2026-08-14T07:00:00.000Z",
       ),
     ).toMatchObject({ staff: { id: "zhouning" } });
+  });
+
+  it("待处理或生效的员工停班与门店临时闭店会从真实容量中扣除", async () => {
+    await database.pool.query(
+      `
+        INSERT INTO staff_time_off_intervals (
+          id, staff_id, local_date, starts_at, ends_at, status, reason
+        )
+        VALUES (
+          'time-off-slot-test', 'linxia', '2026-08-14', '10:00', '12:00',
+          'pending', '测试停班'
+        )
+      `,
+    );
+    await database.pool.query(
+      `
+        INSERT INTO store_closure_intervals (
+          id, local_date, starts_at, ends_at, status, reason
+        )
+        VALUES (
+          'closure-slot-test', '2026-08-14', '16:00', '17:00',
+          'active', '测试临时闭店'
+        )
+      `,
+    );
+
+    const response = await app.inject({
+      method: "GET",
+      url: "/miniapp/available-slots?petId=pet-tuanzi&primaryServiceId=dog-basic-care&staffId=linxia",
+      headers: { authorization: xuLanAuthorization },
+    });
+    const friday = response.json().days.find((day: { date: string }) => day.date === "2026-08-14");
+    const starts = friday.slots.map((slot: { startsAt: string }) => slot.startsAt);
+
+    expect(response.statusCode).toBe(200);
+    expect(starts).not.toContain("2026-08-14T01:30:00.000Z");
+    expect(starts).not.toContain("2026-08-14T03:30:00.000Z");
+    expect(starts).not.toContain("2026-08-14T07:00:00.000Z");
+    expect(starts).not.toContain("2026-08-14T08:30:00.000Z");
+  });
+
+  it("PostgreSQL 最终拒绝员工实际占用或同宠物服务区间重叠", async () => {
+    await database.pool.query(
+      `
+        INSERT INTO bookings (
+          id, customer_id, pet_id, staff_id, starts_at, ends_at,
+          occupancy_starts_at, occupancy_ends_at, service_duration_minutes, status
+        )
+        VALUES (
+          'booking-exclusion-base', 'customer-xu-lan', 'pet-tuanzi', 'linxia',
+          '2026-08-20T02:00:00.000Z', '2026-08-20T03:00:00.000Z',
+          '2026-08-20T02:00:00.000Z', '2026-08-20T03:15:00.000Z', 60, 'confirmed'
+        )
+      `,
+    );
+
+    await expect(
+      database.pool.query(
+        `
+          INSERT INTO bookings (
+            id, customer_id, pet_id, staff_id, starts_at, ends_at,
+            occupancy_starts_at, occupancy_ends_at, service_duration_minutes, status
+          )
+          VALUES (
+            'booking-exclusion-staff', 'customer-cheng-mo', 'pet-bohe', 'linxia',
+            '2026-08-20T03:00:00.000Z', '2026-08-20T03:30:00.000Z',
+            '2026-08-20T03:00:00.000Z', '2026-08-20T03:45:00.000Z', 30, 'confirmed'
+          )
+        `,
+      ),
+    ).rejects.toMatchObject({ code: "23P01" });
+    await expect(
+      database.pool.query(
+        `
+          INSERT INTO bookings (
+            id, customer_id, pet_id, staff_id, starts_at, ends_at,
+            occupancy_starts_at, occupancy_ends_at, service_duration_minutes, status
+          )
+          VALUES (
+            'booking-exclusion-pet', 'customer-xu-lan', 'pet-tuanzi', 'zhaohang',
+            '2026-08-20T02:30:00.000Z', '2026-08-20T03:30:00.000Z',
+            '2026-08-20T02:30:00.000Z', '2026-08-20T03:45:00.000Z', 60, 'confirmed'
+          )
+        `,
+      ),
+    ).rejects.toMatchObject({ code: "23P01" });
   });
 
   it("拒绝越权宠物、归档宠物和不适用的服务组合", async () => {

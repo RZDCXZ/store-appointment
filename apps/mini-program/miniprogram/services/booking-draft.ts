@@ -179,6 +179,14 @@ export function chooseBookingTime(
   return next;
 }
 
+export function clearBookingTime(storage: BookingDraftStorage = localStorage): BookingDraft {
+  const draft = readBookingDraft(storage);
+  if (!draft.selectedTime) return draft;
+  const next = { ...draft, selectedTime: null };
+  storage.set(next);
+  return next;
+}
+
 export function recoveryForBookingStep(
   step: BookingFlowStep,
   draft: BookingDraft,

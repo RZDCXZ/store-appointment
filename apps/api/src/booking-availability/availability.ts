@@ -91,6 +91,54 @@ export function earliestCustomerCandidate(now: string | Date): string {
   ).toISOString();
 }
 
+export function earliestCandidateMinutesForDate(
+  localDate: string,
+  earliestStartsAt: string,
+): number {
+  const earliest = new Date(earliestStartsAt);
+  if (Number.isNaN(earliest.getTime())) {
+    throw new Error("无法从无效时刻计算当日最早可约分钟。");
+  }
+
+  const earliestLocalDate = shanghaiLocalDate(earliest);
+  if (localDate < earliestLocalDate) return 24 * 60;
+  if (localDate > earliestLocalDate) return 0;
+
+  const shifted = new Date(earliest.getTime() + shanghaiOffsetMinutes * 60_000);
+  return shifted.getUTCHours() * 60 + shifted.getUTCMinutes();
+}
+
+export function subtractAvailabilityIntervals(
+  capacity: AvailabilityInterval[],
+  blocks: AvailabilityInterval[],
+): AvailabilityInterval[] {
+  return [...blocks]
+    .sort((left, right) => left.startsAtMinutes - right.startsAtMinutes)
+    .reduce<AvailabilityInterval[]>(
+      (remaining, block) => {
+        return remaining.flatMap((interval) => {
+          if (!overlaps(interval, block)) return [interval];
+
+          const fragments: AvailabilityInterval[] = [];
+          if (interval.startsAtMinutes < block.startsAtMinutes) {
+            fragments.push({
+              startsAtMinutes: interval.startsAtMinutes,
+              endsAtMinutes: Math.min(interval.endsAtMinutes, block.startsAtMinutes),
+            });
+          }
+          if (block.endsAtMinutes < interval.endsAtMinutes) {
+            fragments.push({
+              startsAtMinutes: Math.max(interval.startsAtMinutes, block.endsAtMinutes),
+              endsAtMinutes: interval.endsAtMinutes,
+            });
+          }
+          return fragments;
+        });
+      },
+      capacity.map((interval) => ({ ...interval })),
+    );
+}
+
 function contains(container: AvailabilityInterval, interval: AvailabilityInterval): boolean {
   return (
     container.startsAtMinutes <= interval.startsAtMinutes &&

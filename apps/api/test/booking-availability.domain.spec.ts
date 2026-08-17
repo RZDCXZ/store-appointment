@@ -3,7 +3,9 @@ import { describe, expect, it } from "vitest";
 import {
   bookingWindowFor,
   discoverDayAvailability,
+  earliestCandidateMinutesForDate,
   earliestCustomerCandidate,
+  subtractAvailabilityIntervals,
   type AvailabilityBooking,
   type AvailabilityStaff,
 } from "../src/booking-availability/availability.js";
@@ -41,6 +43,31 @@ describe("顾客查询真实可约时段领域规则", () => {
 
     expect(bookingWindowFor(now)).toEqual({ startsOn: "2026-08-13", endsOn: "2026-08-26" });
     expect(earliestCustomerCandidate(now)).toBe("2026-08-13T05:00:00.000Z");
+  });
+
+  it("两小时提前量跨过上海午夜时不会把首日已经过去的时段重新开放", () => {
+    const earliest = earliestCustomerCandidate("2026-08-13T15:50:00.000Z");
+
+    expect(earliest).toBe("2026-08-13T18:00:00.000Z");
+    expect(earliestCandidateMinutesForDate("2026-08-13", earliest)).toBe(24 * 60);
+    expect(earliestCandidateMinutesForDate("2026-08-14", earliest)).toBe(2 * 60);
+    expect(earliestCandidateMinutesForDate("2026-08-15", earliest)).toBe(0);
+  });
+
+  it("从已发布班次容量中扣除相邻、重叠的停班和临时闭店区间", () => {
+    expect(
+      subtractAvailabilityIntervals(
+        [{ startsAtMinutes: 9 * 60 + 30, endsAtMinutes: 18 * 60 }],
+        [
+          { startsAtMinutes: 10 * 60, endsAtMinutes: 11 * 60 },
+          { startsAtMinutes: 10 * 60 + 30, endsAtMinutes: 12 * 60 },
+          { startsAtMinutes: 16 * 60, endsAtMinutes: 18 * 60 },
+        ],
+      ),
+    ).toEqual([
+      { startsAtMinutes: 9 * 60 + 30, endsAtMinutes: 10 * 60 },
+      { startsAtMinutes: 12 * 60, endsAtMinutes: 16 * 60 },
+    ]);
   });
 
   it("要求服务与十五分钟周转完整位于同一可用区间，并允许左闭右开区间首尾相邻", () => {

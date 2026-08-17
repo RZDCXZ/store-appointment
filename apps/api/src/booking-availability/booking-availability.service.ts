@@ -1,4 +1,5 @@
 import { HttpException, HttpStatus, Inject, Injectable } from "@nestjs/common";
+import { quoteBookingSelection } from "@rongguang/contracts";
 import type {
   BookingAvailabilityDay,
   BookingAvailabilityReason,
@@ -15,7 +16,9 @@ import { ServiceCatalogService } from "../service-catalog/service-catalog.servic
 import {
   bookingWindowFor,
   discoverDayAvailability,
+  earliestCandidateMinutesForDate,
   earliestCustomerCandidate,
+  subtractAvailabilityIntervals,
   type AvailabilityBooking,
   type AvailabilityInterval,
   type AvailabilityStaff,
@@ -65,11 +68,21 @@ interface ScheduleRow {
 interface BookingRow {
   local_date: string;
   pet_id: string;
-  staff_id: string | null;
+  staff_id: string;
   starts_at_minutes: number;
   ends_at_minutes: number;
   occupancy_ends_at_minutes: number;
   service_minutes: number;
+}
+
+interface CapacityBlockRow {
+  local_date: string;
+  starts_at: string;
+  ends_at: string;
+}
+
+interface StaffCapacityBlockRow extends CapacityBlockRow {
+  staff_id: string;
 }
 
 interface ShiftBuilder {
@@ -159,11 +172,6 @@ function localInstant(localDate: string, minuteOfDay: number): string {
   return new Date(
     Date.UTC(year ?? 0, (month ?? 1) - 1, day ?? 1, hours - 8, minutes),
   ).toISOString();
-}
-
-function minuteOfDayInShanghai(instant: string): number {
-  const shifted = new Date(new Date(instant).getTime() + 8 * 60 * 60_000);
-  return shifted.getUTCHours() * 60 + shifted.getUTCMinutes();
 }
 
 function hasAllSkills(staff: StaffRow, requiredSkills: StaffSkillId[]): boolean {
@@ -271,18 +279,40 @@ export class BookingAvailabilityService {
                      + extract(minute FROM ends_at AT TIME ZONE 'Asia/Shanghai')
                    )::int AS ends_at_minutes,
                    (
-                     extract(hour FROM (ends_at + interval '15 minutes') AT TIME ZONE 'Asia/Shanghai') * 60
-                     + extract(minute FROM (ends_at + interval '15 minutes') AT TIME ZONE 'Asia/Shanghai')
+                     extract(hour FROM occupancy_ends_at AT TIME ZONE 'Asia/Shanghai') * 60
+                     + extract(minute FROM occupancy_ends_at AT TIME ZONE 'Asia/Shanghai')
                    )::int AS occupancy_ends_at_minutes,
-                   coalesce(
-                     service_duration_minutes,
-                     extract(epoch FROM (ends_at - starts_at))::int / 60
-                   )::int AS service_minutes
+                   service_duration_minutes::int AS service_minutes
             FROM bookings
             WHERE status NOT IN ('cancelled', 'no_show')
               AND starts_at < (($2::date + 1)::timestamp AT TIME ZONE 'Asia/Shanghai')
               AND ends_at > ($1::date::timestamp AT TIME ZONE 'Asia/Shanghai')
           `,
+        [window.startsOn, window.endsOn],
+      );
+      const timeOffResult = await client.query<StaffCapacityBlockRow>(
+        `
+          SELECT to_char(local_date, 'YYYY-MM-DD') AS local_date,
+                 staff_id,
+                 to_char(starts_at, 'HH24:MI') AS starts_at,
+                 to_char(ends_at, 'HH24:MI') AS ends_at
+          FROM staff_time_off_intervals
+          WHERE local_date BETWEEN $1 AND $2
+            AND status IN ('pending', 'active')
+          ORDER BY local_date, staff_id, starts_at
+        `,
+        [window.startsOn, window.endsOn],
+      );
+      const closureResult = await client.query<CapacityBlockRow>(
+        `
+          SELECT to_char(local_date, 'YYYY-MM-DD') AS local_date,
+                 to_char(starts_at, 'HH24:MI') AS starts_at,
+                 to_char(ends_at, 'HH24:MI') AS ends_at
+          FROM store_closure_intervals
+          WHERE local_date BETWEEN $1 AND $2
+            AND status IN ('pending', 'active')
+          ORDER BY local_date, starts_at
+        `,
         [window.startsOn, window.endsOn],
       );
       await client.query("COMMIT");
@@ -321,12 +351,34 @@ export class BookingAvailabilityService {
         ]);
       }
 
+      const timeOffByStaffDate = new Map<string, AvailabilityInterval[]>();
+      for (const row of timeOffResult.rows) {
+        const key = `${row.local_date}:${row.staff_id}`;
+        timeOffByStaffDate.set(key, [
+          ...(timeOffByStaffDate.get(key) ?? []),
+          {
+            startsAtMinutes: timeToMinutes(row.starts_at),
+            endsAtMinutes: timeToMinutes(row.ends_at),
+          },
+        ]);
+      }
+      const closuresByDate = new Map<string, AvailabilityInterval[]>();
+      for (const row of closureResult.rows) {
+        closuresByDate.set(row.local_date, [
+          ...(closuresByDate.get(row.local_date) ?? []),
+          {
+            startsAtMinutes: timeToMinutes(row.starts_at),
+            endsAtMinutes: timeToMinutes(row.ends_at),
+          },
+        ]);
+      }
+
       const bookingsByDate = new Map<string, AvailabilityBooking[]>();
       for (const row of bookingResult.rows) {
         const dateBookings = bookingsByDate.get(row.local_date) ?? [];
         dateBookings.push({
           petId: row.pet_id,
-          staffId: row.staff_id ?? "",
+          staffId: row.staff_id,
           startsAtMinutes: row.starts_at_minutes,
           endsAtMinutes: row.ends_at_minutes,
           occupancyEndsAtMinutes: row.occupancy_ends_at_minutes,
@@ -357,14 +409,19 @@ export class BookingAvailabilityService {
           displayName: staff.display_name,
           employeeNumber: staff.employee_number,
           skills: staff.skills,
-          capacity: capacityByStaffDate.get(`${date}:${staff.id}`) ?? [],
+          capacity: subtractAvailabilityIntervals(
+            capacityByStaffDate.get(`${date}:${staff.id}`) ?? [],
+            [
+              ...(closuresByDate.get(date) ?? []),
+              ...(timeOffByStaffDate.get(`${date}:${staff.id}`) ?? []),
+            ],
+          ),
         }));
         return discoverDayAvailability({
           date,
           window,
           businessHours,
-          earliestStartsAtMinutes:
-            date === window.startsOn ? minuteOfDayInShanghai(earliestStartsAt) : 0,
+          earliestStartsAtMinutes: earliestCandidateMinutesForDate(date, earliestStartsAt),
           petId: selection.pet.id,
           requiredSkills: selection.requiredSkillIds,
           serviceMinutes: selection.serviceDurationMinutes,
@@ -437,64 +494,21 @@ export class BookingAvailabilityService {
   }
 
   private quote(pet: PetRow, primaryServiceId: string, addonIds: string[]): BookingSelectionQuote {
-    const catalog = this.catalog.getStorefront();
-    const primaryService = catalog.primaryServices.find(
-      (service) => service.id === primaryServiceId,
-    );
-    if (!primaryService || !primaryService.applicableSpecies.includes(pet.species)) {
-      selectionError("这项主要服务不适用于所选宠物。");
+    try {
+      return quoteBookingSelection(
+        {
+          id: pet.id,
+          name: pet.name,
+          species: pet.species,
+          petSize: petSizeFor(Number(pet.weight_kg)),
+          weightKg: Number(pet.weight_kg),
+        },
+        this.catalog.getStorefront(),
+        primaryServiceId,
+        addonIds,
+      );
+    } catch (error) {
+      selectionError(error instanceof Error ? error.message : "服务组合无效，请重新选择。");
     }
-
-    const petSize = petSizeFor(Number(pet.weight_kg));
-    const primarySpecification = primaryService.specifications.find(
-      (specification) => specification.petSize === petSize,
-    );
-    if (!primarySpecification) {
-      selectionError("没有找到这只宠物对应的服务规格。");
-    }
-
-    const allowedAddonIds = new Set(primaryService.availableAddonIds);
-    const addons = addonIds.map((addonId) => {
-      const addon = catalog.addons.find((item) => item.id === addonId);
-      const specification = addon?.specifications.find((item) => item.petSize === petSize);
-      if (
-        !addon ||
-        !allowedAddonIds.has(addon.id) ||
-        !addon.applicableSpecies.includes(pet.species) ||
-        !specification
-      ) {
-        selectionError("所选增项与主要服务或宠物不兼容。");
-      }
-      return {
-        id: addon.id,
-        name: addon.name,
-        priceCents: specification.priceCents,
-        durationMinutes: specification.durationMinutes,
-      };
-    });
-    const primaryLine = {
-      id: primaryService.id,
-      name: primaryService.name,
-      priceCents: primarySpecification.priceCents,
-      durationMinutes: primarySpecification.durationMinutes,
-    };
-
-    return {
-      pet: {
-        id: pet.id,
-        name: pet.name,
-        species: pet.species,
-        petSize,
-        weightKg: Number(pet.weight_kg),
-      },
-      primaryService: primaryLine,
-      addons,
-      totalPriceCents:
-        primaryLine.priceCents + addons.reduce((total, addon) => total + addon.priceCents, 0),
-      serviceDurationMinutes:
-        primaryLine.durationMinutes +
-        addons.reduce((total, addon) => total + addon.durationMinutes, 0),
-      requiredSkillIds: [primaryService.id, ...addonIds] as StaffSkillId[],
-    };
   }
 }
