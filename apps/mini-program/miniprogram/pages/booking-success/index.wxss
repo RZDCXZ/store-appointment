@@ -1,0 +1,118 @@
+@import "../../styles/booking-flow.wxss";
+
+.success-page {
+  box-sizing: border-box;
+  min-height: 100vh;
+  padding: 88rpx 32rpx calc(env(safe-area-inset-bottom) + 48rpx);
+}
+.success-hero {
+  display: flex;
+  align-items: center;
+  flex-direction: column;
+  text-align: center;
+}
+.success-hero__mark {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 104rpx;
+  height: 104rpx;
+  border-radius: 50%;
+  color: #fff;
+  background: #3f6253;
+  font-size: 56rpx;
+}
+.success-hero__status {
+  margin-top: 22rpx;
+  color: #3f6253;
+  font-size: 28rpx;
+  font-weight: 700;
+}
+.success-hero__title {
+  margin-top: 12rpx;
+  color: #24312c;
+  font-family: STSong, "Songti SC", serif;
+  font-size: 48rpx;
+  font-weight: 700;
+}
+.success-hero__body {
+  margin-top: 14rpx;
+  color: #61706a;
+  font-size: 27rpx;
+  line-height: 1.6;
+}
+.success-ticket {
+  margin-top: 44rpx;
+  padding: 30rpx;
+  border: 1rpx solid #ddd7cb;
+  border-radius: 30rpx;
+  background: #fffcf7;
+}
+.success-ticket__time {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding-bottom: 26rpx;
+  border-bottom: 1rpx dashed #ddd7cb;
+}
+.success-ticket__time view {
+  display: flex;
+  flex-direction: column;
+}
+.success-ticket__time view text:first-child {
+  color: #61706a;
+  font-size: 25rpx;
+}
+.success-ticket__time view text:last-child {
+  margin-top: 8rpx;
+  color: #24312c;
+  font-size: 40rpx;
+  font-weight: 700;
+}
+.success-ticket__status {
+  padding: 10rpx 16rpx;
+  border-radius: 999rpx;
+  color: #376e91;
+  background: rgba(55, 110, 145, 0.1);
+  font-size: 24rpx;
+  font-weight: 700;
+}
+.success-ticket__row {
+  display: grid;
+  grid-template-columns: 100rpx 1fr;
+  gap: 18rpx;
+  padding-top: 24rpx;
+  font-size: 28rpx;
+}
+.success-ticket__row text:first-child {
+  color: #61706a;
+}
+.success-ticket__row text:last-child {
+  color: #24312c;
+  font-weight: 600;
+  text-align: right;
+}
+.success-primary,
+.success-secondary {
+  box-sizing: border-box;
+  width: 100%;
+  min-height: 92rpx;
+  margin-top: 26rpx;
+  border-radius: 22rpx;
+  font-size: 29rpx;
+  font-weight: 700;
+}
+.success-primary {
+  color: #fff;
+  background: #3f6253;
+}
+.success-secondary {
+  margin-top: 16rpx;
+  border: 1rpx solid #9eaaa3;
+  color: #3f6253;
+  background: transparent;
+}
+.success-primary::after,
+.success-secondary::after {
+  border: 0;
+}

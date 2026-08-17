@@ -1,5 +1,5 @@
 <view class="booking-page">
-  <view class="booking-progress"><text>预约步骤 1/4</text><view class="booking-progress__track"><text class="booking-progress__value" style="width:25%"></text></view></view>
+  <view class="booking-progress"><text>预约步骤 1/5</text><view class="booking-progress__track"><text class="booking-progress__value" style="width:20%"></text></view></view>
   <view class="booking-question"><text class="booking-question__number">01</text><text class="booking-question__title">这次为谁预约？</text><text class="booking-question__body">请选择一只在用宠物，后续服务会按种类与当前体重匹配。</text></view>
 
   <view wx:if="{{pageState === 'loading'}}" class="booking-state"><text class="booking-state__mark">茸</text><text class="booking-state__title">正在读取宠物档案</text></view>

@@ -12,7 +12,9 @@
     "pages/booking-pet/index",
     "pages/booking-service/index",
     "pages/booking-staff/index",
-    "pages/booking-time/index"
+    "pages/booking-time/index",
+    "pages/booking-confirm/index",
+    "pages/booking-success/index"
   ],
   "window": {
     "backgroundColor": "#F6F1E7",

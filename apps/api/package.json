@@ -11,7 +11,7 @@
     "dev": "tsx watch src/main.ts",
     "lint": "eslint src test --max-warnings=0",
     "start": "node dist/main.js",
-    "test": "vitest run",
+    "test": "vitest run --no-file-parallelism",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {

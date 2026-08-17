@@ -1,0 +1,12 @@
+<view class="success-page">
+  <view wx:if="{{pageState === 'loading'}}" class="booking-state"><text class="booking-state__mark">茸</text><text class="booking-state__title">正在恢复预约事实</text></view>
+  <view wx:elif="{{pageState === 'auth'}}" class="booking-state"><text class="booking-state__mark">顾</text><text class="booking-state__title">请重新选择演示顾客</text><button class="primary-button" bindtap="chooseCustomer">选择演示顾客</button></view>
+  <view wx:elif="{{pageState === 'missing'}}" class="booking-state"><text class="booking-state__mark">!</text><text class="booking-state__title">缺少预约身份</text><text class="booking-state__body">请从预约记录重新打开这笔预约。</text><button class="primary-button" bindtap="viewAppointments">查看预约记录</button></view>
+  <view wx:elif="{{pageState === 'error'}}" class="booking-state"><text class="booking-state__mark">!</text><text class="booking-state__title">预约事实没有加载出来</text><text class="booking-state__body">{{errorMessage}}</text><button class="primary-button" bindtap="retry">重新加载</button></view>
+  <block wx:else>
+    <view class="success-hero"><text class="success-hero__mark">✓</text><text class="success-hero__status">{{statusLabel}}</text><text class="success-hero__title">{{petName}}的洗护安排好了</text><text class="success-hero__body">具体员工与核销码已经生成，可在预约记录中继续查看。</text></view>
+    <view class="success-ticket"><view class="success-ticket__time"><view><text>{{dateLabel}}</text><text>{{timeLabel}}</text></view><text class="success-ticket__status">已确认</text></view><view class="success-ticket__row"><text>服务</text><text>{{serviceLabel}}</text></view><view class="success-ticket__row"><text>员工</text><text>{{staffLabel}}</text></view><view class="success-ticket__row"><text>价格</text><text>{{priceLabel}}</text></view></view>
+    <button class="success-primary" bindtap="viewAppointments">查看预约记录</button>
+    <button class="success-secondary" bindtap="goHome">返回首页</button>
+  </block>
+</view>

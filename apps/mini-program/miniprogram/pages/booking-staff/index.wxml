@@ -1,5 +1,5 @@
 <view class="booking-page">
-  <view class="booking-progress"><text>预约步骤 3/4</text><view class="booking-progress__track"><text class="booking-progress__value" style="width:75%"></text></view></view>
+  <view class="booking-progress"><text>预约步骤 3/5</text><view class="booking-progress__track"><text class="booking-progress__value" style="width:60%"></text></view></view>
   <view class="booking-question"><text class="booking-question__number">03</text><text class="booking-question__title">有偏好的员工吗？</text><text class="booking-question__body">指定员工只查看该员工时段；最快可约会按最早时间、当天服务分钟数和固定员工编号确定。</text></view>
   <view wx:if="{{pageState === 'recovery'}}" class="booking-state"><text class="booking-state__mark">←</text><text class="booking-state__title">还缺少前一步选择</text><text class="booking-state__body">{{recoveryMessage}}</text><button class="primary-button" bindtap="recover">返回恢复选择</button></view>
   <view wx:elif="{{pageState === 'loading'}}" class="booking-state"><text class="booking-state__mark">茸</text><text class="booking-state__title">正在查询合格员工</text></view>

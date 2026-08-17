@@ -425,7 +425,15 @@ async function seed(client: PoolClient): Promise<void> {
     `
       INSERT INTO bookings (
         id, customer_id, pet_id, staff_id, starts_at, ends_at,
-        occupancy_starts_at, occupancy_ends_at, service_duration_minutes, status
+        occupancy_starts_at, occupancy_ends_at, service_duration_minutes, status,
+        pet_name_snapshot, pet_species_snapshot, pet_weight_kg_snapshot, pet_size_snapshot,
+        primary_service_id_snapshot, primary_service_name_snapshot,
+        primary_service_price_cents, primary_service_duration_minutes,
+        addon_snapshots, required_skill_ids_snapshot, total_price_cents,
+        staff_display_name_snapshot, turnover_minutes,
+        original_starts_at, original_ends_at,
+        original_occupancy_starts_at, original_occupancy_ends_at,
+        verification_code_digest
       )
       VALUES (
         'booking-bohe-future',
@@ -437,16 +445,41 @@ async function seed(client: PoolClient): Promise<void> {
         '2026-08-14T03:00:00.000Z',
         '2026-08-14T04:45:00.000Z',
         90,
-        'confirmed'
+        'confirmed',
+        '薄荷', 'cat', 4.8, 'small',
+        'cat-care', '猫咪洗护', 16800, 90,
+        '[]'::jsonb, '["cat-care"]'::jsonb, 16800,
+        '陈嘉', 15,
+        '2026-08-14T03:00:00.000Z', '2026-08-14T04:30:00.000Z',
+        '2026-08-14T03:00:00.000Z', '2026-08-14T04:45:00.000Z',
+        repeat('0', 64)
       )
       ON CONFLICT (id) DO UPDATE
       SET staff_id = excluded.staff_id,
           starts_at = excluded.starts_at,
           ends_at = excluded.ends_at,
           occupancy_starts_at = excluded.occupancy_starts_at,
-          occupancy_ends_at = excluded.occupancy_ends_at,
-          service_duration_minutes = excluded.service_duration_minutes,
-          status = excluded.status
+            occupancy_ends_at = excluded.occupancy_ends_at,
+            service_duration_minutes = excluded.service_duration_minutes,
+            status = excluded.status,
+            pet_name_snapshot = excluded.pet_name_snapshot,
+            pet_species_snapshot = excluded.pet_species_snapshot,
+            pet_weight_kg_snapshot = excluded.pet_weight_kg_snapshot,
+            pet_size_snapshot = excluded.pet_size_snapshot,
+            primary_service_id_snapshot = excluded.primary_service_id_snapshot,
+            primary_service_name_snapshot = excluded.primary_service_name_snapshot,
+            primary_service_price_cents = excluded.primary_service_price_cents,
+            primary_service_duration_minutes = excluded.primary_service_duration_minutes,
+            addon_snapshots = excluded.addon_snapshots,
+            required_skill_ids_snapshot = excluded.required_skill_ids_snapshot,
+            total_price_cents = excluded.total_price_cents,
+            staff_display_name_snapshot = excluded.staff_display_name_snapshot,
+            turnover_minutes = excluded.turnover_minutes,
+            original_starts_at = excluded.original_starts_at,
+            original_ends_at = excluded.original_ends_at,
+            original_occupancy_starts_at = excluded.original_occupancy_starts_at,
+            original_occupancy_ends_at = excluded.original_occupancy_ends_at,
+            verification_code_digest = excluded.verification_code_digest
     `,
   );
 
@@ -468,7 +501,7 @@ async function seed(client: PoolClient): Promise<void> {
 async function reset(client: PoolClient): Promise<void> {
   await withTransaction(client, async () => {
     await client.query(
-      "TRUNCATE TABLE app_metadata, staff_time_off_intervals, store_closure_intervals, staff_schedule_breaks, staff_schedule_shifts, staff_schedule_days, weekly_shift_template_breaks, weekly_shift_templates, store_business_hours, staff_skills, staff_members, privacy_consents, privacy_notices, bookings, pet_care_tags, pets, pet_photos, customer_sessions, demo_customer_profiles, customers, backoffice_sessions, backoffice_accounts",
+      "TRUNCATE TABLE app_metadata, notification_outbox, audit_events, booking_events, booking_idempotency_keys, staff_time_off_intervals, store_closure_intervals, staff_schedule_breaks, staff_schedule_shifts, staff_schedule_days, weekly_shift_template_breaks, weekly_shift_templates, store_business_hours, staff_skills, staff_members, privacy_consents, privacy_notices, bookings, pet_care_tags, pets, pet_photos, customer_sessions, demo_customer_profiles, customers, backoffice_sessions, backoffice_accounts",
     );
     await seed(client);
   });

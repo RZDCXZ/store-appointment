@@ -142,12 +142,24 @@ describe("顾客查询真实可约时段", () => {
       `
         INSERT INTO bookings (
           id, customer_id, pet_id, staff_id, starts_at, ends_at,
-          occupancy_starts_at, occupancy_ends_at, service_duration_minutes, status
+          occupancy_starts_at, occupancy_ends_at, service_duration_minutes, status,
+          pet_name_snapshot, pet_species_snapshot, pet_weight_kg_snapshot, pet_size_snapshot,
+          primary_service_id_snapshot, primary_service_name_snapshot,
+          primary_service_price_cents, primary_service_duration_minutes,
+          addon_snapshots, required_skill_ids_snapshot, total_price_cents,
+          staff_display_name_snapshot, turnover_minutes,
+          original_starts_at, original_ends_at,
+          original_occupancy_starts_at, original_occupancy_ends_at,
+          verification_code_digest
         )
         VALUES (
           'booking-slot-pet-conflict', 'customer-cheng-mo', 'pet-bohe', 'chenjia',
           '2026-08-14T07:00:00.000Z', '2026-08-14T08:30:00.000Z',
-          '2026-08-14T07:00:00.000Z', '2026-08-14T08:45:00.000Z', 90, 'confirmed'
+          '2026-08-14T07:00:00.000Z', '2026-08-14T08:45:00.000Z', 90, 'confirmed',
+          '薄荷', 'cat', 4.8, 'small', 'cat-care', '猫咪洗护', 16800, 90,
+          '[]'::jsonb, '["cat-care"]'::jsonb, 16800, '陈嘉', 15,
+          '2026-08-14T07:00:00.000Z', '2026-08-14T08:30:00.000Z',
+          '2026-08-14T07:00:00.000Z', '2026-08-14T08:45:00.000Z', repeat('0', 64)
         )
         ON CONFLICT (id) DO UPDATE
         SET staff_id = excluded.staff_id,
@@ -236,12 +248,24 @@ describe("顾客查询真实可约时段", () => {
       `
         INSERT INTO bookings (
           id, customer_id, pet_id, staff_id, starts_at, ends_at,
-          occupancy_starts_at, occupancy_ends_at, service_duration_minutes, status
+          occupancy_starts_at, occupancy_ends_at, service_duration_minutes, status,
+          pet_name_snapshot, pet_species_snapshot, pet_weight_kg_snapshot, pet_size_snapshot,
+          primary_service_id_snapshot, primary_service_name_snapshot,
+          primary_service_price_cents, primary_service_duration_minutes,
+          addon_snapshots, required_skill_ids_snapshot, total_price_cents,
+          staff_display_name_snapshot, turnover_minutes,
+          original_starts_at, original_ends_at,
+          original_occupancy_starts_at, original_occupancy_ends_at,
+          verification_code_digest
         )
         VALUES (
           'booking-exclusion-base', 'customer-xu-lan', 'pet-tuanzi', 'linxia',
           '2026-08-20T02:00:00.000Z', '2026-08-20T03:00:00.000Z',
-          '2026-08-20T02:00:00.000Z', '2026-08-20T03:15:00.000Z', 60, 'confirmed'
+          '2026-08-20T02:00:00.000Z', '2026-08-20T03:15:00.000Z', 60, 'confirmed',
+          '团子', 'dog', 8.4, 'small', 'dog-basic-care', '犬基础洗护', 12800, 60,
+          '[]'::jsonb, '["dog-basic-care"]'::jsonb, 12800, '林夏', 15,
+          '2026-08-20T02:00:00.000Z', '2026-08-20T03:00:00.000Z',
+          '2026-08-20T02:00:00.000Z', '2026-08-20T03:15:00.000Z', repeat('0', 64)
         )
       `,
     );
@@ -251,12 +275,24 @@ describe("顾客查询真实可约时段", () => {
         `
           INSERT INTO bookings (
             id, customer_id, pet_id, staff_id, starts_at, ends_at,
-            occupancy_starts_at, occupancy_ends_at, service_duration_minutes, status
+            occupancy_starts_at, occupancy_ends_at, service_duration_minutes, status,
+            pet_name_snapshot, pet_species_snapshot, pet_weight_kg_snapshot, pet_size_snapshot,
+            primary_service_id_snapshot, primary_service_name_snapshot,
+            primary_service_price_cents, primary_service_duration_minutes,
+            addon_snapshots, required_skill_ids_snapshot, total_price_cents,
+            staff_display_name_snapshot, turnover_minutes,
+            original_starts_at, original_ends_at,
+            original_occupancy_starts_at, original_occupancy_ends_at,
+            verification_code_digest
           )
           VALUES (
             'booking-exclusion-staff', 'customer-cheng-mo', 'pet-bohe', 'linxia',
             '2026-08-20T03:00:00.000Z', '2026-08-20T03:30:00.000Z',
-            '2026-08-20T03:00:00.000Z', '2026-08-20T03:45:00.000Z', 30, 'confirmed'
+            '2026-08-20T03:00:00.000Z', '2026-08-20T03:45:00.000Z', 30, 'confirmed',
+            '薄荷', 'cat', 4.8, 'small', 'cat-care', '猫咪洗护', 16800, 30,
+            '[]'::jsonb, '["cat-care"]'::jsonb, 16800, '林夏', 15,
+            '2026-08-20T03:00:00.000Z', '2026-08-20T03:30:00.000Z',
+            '2026-08-20T03:00:00.000Z', '2026-08-20T03:45:00.000Z', repeat('0', 64)
           )
         `,
       ),
@@ -266,12 +302,24 @@ describe("顾客查询真实可约时段", () => {
         `
           INSERT INTO bookings (
             id, customer_id, pet_id, staff_id, starts_at, ends_at,
-            occupancy_starts_at, occupancy_ends_at, service_duration_minutes, status
+            occupancy_starts_at, occupancy_ends_at, service_duration_minutes, status,
+            pet_name_snapshot, pet_species_snapshot, pet_weight_kg_snapshot, pet_size_snapshot,
+            primary_service_id_snapshot, primary_service_name_snapshot,
+            primary_service_price_cents, primary_service_duration_minutes,
+            addon_snapshots, required_skill_ids_snapshot, total_price_cents,
+            staff_display_name_snapshot, turnover_minutes,
+            original_starts_at, original_ends_at,
+            original_occupancy_starts_at, original_occupancy_ends_at,
+            verification_code_digest
           )
           VALUES (
             'booking-exclusion-pet', 'customer-xu-lan', 'pet-tuanzi', 'zhaohang',
             '2026-08-20T02:30:00.000Z', '2026-08-20T03:30:00.000Z',
-            '2026-08-20T02:30:00.000Z', '2026-08-20T03:45:00.000Z', 60, 'confirmed'
+            '2026-08-20T02:30:00.000Z', '2026-08-20T03:45:00.000Z', 60, 'confirmed',
+            '团子', 'dog', 8.4, 'small', 'dog-basic-care', '犬基础洗护', 12800, 60,
+            '[]'::jsonb, '["dog-basic-care"]'::jsonb, 12800, '赵航', 15,
+            '2026-08-20T02:30:00.000Z', '2026-08-20T03:30:00.000Z',
+            '2026-08-20T02:30:00.000Z', '2026-08-20T03:45:00.000Z', repeat('0', 64)
           )
         `,
       ),

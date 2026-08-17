@@ -117,4 +117,20 @@ describe("原生小程序项目契约", () => {
       ),
     );
   });
+
+  it("MP-10 确认预约与 MP-11 预约成功是可直接打开并恢复服务端事实的独立页面", async () => {
+    const appConfig = JSON.parse(
+      await readFile(new URL("../miniprogram/app.json", import.meta.url), "utf8"),
+    ) as { pages: string[] };
+    const bookingFactPages = ["pages/booking-confirm/index", "pages/booking-success/index"];
+
+    expect(appConfig.pages).toEqual(expect.arrayContaining(bookingFactPages));
+    await Promise.all(
+      bookingFactPages.flatMap((page) =>
+        ["ts", "json", "wxml", "wxss"].map((extension) =>
+          access(new URL(`../miniprogram/${page}.${extension}`, import.meta.url)),
+        ),
+      ),
+    );
+  });
 });

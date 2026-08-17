@@ -60,6 +60,16 @@ export function getMiniappSessionTtlSeconds(): number {
   return value;
 }
 
+export function getBookingCodeSecret(): string {
+  const value = process.env.BOOKING_CODE_SECRET ?? "rongguang-local-demo-booking-code-secret";
+
+  if (value.length < 24) {
+    throw new Error("BOOKING_CODE_SECRET 至少需要 24 个字符。");
+  }
+
+  return value;
+}
+
 export function redactDatabaseUrl(databaseUrl: string): string {
   try {
     const url = new URL(databaseUrl);

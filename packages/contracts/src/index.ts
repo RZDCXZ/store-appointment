@@ -441,3 +441,51 @@ export interface BookingAvailabilityResponse {
   staffOptions: BookingAvailabilityStaff[];
   days: BookingAvailabilityDay[];
 }
+
+export interface CreateBookingInput {
+  idempotencyKey: string;
+  petId: string;
+  primaryServiceId: string;
+  addonIds: string[];
+  staffId: string;
+  startsAt: string;
+}
+
+export interface ConfirmedBooking {
+  id: string;
+  status: "confirmed";
+  pet: {
+    id: string;
+    name: string;
+    species: PetSpecies;
+    weightKg: number;
+    petSize: PetSize;
+  };
+  primaryService: BookingSelectionLine;
+  addons: BookingSelectionLine[];
+  staff: {
+    id: string;
+    displayName: string;
+  };
+  startsAt: string;
+  endsAt: string;
+  turnoverEndsAt: string;
+  totalPriceCents: number;
+  serviceDurationMinutes: number;
+  turnoverMinutes: number;
+  originalSchedule: {
+    startsAt: string;
+    endsAt: string;
+    occupancyStartsAt: string;
+    occupancyEndsAt: string;
+  };
+  createdAt: string;
+}
+
+export interface BookingDetailResponse {
+  booking: ConfirmedBooking;
+}
+
+export interface CreateBookingResponse extends BookingDetailResponse {
+  verificationCode: string;
+}

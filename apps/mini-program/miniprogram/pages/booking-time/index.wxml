@@ -1,5 +1,5 @@
 <view class="booking-page">
-  <view class="booking-progress"><text>预约步骤 4/4</text><view class="booking-progress__track"><text class="booking-progress__value" style="width:100%"></text></view></view>
+  <view class="booking-progress"><text>预约步骤 4/5</text><view class="booking-progress__track"><text class="booking-progress__value" style="width:80%"></text></view></view>
   <view class="booking-question"><text class="booking-question__number">04</text><text class="booking-question__title">选择日期与开始时间</text><text class="booking-question__body">时段已考虑营业、技能、已发布班次、休息、已有预约与 15 分钟周转。</text></view>
   <view wx:if="{{pageState === 'recovery'}}" class="booking-state"><text class="booking-state__mark">←</text><text class="booking-state__title">还缺少前一步选择</text><text class="booking-state__body">{{recoveryMessage}}</text><button class="primary-button" bindtap="recover">返回恢复选择</button></view>
   <view wx:elif="{{pageState === 'loading'}}" class="booking-state"><text class="booking-state__mark">茸</text><text class="booking-state__title">正在计算真实可约时段</text></view>

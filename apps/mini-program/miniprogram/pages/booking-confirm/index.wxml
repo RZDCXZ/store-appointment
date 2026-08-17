@@ -1,0 +1,22 @@
+<view class="booking-page confirm-page">
+  <view class="booking-progress"><text>预约步骤 5/5</text><view class="booking-progress__track"><text class="booking-progress__value" style="width:100%"></text></view></view>
+  <view class="booking-question"><text class="booking-question__number">05</text><text class="booking-question__title">确认本次预约</text><text class="booking-question__body">提交成功后将立即确认，并占用这位员工与宠物的时间。</text></view>
+  <view wx:if="{{pageState === 'recovery'}}" class="booking-state"><text class="booking-state__mark">←</text><text class="booking-state__title">预约草稿需要恢复</text><text class="booking-state__body">{{recoveryMessage}}</text><button class="primary-button" bindtap="recover">返回恢复选择</button></view>
+  <view wx:elif="{{pageState === 'loading'}}" class="booking-state"><text class="booking-state__mark">茸</text><text class="booking-state__title">正在恢复当前预约事实</text></view>
+  <view wx:elif="{{pageState === 'auth'}}" class="booking-state"><text class="booking-state__mark">顾</text><text class="booking-state__title">请重新选择演示顾客</text><button class="primary-button" bindtap="chooseCustomer">选择演示顾客</button></view>
+  <view wx:elif="{{pageState === 'error'}}" class="booking-state"><text class="booking-state__mark">!</text><text class="booking-state__title">预约事实没有加载出来</text><text class="booking-state__body">{{errorMessage}}</text><button class="primary-button" bindtap="retry">重新加载</button></view>
+  <block wx:else>
+    <view class="confirm-sheet">
+      <view class="confirm-row"><text class="confirm-row__label">宠物</text><view><text class="confirm-row__value">{{petLabel}}</text><text class="confirm-row__detail">体重与体型会保存为本次预约快照</text></view></view>
+      <view class="confirm-row"><text class="confirm-row__label">服务</text><view><text class="confirm-row__value">{{serviceLabel}}</text><text class="confirm-row__detail">{{serviceDetail}}</text></view></view>
+      <view class="confirm-row"><text class="confirm-row__label">员工</text><view><text class="confirm-row__value">{{staffLabel}}</text><text class="confirm-row__detail">可连续完成主要服务与全部增项</text></view></view>
+      <view class="confirm-row"><text class="confirm-row__label">时间</text><view><text class="confirm-row__value">{{dateLabel}}　{{timeLabel}}</text><text class="confirm-row__detail">门店另预留 15 分钟交接，不计入服务时长</text></view></view>
+      <view class="confirm-row"><text class="confirm-row__label">时长</text><view><text class="confirm-row__value">{{durationLabel}}</text><text class="confirm-row__detail">顾客可见的预计服务时长</text></view></view>
+      <view class="confirm-row confirm-row--price"><text class="confirm-row__label">价格</text><view><text class="confirm-row__value">{{priceLabel}}</text><text class="confirm-row__detail">服务标价，不含支付</text></view></view>
+    </view>
+    <view class="consent-summary"><text class="consent-summary__mark">✓</text><view><text>隐私同意已确认</text><text>当前版本 {{privacyVersion}}</text></view></view>
+    <view wx:if="{{submissionError}}" class="submission-error"><text>{{submissionError}}</text><button wx:if="{{submissionActionPath}}" bindtap="resolveSubmissionError">{{submissionActionLabel}}</button><text wx:else>草稿与幂等键已保留，可直接重试。</text></view>
+    <text class="submission-note">点击确认表示你已核对宠物、服务、具体员工、时间、价格与时长。网络重试不会重复创建预约。</text>
+  </block>
+</view>
+<view class="booking-footer" wx:if="{{pageState === 'ready'}}"><view class="booking-footer__summary"><text>当前合计</text><text>{{priceLabel}} · {{durationLabel}}</text></view><button disabled="{{submitting}}" loading="{{submitting}}" bindtap="submitBooking">{{submitting ? '正在确认' : '确认预约'}}</button></view>

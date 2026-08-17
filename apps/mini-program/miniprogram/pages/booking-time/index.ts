@@ -154,7 +154,7 @@ Page({
   },
   saveTime() {
     if (!this.data.selectedStartsAt) return;
-    wx.showToast({ title: "可约时段已保存", icon: "success" });
+    wx.navigateTo({ url: bookingFlowPaths.confirm });
   },
   recover() {
     wx.redirectTo({ url: this.data.recoveryPath || bookingFlowPaths.staff });

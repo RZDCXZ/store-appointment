@@ -9,6 +9,7 @@ import {
   chooseBookingStaff,
   chooseBookingTime,
   emptyBookingDraft,
+  ensureBookingIdempotencyKey,
   readBookingDraft,
   recoveryForBookingStep,
   type BookingDraftStorage,
@@ -83,6 +84,7 @@ describe("预约草稿与服务组合", () => {
 
     expect(readBookingDraft(storage)).toEqual({
       version: 1,
+      idempotencyKey: null,
       petId: "pet-tuanzi",
       primaryServiceId: "dog-basic-care",
       addonIds: ["oral-care"],
@@ -128,6 +130,40 @@ describe("预约草稿与服务组合", () => {
       ...emptyBookingDraft(),
       petId: "pet-other",
     });
+  });
+
+  it("同一草稿重试复用幂等键，改变时段后生成新的命令键", () => {
+    const storage = memoryStorage();
+    chooseBookingPet("pet-tuanzi", storage);
+    chooseBookingService("dog-basic-care", [], storage);
+    chooseBookingStaff({ kind: "fastest" }, storage);
+    chooseBookingTime(
+      {
+        date: "2026-08-14",
+        startsAt: "2026-08-14T01:30:00.000Z",
+        endsAt: "2026-08-14T02:30:00.000Z",
+        assignedStaffId: "linxia",
+      },
+      storage,
+    );
+
+    expect(ensureBookingIdempotencyKey(storage, () => "booking-first-key")).toBe(
+      "booking-first-key",
+    );
+    expect(ensureBookingIdempotencyKey(storage, () => "unused-key")).toBe("booking-first-key");
+
+    chooseBookingTime(
+      {
+        date: "2026-08-14",
+        startsAt: "2026-08-14T02:00:00.000Z",
+        endsAt: "2026-08-14T03:00:00.000Z",
+        assignedStaffId: "zhaohang",
+      },
+      storage,
+    );
+    expect(ensureBookingIdempotencyKey(storage, () => "booking-second-key")).toBe(
+      "booking-second-key",
+    );
   });
 
   it("刷新时只恢复当前响应中仍真实存在的员工时段，并清除已经失效的时间", () => {
@@ -191,6 +227,15 @@ describe("预约草稿与服务组合", () => {
         staffPreference: { kind: "fastest" },
       }),
     ).toBeNull();
+    expect(
+      recoveryForBookingStep("confirm", {
+        ...serviceReady,
+        staffPreference: { kind: "fastest" },
+      }),
+    ).toEqual({
+      path: bookingFlowPaths.time,
+      message: "请先选择仍然可约的日期与时段。",
+    });
   });
 
   it("按宠物体型实时合计价格、服务时长和同一员工所需的全部技能", () => {

@@ -2,7 +2,7 @@
 
 “茸光宠物洗护”是一个公开源码、仅承诺本地运行的单门店作品集案例。正式应用由三部分组成：原生 TypeScript 微信小程序、React/Vite 响应式后台，以及 NestJS/Fastify REST API。PostgreSQL 是唯一的 Docker 服务，Node 应用在宿主机保留热更新。
 
-当前完成 ticket 01 的可启动骨架、ticket 02 的后台演示账号与角色路由、ticket 03 的小程序演示顾客 Bearer 会话、ticket 04 的门店首页与确定价格服务目录，以及 ticket 05 的宠物档案和版本化隐私同意；完整预约创建业务尚未开放。真实微信登录、订阅消息、支付和生产运维不在本地演示能力内。
+当前已完成 ticket 01–08：三端骨架、后台演示身份、顾客 Bearer 会话、门店服务目录、宠物档案与版本化隐私同意、已发布排班、真实可约时段，以及立即确认且可幂等重试的预约创建。真实微信登录、订阅消息、支付和生产运维不在本地演示能力内。
 
 ## 环境要求
 
@@ -83,6 +83,12 @@ cp apps/mini-program/project.config.example.json apps/mini-program/project.confi
 “我的”页面可直接进入 `pages/pets/index` 与 `pages/privacy-consent/index`。新建宠物使用 `pages/pet-form/index`，编辑使用 `pages/pet-form/index?id=<petId>`；刷新编辑页会按 ID 重新读取当前顾客自己的档案。服务端执行宠物归属、输入校验、未来预约归档阻断和隐私版本门禁，客户端提交的顾客 ID 不会改变身份。
 
 宠物照片只接受 JPEG/PNG，最大 512 KiB，保存在被 Git 忽略的 `.data/uploads/pets/`。这是单机作品集演示存储，不是生产对象存储；`db:reset` 会清理上传并恢复种子状态。上传失败时小程序保留表单和待重试文件。
+
+### 创建已确认预约
+
+顾客按宠物、服务与增项、员工偏好、日期与时段完成草稿后，通过 `pages/booking-confirm/index` 复核服务端当前事实。`POST /miniapp/bookings` 要求顾客作用域的幂等键，并在同一 PostgreSQL 事务内重新校验当前隐私同意、宠物状态、服务组合、员工技能、已发布排班与冲突；成功后立即返回已确认预约和具体员工。`pages/booking-success/index?id=<bookingId>` 只凭预约身份调用 `GET /miniapp/bookings/:bookingId` 恢复快照，不依赖上一页内存状态。
+
+预约保存宠物体重与体型、主要服务与增项、价格、时长、原计划和实际占用快照。PostgreSQL 的员工实际占用与宠物服务区间排除约束是并发冲突的最终防线。六位核销码只在响应中出现，数据库保存带服务端密钥的 HMAC 摘要；确认通知 outbox、预约事实、审计事实和幂等结果与预约在同一事务写入。
 
 ## 数据库命令边界
 

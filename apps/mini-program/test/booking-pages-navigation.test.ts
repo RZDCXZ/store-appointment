@@ -8,6 +8,8 @@ interface FlowPageDefinition {
   data: Record<string, unknown>;
   continueFlow?(this: FlowPageInstance): void;
   recover?(this: FlowPageInstance): void;
+  saveTime?(this: FlowPageInstance): void;
+  showSuccess?(this: FlowPageInstance, bookingId: string): void;
 }
 
 describe("MP-06 至 MP-09 页面导航", () => {
@@ -21,6 +23,8 @@ describe("MP-06 至 MP-09 页面导航", () => {
     await import("../miniprogram/pages/booking-service/index");
     await import("../miniprogram/pages/booking-staff/index");
     await import("../miniprogram/pages/booking-time/index");
+    await import("../miniprogram/pages/booking-confirm/index");
+    await import("../miniprogram/pages/booking-success/index");
   });
 
   beforeEach(() => {
@@ -44,16 +48,32 @@ describe("MP-06 至 MP-09 页面导航", () => {
   });
 
   it("直接访问缺少前置选择时可逐级回到准确恢复页", () => {
-    const [, servicePage, staffPage, timePage] = definitions;
+    const [, servicePage, staffPage, timePage, confirmPage] = definitions;
 
     servicePage?.recover?.call({ data: { ...servicePage.data, recoveryPath: "" } });
     staffPage?.recover?.call({ data: { ...staffPage.data, recoveryPath: "" } });
     timePage?.recover?.call({ data: { ...timePage.data, recoveryPath: "" } });
+    confirmPage?.recover?.call({ data: { ...confirmPage.data, recoveryPath: "" } });
 
     expect(redirectTo.mock.calls).toEqual([
       [{ url: "/pages/booking-pet/index" }],
       [{ url: "/pages/booking-service/index" }],
       [{ url: "/pages/booking-staff/index" }],
+      [{ url: "/pages/booking-time/index" }],
     ]);
+  });
+
+  it("保存真实时段进入确认页，创建后按预约身份替换为成功页", () => {
+    const [, , , timePage, confirmPage] = definitions;
+
+    timePage?.saveTime?.call({
+      data: { ...timePage.data, selectedStartsAt: "2026-08-26T05:00:00.000Z" },
+    });
+    confirmPage?.showSuccess?.call({ data: { ...confirmPage.data } }, "booking-created");
+
+    expect(navigateTo).toHaveBeenCalledWith({ url: "/pages/booking-confirm/index" });
+    expect(redirectTo).toHaveBeenCalledWith({
+      url: "/pages/booking-success/index?id=booking-created",
+    });
   });
 });
