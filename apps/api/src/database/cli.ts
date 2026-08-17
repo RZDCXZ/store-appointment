@@ -3,8 +3,14 @@ import { mkdir, readdir, readFile, rm } from "node:fs/promises";
 
 import { Pool, type PoolClient } from "pg";
 
-import { getDatabaseUrl, getPetUploadDirectory, redactDatabaseUrl } from "../config/environment.js";
+import {
+  getDatabaseUrl,
+  getDemoNow,
+  getPetUploadDirectory,
+  redactDatabaseUrl,
+} from "../config/environment.js";
 import { hashPassword } from "../auth/password.js";
+import { addLocalDays, getLocalWeekday, getShanghaiLocalDate } from "../schedule/schedule-date.js";
 
 const migrationsDirectory = new URL("../../database/migrations/", import.meta.url);
 
@@ -108,6 +114,153 @@ async function seed(client: PoolClient): Promise<void> {
       `,
       [account.id, account.username, account.displayName, account.role, passwordHash],
     );
+  }
+
+  await client.query("DELETE FROM staff_schedule_days");
+  await client.query("DELETE FROM weekly_shift_templates");
+  await client.query("DELETE FROM staff_skills");
+  await client.query("DELETE FROM staff_members");
+  await client.query("DELETE FROM store_business_hours");
+
+  const staff = [
+    {
+      id: "linxia",
+      employeeNumber: 1,
+      skills: ["dog-basic-care", "dog-styling", "nail-care", "deshedding-care", "oral-care"],
+      weekdays: [2, 3, 4, 5, 6],
+      shift: ["09:30", "18:00"],
+      shiftBreak: ["12:30", "13:15"],
+    },
+    {
+      id: "chenjia",
+      employeeNumber: 2,
+      skills: ["dog-basic-care", "cat-care", "nail-care", "deshedding-care"],
+      weekdays: [0, 2, 3, 4, 5, 6],
+      shift: ["09:30", "18:00"],
+      shiftBreak: ["12:00", "12:45"],
+    },
+    {
+      id: "zhouning",
+      employeeNumber: 3,
+      skills: ["cat-care", "nail-care", "oral-care"],
+      weekdays: [0, 2, 3, 4, 5, 6],
+      shift: ["10:00", "19:00"],
+      shiftBreak: ["13:00", "13:45"],
+    },
+    {
+      id: "zhaohang",
+      employeeNumber: 4,
+      skills: ["dog-basic-care", "dog-styling", "nail-care", "oral-care"],
+      weekdays: [2, 3, 4, 5, 6],
+      shift: ["10:00", "19:00"],
+      shiftBreak: ["13:15", "14:00"],
+    },
+  ] as const;
+
+  for (const member of staff) {
+    await client.query("INSERT INTO staff_members (id, employee_number) VALUES ($1, $2)", [
+      member.id,
+      member.employeeNumber,
+    ]);
+
+    for (const skill of member.skills) {
+      await client.query("INSERT INTO staff_skills (staff_id, skill_id) VALUES ($1, $2)", [
+        member.id,
+        skill,
+      ]);
+    }
+
+    for (const weekday of member.weekdays) {
+      const templateId = `template-${member.id}-${weekday}`;
+
+      await client.query(
+        `
+          INSERT INTO weekly_shift_templates (id, staff_id, weekday, starts_at, ends_at)
+          VALUES ($1, $2, $3, $4, $5)
+        `,
+        [templateId, member.id, weekday, member.shift[0], member.shift[1]],
+      );
+      await client.query(
+        `
+          INSERT INTO weekly_shift_template_breaks (id, template_id, starts_at, ends_at)
+          VALUES ($1, $2, $3, $4)
+        `,
+        [`template-break-${member.id}-${weekday}`, templateId, ...member.shiftBreak],
+      );
+    }
+  }
+
+  for (let weekday = 0; weekday <= 6; weekday += 1) {
+    const open = weekday !== 1;
+
+    await client.query(
+      `
+        INSERT INTO store_business_hours (weekday, opens_at, closes_at)
+        VALUES ($1, $2, $3)
+      `,
+      [weekday, open ? "09:30" : null, open ? "19:00" : null],
+    );
+  }
+
+  const demoNow = getDemoNow();
+  const scheduleStartsOn = getShanghaiLocalDate(demoNow);
+  let seededSaturdayException = false;
+
+  for (let offset = 0; offset < 14; offset += 1) {
+    const localDate = addLocalDays(scheduleStartsOn, offset);
+    const weekday = getLocalWeekday(localDate);
+
+    if (weekday === 1) {
+      continue;
+    }
+
+    for (const member of staff) {
+      if (!(member.weekdays as readonly number[]).includes(weekday)) {
+        continue;
+      }
+
+      const adjustedSaturday = weekday === 6 && member.id === "linxia" && !seededSaturdayException;
+      const scheduleDayId = `schedule-${localDate}-${member.id}`;
+      const shift = adjustedSaturday ? (["11:00", "19:00"] as const) : member.shift;
+      const shiftBreak = adjustedSaturday ? (["15:00", "15:30"] as const) : member.shiftBreak;
+
+      await client.query(
+        `
+          INSERT INTO staff_schedule_days (
+            id, staff_id, local_date, publication_status, source,
+            exception_kind, exception_note, published_at
+          )
+          VALUES ($1, $2, $3, 'published', $4, $5, $6, $7)
+        `,
+        [
+          scheduleDayId,
+          member.id,
+          localDate,
+          adjustedSaturday ? "date_exception" : "weekly_template",
+          adjustedSaturday ? "adjusted_shift" : null,
+          adjustedSaturday ? "周六门店活动，调整到岗与休息时间。" : null,
+          demoNow,
+        ],
+      );
+      await client.query(
+        `
+          INSERT INTO staff_schedule_shifts (id, schedule_day_id, starts_at, ends_at)
+          VALUES ($1, $2, $3, $4)
+        `,
+        [`shift-${localDate}-${member.id}`, scheduleDayId, shift[0], shift[1]],
+      );
+      await client.query(
+        `
+          INSERT INTO staff_schedule_breaks (id, schedule_shift_id, starts_at, ends_at)
+          VALUES ($1, $2, $3, $4)
+        `,
+        [`break-${localDate}-${member.id}`, `shift-${localDate}-${member.id}`, ...shiftBreak],
+      );
+
+      if (adjustedSaturday) {
+        seededSaturdayException = true;
+      }
+    }
   }
 
   const demoCustomers = [
@@ -298,13 +451,13 @@ async function seed(client: PoolClient): Promise<void> {
     `,
   );
 
-  console.info("种子已写入：茸光本地演示元数据、账号、顾客、宠物与隐私同意");
+  console.info("种子已写入：茸光本地演示元数据、账号、排班容量、顾客、宠物与隐私同意");
 }
 
 async function reset(client: PoolClient): Promise<void> {
   await withTransaction(client, async () => {
     await client.query(
-      "TRUNCATE TABLE app_metadata, privacy_consents, privacy_notices, bookings, pet_care_tags, pets, pet_photos, customer_sessions, demo_customer_profiles, customers, backoffice_sessions, backoffice_accounts",
+      "TRUNCATE TABLE app_metadata, staff_schedule_breaks, staff_schedule_shifts, staff_schedule_days, weekly_shift_template_breaks, weekly_shift_templates, store_business_hours, staff_skills, staff_members, privacy_consents, privacy_notices, bookings, pet_care_tags, pets, pet_photos, customer_sessions, demo_customer_profiles, customers, backoffice_sessions, backoffice_accounts",
     );
     await seed(client);
   });

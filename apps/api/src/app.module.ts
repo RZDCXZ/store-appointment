@@ -7,6 +7,7 @@ import { HealthModule } from "./health/health.module.js";
 import { PetProfileModule } from "./pet-profile/pet-profile.module.js";
 import { PrivacyConsentModule } from "./privacy-consent/privacy-consent.module.js";
 import { ServiceCatalogModule } from "./service-catalog/service-catalog.module.js";
+import { ScheduleModule } from "./schedule/schedule.module.js";
 
 @Module({
   imports: [
@@ -16,6 +17,7 @@ import { ServiceCatalogModule } from "./service-catalog/service-catalog.module.j
     HealthModule,
     PetProfileModule,
     PrivacyConsentModule,
+    ScheduleModule,
     ServiceCatalogModule,
   ],
 })

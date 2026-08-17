@@ -9,7 +9,10 @@
 | —         | 员工本人预约   | Web 后台   | `/staff/appointments`                      | `apps/admin/src/pages/staff/appointments-page.tsx`     | 骨架   | 会话回跳测试 + Vite history fallback                      |
 | MG-01     | 店长今日工作台 | Web 后台   | `/manager/workbench`                       | `apps/admin/src/pages/manager/workbench-page.tsx`      | 骨架   | Vite history fallback + 角色路由测试                      |
 | —         | 店长预约入口   | Web 后台   | `/manager/appointments`                    | `apps/admin/src/pages/manager/appointments-page.tsx`   | 骨架   | Vite history fallback + 独立路由测试                      |
-| —         | 店长排班入口   | Web 后台   | `/manager/schedule`                        | `apps/admin/src/pages/manager/schedule-page.tsx`       | 骨架   | Vite history fallback + 独立路由测试                      |
+| —         | 店长排班入口   | Web 后台   | `/manager/schedule`                        | `apps/admin/src/pages/manager/schedule-page.tsx`       | 已完成 | 保留查询参数并重定向到 MG-09 已发布排班                   |
+| MG-08     | 排班模板边界   | Web 后台   | `/manager/schedule/template`               | `apps/admin/src/pages/manager/schedule-page.tsx`       | 实现中 | 独立路由 + 明确不形成容量；编辑能力留给 MG-08 工单        |
+| MG-08     | 14 天排班草稿  | Web 后台   | `/manager/schedule/draft`                  | `apps/admin/src/pages/manager/schedule-page.tsx`       | 实现中 | 独立路由 + 空草稿状态；生成与发布能力留给 MG-08 工单      |
+| MG-09     | 已发布排班     | Web 后台   | `/manager/schedule/published?date=:date`   | `apps/admin/src/pages/manager/schedule-page.tsx`       | 已完成 | 指定日期直达、刷新恢复、角色边界与 history fallback 测试  |
 | —         | 店长服务入口   | Web 后台   | `/manager/services`                        | `apps/admin/src/pages/manager/services-page.tsx`       | 骨架   | Vite history fallback + 独立路由测试                      |
 | —         | 店长顾客入口   | Web 后台   | `/manager/customers`                       | `apps/admin/src/pages/manager/customers-page.tsx`      | 骨架   | Vite history fallback + 独立路由测试                      |
 | —         | 店长经营入口   | Web 后台   | `/manager/business`                        | `apps/admin/src/pages/manager/business-page.tsx`       | 骨架   | Vite history fallback + 独立路由测试                      |

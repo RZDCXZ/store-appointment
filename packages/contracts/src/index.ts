@@ -240,3 +240,59 @@ export interface StorefrontCatalogResponse {
   primaryServices: PrimaryService[];
   addons: ServiceAddon[];
 }
+
+export type StaffSkillId =
+  "dog-basic-care" | "dog-styling" | "cat-care" | "nail-care" | "deshedding-care" | "oral-care";
+
+export interface ScheduleBusinessHours {
+  status: "open" | "closed";
+  opensAt: string | null;
+  closesAt: string | null;
+}
+
+export interface ScheduleWindowDay {
+  date: string;
+  weekday: number;
+  businessHours: ScheduleBusinessHours;
+  publishedStaffCount: number;
+}
+
+export interface ScheduleTimeInterval {
+  startsAt: string;
+  endsAt: string;
+}
+
+export interface PublishedScheduleShift extends ScheduleTimeInterval {
+  breaks: ScheduleTimeInterval[];
+  capacity: ScheduleTimeInterval[];
+}
+
+export interface PublishedScheduleStaffDay {
+  staff: {
+    id: string;
+    displayName: string;
+    employeeNumber: number;
+    skills: StaffSkillId[];
+  };
+  scheduleStatus: "published" | "no_schedule";
+  source: "weekly_template" | "date_exception" | null;
+  exception: {
+    kind: "adjusted_shift" | "special_break" | "day_off";
+    note: string;
+  } | null;
+  shifts: PublishedScheduleShift[];
+}
+
+export interface ManagerPublishedScheduleResponse {
+  timeZone: "Asia/Shanghai";
+  demoNow: string;
+  selectedDate: string;
+  window: {
+    startsOn: string;
+    endsOn: string;
+    days: ScheduleWindowDay[];
+  };
+  businessHours: ScheduleBusinessHours;
+  draftDayCount: number;
+  staffDays: PublishedScheduleStaffDay[];
+}
