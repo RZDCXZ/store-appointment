@@ -76,4 +76,24 @@ describe("原生小程序项目契约", () => {
       ),
     );
   });
+
+  it("MP-03、MP-04 与 MP-05 是可直接打开并可刷新恢复的独立原生页面", async () => {
+    const appConfig = JSON.parse(
+      await readFile(new URL("../miniprogram/app.json", import.meta.url), "utf8"),
+    ) as { pages: string[] };
+    const petAndPrivacyPages = [
+      "pages/pets/index",
+      "pages/pet-form/index",
+      "pages/privacy-consent/index",
+    ];
+
+    expect(appConfig.pages).toEqual(expect.arrayContaining(petAndPrivacyPages));
+    await Promise.all(
+      petAndPrivacyPages.flatMap((page) =>
+        ["ts", "json", "wxml", "wxss"].map((extension) =>
+          access(new URL(`../miniprogram/${page}.${extension}`, import.meta.url)),
+        ),
+      ),
+    );
+  });
 });

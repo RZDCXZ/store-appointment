@@ -1,9 +1,9 @@
 import { createHash } from "node:crypto";
-import { readdir, readFile } from "node:fs/promises";
+import { mkdir, readdir, readFile, rm } from "node:fs/promises";
 
 import { Pool, type PoolClient } from "pg";
 
-import { getDatabaseUrl, redactDatabaseUrl } from "../config/environment.js";
+import { getDatabaseUrl, getPetUploadDirectory, redactDatabaseUrl } from "../config/environment.js";
 import { hashPassword } from "../auth/password.js";
 
 const migrationsDirectory = new URL("../../database/migrations/", import.meta.url);
@@ -161,16 +161,156 @@ async function seed(client: PoolClient): Promise<void> {
     );
   }
 
-  console.info("种子已写入：茸光本地演示元数据、后台账号与快捷顾客");
+  await client.query("UPDATE privacy_notices SET is_current = false WHERE is_current");
+  await client.query(
+    `
+      INSERT INTO privacy_notices (version, title, summary, published_at, is_current)
+      VALUES
+        ('2026.05', '茸光隐私说明', '说明预约与宠物洗护所需资料的使用范围。', '2026-05-01T00:00:00.000Z', false),
+        ('2026.08', '茸光隐私说明', '说明顾客资料、宠物档案与预约记录的使用和保留方式。', '2026-08-01T00:00:00.000Z', true)
+      ON CONFLICT (version) DO UPDATE
+      SET title = excluded.title,
+          summary = excluded.summary,
+          published_at = excluded.published_at,
+          is_current = excluded.is_current
+    `,
+  );
+
+  const demoPets = [
+    {
+      id: "pet-tuanzi",
+      customerId: "customer-xu-lan",
+      name: "团子",
+      species: "dog",
+      weightKg: 8.4,
+      breed: "柴犬",
+      sex: "male",
+      birthDate: "2022-03-18",
+      coatType: "double",
+      seedPhotoPath: "/assets/brand/pet-tuanzi-shiba.jpg",
+      careNotes: "吹风时从低档开始，适应后再逐步调高。",
+      archivedAt: null,
+      careTags: ["怕吹风"],
+    },
+    {
+      id: "pet-bohe",
+      customerId: "customer-cheng-mo",
+      name: "薄荷",
+      species: "cat",
+      weightKg: 4.8,
+      breed: "英国短毛猫",
+      sex: "female",
+      birthDate: "2021-09-06",
+      coatType: "short",
+      seedPhotoPath: "/assets/brand/pet-bohe-british-shorthair.jpg",
+      careNotes: "请与犬只保持距离，使用安静的等候区域。",
+      archivedAt: null,
+      careTags: ["对陌生犬敏感"],
+    },
+    {
+      id: "pet-lizi",
+      customerId: "customer-lu-yao",
+      name: "栗子",
+      species: "dog",
+      weightKg: 28.6,
+      breed: "金毛寻回犬",
+      sex: "male",
+      birthDate: "2020-11-22",
+      coatType: "long",
+      seedPhotoPath: "/assets/brand/pet-lizi-golden.jpg",
+      careNotes: "耳部清洁动作放缓。",
+      archivedAt: "2026-08-02T04:00:00.000Z",
+      careTags: ["耳部需轻柔"],
+    },
+  ] as const;
+
+  for (const pet of demoPets) {
+    await client.query(
+      `
+        INSERT INTO pets (
+          id, customer_id, name, species, weight_kg, breed, sex, birth_date,
+          coat_type, seed_photo_path, care_notes, archived_at
+        )
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
+        ON CONFLICT (id) DO UPDATE
+        SET customer_id = excluded.customer_id,
+            name = excluded.name,
+            species = excluded.species,
+            weight_kg = excluded.weight_kg,
+            breed = excluded.breed,
+            sex = excluded.sex,
+            birth_date = excluded.birth_date,
+            coat_type = excluded.coat_type,
+            seed_photo_path = excluded.seed_photo_path,
+            care_notes = excluded.care_notes,
+            archived_at = excluded.archived_at,
+            updated_at = now()
+      `,
+      [
+        pet.id,
+        pet.customerId,
+        pet.name,
+        pet.species,
+        pet.weightKg,
+        pet.breed,
+        pet.sex,
+        pet.birthDate,
+        pet.coatType,
+        pet.seedPhotoPath,
+        pet.careNotes,
+        pet.archivedAt,
+      ],
+    );
+    await client.query("DELETE FROM pet_care_tags WHERE pet_id = $1", [pet.id]);
+
+    for (const tag of pet.careTags) {
+      await client.query("INSERT INTO pet_care_tags (pet_id, tag) VALUES ($1, $2)", [pet.id, tag]);
+    }
+  }
+
+  await client.query(
+    `
+      INSERT INTO bookings (id, customer_id, pet_id, starts_at, ends_at, status)
+      VALUES (
+        'booking-bohe-future',
+        'customer-cheng-mo',
+        'pet-bohe',
+        '2026-08-14T03:00:00.000Z',
+        '2026-08-14T04:30:00.000Z',
+        'confirmed'
+      )
+      ON CONFLICT (id) DO UPDATE
+      SET starts_at = excluded.starts_at,
+          ends_at = excluded.ends_at,
+          status = excluded.status
+    `,
+  );
+
+  await client.query(
+    `
+      INSERT INTO privacy_consents (customer_id, notice_version, source, consented_at)
+      VALUES
+        ('customer-cheng-mo', '2026.08', 'miniapp_booking', '2026-08-02T03:20:00.000Z'),
+        ('customer-lu-yao', '2026.05', 'miniapp_booking', '2026-05-06T01:10:00.000Z')
+      ON CONFLICT (customer_id, notice_version) DO UPDATE
+      SET source = excluded.source,
+          consented_at = excluded.consented_at
+    `,
+  );
+
+  console.info("种子已写入：茸光本地演示元数据、账号、顾客、宠物与隐私同意");
 }
 
 async function reset(client: PoolClient): Promise<void> {
   await withTransaction(client, async () => {
     await client.query(
-      "TRUNCATE TABLE app_metadata, customer_sessions, demo_customer_profiles, customers, backoffice_sessions, backoffice_accounts",
+      "TRUNCATE TABLE app_metadata, privacy_consents, privacy_notices, bookings, pet_care_tags, pets, pet_photos, customer_sessions, demo_customer_profiles, customers, backoffice_sessions, backoffice_accounts",
     );
     await seed(client);
   });
+  const petUploadDirectory = getPetUploadDirectory();
+  await rm(petUploadDirectory, { force: true, recursive: true });
+  await mkdir(petUploadDirectory, { recursive: true });
   console.info("本地演示数据已重置");
 }
 

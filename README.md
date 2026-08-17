@@ -2,7 +2,7 @@
 
 “茸光宠物洗护”是一个公开源码、仅承诺本地运行的单门店作品集案例。正式应用由三部分组成：原生 TypeScript 微信小程序、React/Vite 响应式后台，以及 NestJS/Fastify REST API。PostgreSQL 是唯一的 Docker 服务，Node 应用在宿主机保留热更新。
 
-当前完成 ticket 01 的可启动骨架、ticket 02 的后台演示账号与角色路由、ticket 03 的小程序演示顾客 Bearer 会话，以及 ticket 04 的门店首页与确定价格服务目录；预约创建业务尚未开放。真实微信登录、订阅消息、支付和生产运维不在本地演示能力内。
+当前完成 ticket 01 的可启动骨架、ticket 02 的后台演示账号与角色路由、ticket 03 的小程序演示顾客 Bearer 会话、ticket 04 的门店首页与确定价格服务目录，以及 ticket 05 的宠物档案和版本化隐私同意；完整预约创建业务尚未开放。真实微信登录、订阅消息、支付和生产运维不在本地演示能力内。
 
 ## 环境要求
 
@@ -76,7 +76,13 @@ cp apps/mini-program/project.config.example.json apps/mini-program/project.confi
 
 “我的”页面提供三位服务端预置顾客：许岚（正常预约）、程墨（已有未来预约）和陆遥（取消或爽约历史）。这只是本地演示身份切换，不是微信真实登录。
 
-选择顾客时，小程序调用 `POST /miniapp/demo-sessions`，API 默认签发 30 分钟有效的不透明 Bearer token；数据库只保存 token 摘要。后续 `GET /miniapp/me` 从 token 得到顾客身份，不读取客户端声明的顾客 ID 或角色。会话与当前 tab 会在重新编译或重新打开后恢复；会话失效时，重新选择身份后返回之前的 tab。
+选择顾客时，小程序调用 `POST /miniapp/demo-sessions`，API 默认签发 30 分钟有效的不透明 Bearer token；数据库只保存 token 摘要。后续 `GET /miniapp/me` 从 token 得到顾客身份，不读取客户端声明的顾客 ID 或角色。会话与当前页面会在重新编译或重新打开后恢复；会话失效时，重新选择身份后可返回之前的 tab 或带宠物 ID 的编辑页。
+
+### 宠物档案与隐私同意
+
+“我的”页面可直接进入 `pages/pets/index` 与 `pages/privacy-consent/index`。新建宠物使用 `pages/pet-form/index`，编辑使用 `pages/pet-form/index?id=<petId>`；刷新编辑页会按 ID 重新读取当前顾客自己的档案。服务端执行宠物归属、输入校验、未来预约归档阻断和隐私版本门禁，客户端提交的顾客 ID 不会改变身份。
+
+宠物照片只接受 JPEG/PNG，最大 512 KiB，保存在被 Git 忽略的 `.data/uploads/pets/`。这是单机作品集演示存储，不是生产对象存储；`db:reset` 会清理上传并恢复种子状态。上传失败时小程序保留表单和待重试文件。
 
 ## 数据库命令边界
 

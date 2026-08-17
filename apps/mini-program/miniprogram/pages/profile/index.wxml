@@ -77,10 +77,15 @@
       <text>顾客资料</text>
       <text class="profile-menu__detail">姓名、手机号</text>
     </view>
-    <view class="profile-menu__row">
-      <text>数据边界</text>
-      <text class="profile-menu__detail">仅本人资料</text>
-    </view>
+    <button class="profile-menu__row profile-menu__button" bindtap="openPets">
+      <text>宠物档案</text>
+      <text class="profile-menu__detail">在用 / 已归档 ›</text>
+    </button>
+    <button class="profile-menu__row profile-menu__button" bindtap="openPrivacyConsent">
+      <text>隐私同意</text>
+      <text class="profile-menu__detail">版本与同意事实 ›</text>
+    </button>
+    <view class="profile-menu__row"><text>数据边界</text><text class="profile-menu__detail">仅本人资料</text></view>
   </view>
 
   <view class="store-card">

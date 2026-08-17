@@ -30,6 +30,20 @@ const requiredFiles = [
   "miniprogram/pages/service-detail/index.ts",
   "miniprogram/pages/service-detail/index.wxml",
   "miniprogram/pages/service-detail/index.wxss",
+  "miniprogram/pages/pets/index.json",
+  "miniprogram/pages/pets/index.ts",
+  "miniprogram/pages/pets/index.wxml",
+  "miniprogram/pages/pets/index.wxss",
+  "miniprogram/pages/pet-form/index.json",
+  "miniprogram/pages/pet-form/index.ts",
+  "miniprogram/pages/pet-form/index.wxml",
+  "miniprogram/pages/pet-form/index.wxss",
+  "miniprogram/pages/privacy-consent/index.json",
+  "miniprogram/pages/privacy-consent/index.ts",
+  "miniprogram/pages/privacy-consent/index.wxml",
+  "miniprogram/pages/privacy-consent/index.wxss",
+  "miniprogram/services/pet-profile-api.ts",
+  "miniprogram/services/pet-profile-presentation.ts",
   "miniprogram/services/storefront-presentation.ts",
   "miniprogram/templates/customer-auth-prompt.wxml",
   "miniprogram/assets/brand/rongguang-hero-shiba.jpg",
@@ -54,10 +68,13 @@ export async function verifyProject() {
     "pages/profile/index",
     "pages/services/index",
     "pages/service-detail/index",
+    "pages/pets/index",
+    "pages/pet-form/index",
+    "pages/privacy-consent/index",
   ];
 
   if (!requiredPages.every((page) => appConfig.pages?.includes(page))) {
-    throw new Error("miniprogram/app.json 必须登记四个顾客 tab 与两个服务目录页面。");
+    throw new Error("miniprogram/app.json 必须登记顾客 tab、服务目录、宠物档案与隐私页面。");
   }
 
   console.info(`原生小程序项目结构检查通过：${requiredPages.join("、")}`);

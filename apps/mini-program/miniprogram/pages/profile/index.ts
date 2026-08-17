@@ -1,5 +1,6 @@
 import {
   fetchDemoCustomers,
+  isCustomerTabPath,
   loadCustomerContext,
   switchDemoCustomer,
   takeRecoveryPath,
@@ -70,7 +71,11 @@ Page({
 
       const recoveryPath = takeRecoveryPath();
       if (recoveryPath && recoveryPath !== "/pages/profile/index") {
-        wx.switchTab({ url: recoveryPath });
+        if (isCustomerTabPath(recoveryPath)) {
+          wx.switchTab({ url: recoveryPath });
+        } else {
+          wx.navigateTo({ url: recoveryPath });
+        }
       }
     } catch (error) {
       this.setData({
@@ -78,5 +83,11 @@ Page({
         errorMessage: error instanceof Error ? error.message : "身份切换失败，请重试。",
       });
     }
+  },
+  openPets() {
+    wx.navigateTo({ url: "/pages/pets/index" });
+  },
+  openPrivacyConsent() {
+    wx.navigateTo({ url: "/pages/privacy-consent/index" });
   },
 });

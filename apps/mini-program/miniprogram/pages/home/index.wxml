@@ -20,14 +20,22 @@
         <text class="opening__date">{{businessSummary.dateLabel}}</text>
         <text class="opening__demo-label">上海演示时间</text>
       </view>
-      <button class="hero__cta" bindtap="primaryAction">
+      <button class="hero__cta" bindtap="primaryAction" loading="{{checkingBookingEntry}}" disabled="{{checkingBookingEntry}}">
         <view class="hero__cta-copy">
           <text class="hero__cta-title">为宠物预约洗护</text>
-          <text class="hero__cta-note">先查看服务 · 创建功能后续开放</text>
+          <text class="hero__cta-note">进入前检查当前隐私同意版本</text>
         </view>
         <text class="hero__cta-arrow">›</text>
       </button>
     </view>
+  </view>
+
+  <view wx:if="{{bookingEntryError}}" class="home-query-error home-query-error--booking" role="alert">
+    <view class="home-query-error__copy">
+      <text class="home-query-error__title">暂时无法进入预约</text>
+      <text>{{bookingEntryError}}</text>
+    </view>
+    <button class="home-query-error__action" bindtap="primaryAction">重试</button>
   </view>
 
   <view class="readiness-card recent-card">

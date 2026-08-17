@@ -1,5 +1,6 @@
 import { loadCustomerTabState, openCustomerSelector } from "../../services/customer-session";
 import { fetchStorefrontCatalog } from "../../services/storefront-catalog";
+import { fetchBookingEntry } from "../../services/pet-profile-api";
 import {
   displayPrimaryService,
   getStoreBusinessSummary,
@@ -63,6 +64,8 @@ Page({
     storeAddress: "上海市徐汇区暖茸路 18 号",
     contactPhone: "021-6488 2618",
     serviceCards: [] as PrimaryServiceDisplay[],
+    checkingBookingEntry: false,
+    bookingEntryError: "",
   },
   onLoad() {
     void this.loadCatalog();
@@ -102,8 +105,33 @@ Page({
       });
     }
   },
-  primaryAction() {
-    wx.navigateTo({ url: "/pages/services/index" });
+  async primaryAction() {
+    if (!this.data.customer) {
+      this.chooseCustomer();
+      return;
+    }
+
+    if (this.data.checkingBookingEntry) {
+      return;
+    }
+
+    this.setData({ checkingBookingEntry: true, bookingEntryError: "" });
+    try {
+      const entry = await fetchBookingEntry();
+      const petSelectionPath = "/pages/pets/index?mode=booking";
+      wx.navigateTo({
+        url: entry.canContinue
+          ? petSelectionPath
+          : `/pages/privacy-consent/index?returnTo=${encodeURIComponent(petSelectionPath)}`,
+      });
+    } catch (error) {
+      this.setData({
+        bookingEntryError:
+          error instanceof Error ? error.message : "预约入口检查失败，请稍后重试。",
+      });
+    } finally {
+      this.setData({ checkingBookingEntry: false });
+    }
   },
   goServiceCatalog() {
     wx.navigateTo({ url: "/pages/services/index" });

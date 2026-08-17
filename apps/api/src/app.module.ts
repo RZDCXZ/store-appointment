@@ -4,9 +4,19 @@ import { AuthModule } from "./auth/auth.module.js";
 import { BackofficeModule } from "./backoffice/backoffice.module.js";
 import { CustomerModule } from "./customer/customer.module.js";
 import { HealthModule } from "./health/health.module.js";
+import { PetProfileModule } from "./pet-profile/pet-profile.module.js";
+import { PrivacyConsentModule } from "./privacy-consent/privacy-consent.module.js";
 import { ServiceCatalogModule } from "./service-catalog/service-catalog.module.js";
 
 @Module({
-  imports: [AuthModule, BackofficeModule, CustomerModule, HealthModule, ServiceCatalogModule],
+  imports: [
+    AuthModule,
+    BackofficeModule,
+    CustomerModule,
+    HealthModule,
+    PetProfileModule,
+    PrivacyConsentModule,
+    ServiceCatalogModule,
+  ],
 })
 export class AppModule {}

@@ -64,6 +64,19 @@
   line-height: 88rpx;
 }
 
+.profile-menu__button {
+  width: 100%;
+  margin: 0;
+  border-radius: 0;
+  background: transparent;
+  line-height: 1.4;
+  text-align: left;
+}
+
+.profile-menu__button::after {
+  border: 0;
+}
+
 .demo-banner {
   display: grid;
   grid-template-columns: 48rpx 1fr auto;

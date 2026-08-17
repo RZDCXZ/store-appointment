@@ -1,0 +1,121 @@
+<view class="pets-screen page-screen">
+  <view class="page-heading pets-heading">
+    <view>
+      <text class="page-heading__brand">茸光</text>
+      <text class="page-heading__title">{{bookingMode ? '选择宠物' : '我的宠物'}}</text>
+      <text class="page-heading__subtitle">
+        {{bookingMode ? '仅在用宠物可用于预约' : '维护洗护所需的宠物与护理信息'}}
+      </text>
+    </view>
+    <button class="pets-heading__add" bindtap="addPet">＋ 新增</button>
+  </view>
+
+  <view class="demo-mark">本地演示 · 服务端仅返回当前顾客的档案</view>
+
+  <view wx:if="{{queryError && (activePets.length || archivedPets.length)}}" class="query-error" role="alert">
+    <view>
+      <text class="query-error__title">宠物档案更新失败</text>
+      <text class="query-error__body">{{queryError}} 已保留当前列表。</text>
+    </view>
+    <button class="query-error__action" bindtap="retry">重试</button>
+  </view>
+
+  <view wx:if="{{actionError}}" class="action-error" role="alert">{{actionError}}</view>
+  <text wx:if="{{refreshing}}" class="refreshing-note">正在更新档案…</text>
+
+  <view wx:if="{{pageState === 'loading'}}" class="pet-skeleton-list">
+    <view class="pet-skeleton surface-card" wx:for="{{[1, 2]}}" wx:key="*this"></view>
+  </view>
+
+  <view wx:elif="{{pageState === 'auth'}}" class="state-card surface-card">
+    <text class="state-card__mark">顾</text>
+    <text class="state-card__title">{{authState === 'expired' ? '演示会话已失效' : '请先选择演示顾客'}}</text>
+    <text class="state-card__body">当前宠物页面路径会保留，重新选择后可继续。</text>
+    <button class="primary-button" bindtap="chooseCustomer">选择演示顾客</button>
+  </view>
+
+  <view wx:elif="{{pageState === 'forbidden'}}" class="state-card state-card--danger surface-card">
+    <text class="state-card__mark">!</text>
+    <text class="state-card__title">无法访问这些宠物档案</text>
+    <text class="state-card__body">当前身份没有权限，页面不会提供绕过入口。</text>
+  </view>
+
+  <view wx:elif="{{pageState === 'error'}}" class="state-card surface-card">
+    <text class="state-card__mark">↻</text>
+    <text class="state-card__title">宠物档案没有加载出来</text>
+    <text class="state-card__body">{{queryError}}</text>
+    <button class="secondary-button" bindtap="retry">重新加载</button>
+  </view>
+
+  <view wx:elif="{{pageState === 'empty'}}" class="state-card surface-card">
+    <text class="state-card__mark">宠</text>
+    <text class="state-card__title">还没有宠物档案</text>
+    <text class="state-card__body">先填写名称、犬猫和当前体重，之后预约无需重复录入。</text>
+    <button class="primary-button" bindtap="addPet">新建宠物档案</button>
+  </view>
+
+  <view wx:elif="{{pageState === 'ready'}}">
+    <view class="section-heading">
+      <text class="section-heading__title">在用 · {{activePets.length}}</text>
+      <text class="section-heading__note">体型由当前体重自动确定</text>
+    </view>
+    <view wx:if="{{activePets.length}}" class="pet-list surface-card">
+      <view class="pet-card" wx:for="{{activePets}}" wx:key="id">
+        <button class="pet-card__main" data-id="{{item.id}}" bindtap="editPet">
+          <image class="pet-card__image" src="{{item.photoUrl}}" mode="aspectFill" />
+          <view class="pet-card__copy">
+            <text class="pet-card__name">{{item.name}}</text>
+            <text class="pet-card__meta">{{item.profileLine}}</text>
+            <view class="pet-card__tags" wx:if="{{item.careTags.length}}">
+              <text class="pet-card__tag" wx:for="{{item.careTags}}" wx:for-item="tag" wx:key="*this">{{tag}}</text>
+            </view>
+            <text wx:if="{{item.futureBookingLabel}}" class="pet-card__booking">{{item.futureBookingLabel}}</text>
+          </view>
+          <text class="pet-card__arrow">›</text>
+        </button>
+        <view class="pet-card__actions">
+          <text wx:if="{{item.futureBooking}}" class="pet-card__blocked">有未来预约，暂不能归档</text>
+          <button
+            class="pet-card__archive"
+            data-id="{{item.id}}"
+            bindtap="archivePet"
+            loading="{{actionPetId === item.id}}"
+            disabled="{{!!item.futureBooking || !!actionPetId}}"
+          >归档</button>
+        </view>
+      </view>
+    </view>
+    <view wx:else class="inline-empty surface-card">
+      <text>没有在用宠物</text>
+      <button bindtap="addPet">新增宠物</button>
+    </view>
+
+    <view class="section-heading section-heading--archived">
+      <text class="section-heading__title">已归档 · {{archivedPets.length}}</text>
+      <text class="section-heading__note">不会出现在新预约中</text>
+    </view>
+    <view wx:if="{{archivedPets.length}}" class="pet-list pet-list--archived surface-card">
+      <view class="pet-card" wx:for="{{archivedPets}}" wx:key="id">
+        <button class="pet-card__main" data-id="{{item.id}}" bindtap="editPet">
+          <image class="pet-card__image" src="{{item.photoUrl}}" mode="aspectFill" />
+          <view class="pet-card__copy">
+            <text class="pet-card__name">{{item.name}}</text>
+            <text class="pet-card__meta">{{item.profileLine}}</text>
+            <text class="pet-card__archived-label">已归档，历史关联仍保留</text>
+          </view>
+          <text class="pet-card__arrow">›</text>
+        </button>
+        <view class="pet-card__actions">
+          <button
+            class="pet-card__restore"
+            data-id="{{item.id}}"
+            bindtap="restorePet"
+            loading="{{actionPetId === item.id}}"
+            disabled="{{!!actionPetId}}"
+          >恢复使用</button>
+        </view>
+      </view>
+    </view>
+    <view wx:else class="inline-empty inline-empty--quiet">暂无已归档宠物</view>
+  </view>
+</view>

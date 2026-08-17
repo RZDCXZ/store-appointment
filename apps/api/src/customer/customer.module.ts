@@ -9,5 +9,6 @@ import { CustomerSessionService } from "./customer-session.service.js";
   imports: [DatabaseModule],
   controllers: [CustomerController],
   providers: [CustomerSessionGuard, CustomerSessionService],
+  exports: [CustomerSessionGuard, CustomerSessionService],
 })
 export class CustomerModule {}

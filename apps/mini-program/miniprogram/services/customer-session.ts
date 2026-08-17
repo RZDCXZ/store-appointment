@@ -19,6 +19,20 @@ const tabPaths = new Set([
   "/pages/messages/index",
   "/pages/profile/index",
 ]);
+const recoverablePagePaths = new Set([
+  ...tabPaths,
+  "/pages/pets/index",
+  "/pages/pet-form/index",
+  "/pages/privacy-consent/index",
+]);
+
+function isRecoverablePath(value: string): boolean {
+  if (value.length > 240 || value.includes("#")) {
+    return false;
+  }
+
+  return recoverablePagePaths.has(value.split("?", 1)[0] ?? "");
+}
 
 interface ApiErrorBody {
   code?: string;
@@ -229,7 +243,7 @@ export async function switchDemoCustomer(customerKey: string): Promise<CustomerP
 export function rememberRecoveryPath(pagePath: string): void {
   const normalized = pagePath.startsWith("/") ? pagePath : `/${pagePath}`;
 
-  if (tabPaths.has(normalized)) {
+  if (isRecoverablePath(normalized)) {
     wx.setStorageSync(RECOVERY_PATH_STORAGE_KEY, normalized);
   }
 }
@@ -237,5 +251,9 @@ export function rememberRecoveryPath(pagePath: string): void {
 export function takeRecoveryPath(): string | null {
   const value = wx.getStorageSync(RECOVERY_PATH_STORAGE_KEY) as unknown;
   wx.removeStorageSync(RECOVERY_PATH_STORAGE_KEY);
-  return typeof value === "string" && tabPaths.has(value) ? value : null;
+  return typeof value === "string" && isRecoverablePath(value) ? value : null;
+}
+
+export function isCustomerTabPath(pagePath: string): boolean {
+  return tabPaths.has(pagePath.split("?", 1)[0] ?? "");
 }

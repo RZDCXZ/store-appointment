@@ -1,6 +1,10 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { restoreCustomerSession } from "../miniprogram/services/customer-session";
+import {
+  rememberRecoveryPath,
+  restoreCustomerSession,
+  takeRecoveryPath,
+} from "../miniprogram/services/customer-session";
 import type { RongguangApp } from "../miniprogram/types/customer";
 
 describe("小程序启动会话恢复", () => {
@@ -21,5 +25,18 @@ describe("小程序启动会话恢复", () => {
 
     expect(restoreCustomerSession(globalData)).toEqual({ kind: "missing" });
     expect(globalData.customerSessionStatus).toBe("missing");
+  });
+
+  it("保留带宠物 ID 的独立编辑页，重新选择顾客后可恢复原路径", () => {
+    const storage = new Map<string, unknown>();
+    vi.stubGlobal("wx", {
+      setStorageSync: (key: string, value: unknown) => storage.set(key, value),
+      getStorageSync: (key: string) => storage.get(key),
+      removeStorageSync: (key: string) => storage.delete(key),
+    });
+
+    rememberRecoveryPath("/pages/pet-form/index?id=pet-tuanzi");
+
+    expect(takeRecoveryPath()).toBe("/pages/pet-form/index?id=pet-tuanzi");
   });
 });

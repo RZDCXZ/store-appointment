@@ -71,3 +71,8 @@ export function redactDatabaseUrl(databaseUrl: string): string {
     return "<无效的 DATABASE_URL>";
   }
 }
+
+export function getPetUploadDirectory(): string {
+  return fileURLToPath(new URL("../../../../.data/uploads/pets/", import.meta.url));
+}
+import { fileURLToPath } from "node:url";

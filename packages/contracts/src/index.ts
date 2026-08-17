@@ -101,6 +101,100 @@ export interface MiniappProfileResponse {
 export type PetSpecies = "dog" | "cat";
 export type PetSize = "small" | "medium" | "large";
 
+export type PetSex = "male" | "female";
+export type PetCoatType = "short" | "long" | "double" | "curly" | "hairless" | "other";
+
+export const petCareTags = [
+  "怕吹风",
+  "对陌生犬敏感",
+  "不喜欢碰脚",
+  "易紧张",
+  "需要慢速吹干",
+  "耳部需轻柔",
+] as const;
+
+export type PetCareTag = (typeof petCareTags)[number];
+
+export interface PetFutureBooking {
+  id: string;
+  startsAt: string;
+}
+
+export interface PetProfile {
+  id: string;
+  name: string;
+  species: PetSpecies;
+  weightKg: number;
+  petSize: PetSize;
+  breed: string | null;
+  sex: PetSex | null;
+  birthDate: string | null;
+  coatType: PetCoatType | null;
+  photoId: string | null;
+  photoPath: string | null;
+  careTags: PetCareTag[];
+  careNotes: string | null;
+  archivedAt: string | null;
+  futureBooking: PetFutureBooking | null;
+}
+
+export interface PetListResponse {
+  active: PetProfile[];
+  archived: PetProfile[];
+}
+
+export interface PetProfileResponse {
+  pet: PetProfile;
+}
+
+export interface PetProfileInput {
+  name: string;
+  species: PetSpecies;
+  weightKg: number;
+  breed: string | null;
+  sex: PetSex | null;
+  birthDate: string | null;
+  coatType: PetCoatType | null;
+  photoId: string | null;
+  careTags: PetCareTag[];
+  careNotes: string | null;
+}
+
+export interface PrivacyNotice {
+  version: string;
+  title: string;
+  summary: string;
+  publishedAt: string;
+}
+
+export interface PrivacyConsent {
+  version: string;
+  source: "miniapp_booking" | "manager_offline";
+  consentedAt: string;
+}
+
+export interface PrivacyConsentStatusResponse {
+  notice: PrivacyNotice;
+  consent: PrivacyConsent | null;
+  requiresConsent: boolean;
+}
+
+export interface BookingEntryResponse {
+  canContinue: boolean;
+  requiredPrivacyNoticeVersion: string;
+}
+
+export interface PetPhoto {
+  id: string;
+  photoPath: string;
+  mimeType: "image/jpeg" | "image/png";
+  sizeBytes: number;
+}
+
+export interface PetPhotoUploadResponse {
+  photo: PetPhoto;
+}
+
 export interface WeeklyBusinessHours {
   weekday: 0 | 1 | 2 | 3 | 4 | 5 | 6;
   label: string;
