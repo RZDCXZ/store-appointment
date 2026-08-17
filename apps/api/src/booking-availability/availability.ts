@@ -19,6 +19,7 @@ export interface AvailabilityBooking {
   staffId: string;
   startsAtMinutes: number;
   endsAtMinutes: number;
+  occupancyStartsAtMinutes: number;
   occupancyEndsAtMinutes: number;
   serviceMinutes: number;
 }
@@ -241,7 +242,7 @@ export function discoverDayAvailability(input: DiscoverDayAvailabilityInput): Da
             (booking) =>
               booking.staffId === staffMember.id &&
               overlaps(occupancy, {
-                startsAtMinutes: booking.startsAtMinutes,
+                startsAtMinutes: booking.occupancyStartsAtMinutes,
                 endsAtMinutes: booking.occupancyEndsAtMinutes,
               }),
           ),

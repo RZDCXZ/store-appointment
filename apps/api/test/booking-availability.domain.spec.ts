@@ -32,6 +32,7 @@ function booking(
     staffId,
     startsAtMinutes,
     endsAtMinutes: startsAtMinutes + serviceMinutes,
+    occupancyStartsAtMinutes: startsAtMinutes,
     occupancyEndsAtMinutes: startsAtMinutes + serviceMinutes + 15,
     serviceMinutes,
   };
@@ -164,6 +165,28 @@ describe("顾客查询真实可约时段领域规则", () => {
     expect(otherPet.slots.find((slot) => slot.startsAtMinutes === 10 * 60)).toMatchObject({
       staffId: "zhouning",
     });
+  });
+
+  it("员工冲突使用独立实际占用起点，而不是把计划服务起点当作占用起点", () => {
+    const earlyOccupancy = {
+      ...booking("pet-other", "linxia", 11 * 60, 60),
+      occupancyStartsAtMinutes: 10 * 60 + 30,
+    };
+    const result = discoverDayAvailability({
+      date: "2026-08-14",
+      window: { startsOn: "2026-08-13", endsOn: "2026-08-26" },
+      businessHours: openDay,
+      earliestStartsAtMinutes: 0,
+      petId: "pet-tuanzi",
+      requiredSkills: ["dog-basic-care"],
+      serviceMinutes: 60,
+      turnoverMinutes: 15,
+      staffPreference: { kind: "specified", staffId: "linxia" },
+      staff: [staff("linxia", 1, ["dog-basic-care"])],
+      bookings: [earlyOccupancy],
+    });
+
+    expect(result.slots.find((slot) => slot.startsAtMinutes === 9 * 60 + 30)).toBeUndefined();
   });
 
   it("无时段时区分周一闭店、暂无合格员工、已约满和超出开放窗口", () => {

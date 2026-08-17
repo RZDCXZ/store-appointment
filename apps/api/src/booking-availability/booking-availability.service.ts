@@ -71,6 +71,7 @@ interface BookingRow {
   staff_id: string;
   starts_at_minutes: number;
   ends_at_minutes: number;
+  occupancy_starts_at_minutes: number;
   occupancy_ends_at_minutes: number;
   service_minutes: number;
 }
@@ -279,6 +280,10 @@ export class BookingAvailabilityService {
                      + extract(minute FROM ends_at AT TIME ZONE 'Asia/Shanghai')
                    )::int AS ends_at_minutes,
                    (
+                     extract(hour FROM occupancy_starts_at AT TIME ZONE 'Asia/Shanghai') * 60
+                     + extract(minute FROM occupancy_starts_at AT TIME ZONE 'Asia/Shanghai')
+                   )::int AS occupancy_starts_at_minutes,
+                   (
                      extract(hour FROM occupancy_ends_at AT TIME ZONE 'Asia/Shanghai') * 60
                      + extract(minute FROM occupancy_ends_at AT TIME ZONE 'Asia/Shanghai')
                    )::int AS occupancy_ends_at_minutes,
@@ -381,6 +386,7 @@ export class BookingAvailabilityService {
           staffId: row.staff_id,
           startsAtMinutes: row.starts_at_minutes,
           endsAtMinutes: row.ends_at_minutes,
+          occupancyStartsAtMinutes: row.occupancy_starts_at_minutes,
           occupancyEndsAtMinutes: row.occupancy_ends_at_minutes,
           serviceMinutes: row.service_minutes,
         });
