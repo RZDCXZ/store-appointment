@@ -1,5 +1,7 @@
 import type { BookingConflictSuggestion } from "@rongguang/contracts";
 
+import { parseBookingConflictSuggestions } from "./booking-conflict-suggestion";
+
 export interface BookingConflictContext {
   requestedStartsAt: string;
   petLabel: string;
@@ -35,58 +37,47 @@ function validInstant(value: unknown): value is string {
   return typeof value === "string" && Number.isFinite(Date.parse(value));
 }
 
-function validSuggestion(value: unknown): value is BookingConflictSuggestion {
-  if (!value || typeof value !== "object") return false;
-  const suggestion = value as Partial<BookingConflictSuggestion>;
-  const staff = suggestion.staff as Partial<BookingConflictSuggestion["staff"]> | undefined;
-  return (
-    typeof suggestion.date === "string" &&
-    /^\d{4}-\d{2}-\d{2}$/.test(suggestion.date) &&
-    validInstant(suggestion.startsAt) &&
-    validInstant(suggestion.endsAt) &&
-    Date.parse(suggestion.endsAt) > Date.parse(suggestion.startsAt) &&
-    validLabel(staff?.id) &&
-    validLabel(staff?.displayName)
-  );
-}
-
-function validContext(value: unknown): value is BookingConflictContext & { version: 1 } {
-  if (!value || typeof value !== "object") return false;
+function parseContext(value: unknown): (BookingConflictContext & { version: 1 }) | null {
+  if (!value || typeof value !== "object") return null;
   const context = value as Partial<BookingConflictContext> & { version?: unknown };
-  return (
-    context.version === 1 &&
-    validInstant(context.requestedStartsAt) &&
-    validLabel(context.petLabel) &&
-    validLabel(context.serviceLabel) &&
-    validLabel(context.staffPreferenceLabel) &&
-    Array.isArray(context.suggestions) &&
-    context.suggestions.length <= 5 &&
-    context.suggestions.every(validSuggestion)
-  );
+  const suggestions = parseBookingConflictSuggestions(context.suggestions);
+  if (
+    context.version !== 1 ||
+    !validInstant(context.requestedStartsAt) ||
+    !validLabel(context.petLabel) ||
+    !validLabel(context.serviceLabel) ||
+    !validLabel(context.staffPreferenceLabel) ||
+    !Array.isArray(context.suggestions) ||
+    suggestions.length !== context.suggestions.length
+  ) {
+    return null;
+  }
+  return {
+    version: 1,
+    requestedStartsAt: context.requestedStartsAt,
+    petLabel: context.petLabel,
+    serviceLabel: context.serviceLabel,
+    staffPreferenceLabel: context.staffPreferenceLabel,
+    suggestions,
+  };
 }
 
 export function writeBookingConflict(
   context: BookingConflictContext,
   storage: BookingConflictStorage = localStorage,
 ): void {
-  const stored = { version: 1 as const, ...context };
-  if (!validContext(stored)) {
+  const stored = parseContext({ version: 1 as const, ...context });
+  if (!stored) {
     throw new Error("无法保存无效的时段冲突上下文。");
   }
-  storage.set({
-    ...stored,
-    suggestions: stored.suggestions.map((suggestion) => ({
-      ...suggestion,
-      staff: { ...suggestion.staff },
-    })),
-  });
+  storage.set(stored);
 }
 
 export function readBookingConflict(
   storage: BookingConflictStorage = localStorage,
 ): BookingConflictContext | null {
-  const stored = storage.get();
-  if (!validContext(stored)) {
+  const stored = parseContext(storage.get());
+  if (!stored) {
     storage.remove();
     return null;
   }
@@ -95,10 +86,7 @@ export function readBookingConflict(
     petLabel: stored.petLabel,
     serviceLabel: stored.serviceLabel,
     staffPreferenceLabel: stored.staffPreferenceLabel,
-    suggestions: stored.suggestions.map((suggestion) => ({
-      ...suggestion,
-      staff: { ...suggestion.staff },
-    })),
+    suggestions: stored.suggestions,
   };
 }
 

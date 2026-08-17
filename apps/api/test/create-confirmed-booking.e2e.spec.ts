@@ -3,6 +3,7 @@ import type { BookingAvailabilityResponse } from "@rongguang/contracts";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 
 import { createApplication } from "../src/bootstrap.js";
+import { BookingAvailabilityService } from "../src/booking-availability/booking-availability.service.js";
 import { DatabaseService } from "../src/database/database.service.js";
 
 async function customerAuthorization(
@@ -556,19 +557,28 @@ describe("顾客提交并确认预约", () => {
       idempotencyKey: "retry-conflict-loser-20260813",
       petId: retryPetIds[1],
     };
-    const firstConflict = await create(retryPayload);
-    expect(firstConflict.statusCode).toBe(409);
-    const firstBody = firstConflict.json<{
+    const availabilityService = app.get(BookingAvailabilityService);
+    const discover = vi.spyOn(availabilityService, "discover");
+    const simultaneousRetries = await Promise.all(
+      Array.from({ length: 10 }, () => create(retryPayload)),
+    );
+    expect(simultaneousRetries.every((response) => response.statusCode === 409)).toBe(true);
+    const firstBody = simultaneousRetries[0]?.json<{
       code: string;
       suggestions: Array<{
         startsAt: string;
         staff: { id: string };
       }>;
     }>();
-    expect(firstBody.code).toBe("BOOKING_TIME_CONFLICT");
-    expect(firstBody.suggestions[0]).toBeDefined();
+    expect(firstBody?.code).toBe("BOOKING_TIME_CONFLICT");
+    expect(firstBody?.suggestions[0]).toBeDefined();
+    expect(simultaneousRetries.map((response) => response.json())).toEqual(
+      Array.from({ length: 10 }, () => firstBody),
+    );
+    expect(discover).toHaveBeenCalledTimes(1);
+    discover.mockRestore();
 
-    const firstSuggestion = firstBody.suggestions[0];
+    const firstSuggestion = firstBody?.suggestions[0];
     expect(
       (
         await create({
@@ -582,9 +592,16 @@ describe("顾客提交并确认预约", () => {
       ).statusCode,
     ).toBe(201);
 
+    await database.pool.query(
+      "UPDATE pets SET archived_at = $1 WHERE id = 'pet-booking-retry-loser'",
+      ["2026-08-13T03:00:00.000Z"],
+    );
     const retry = await create(retryPayload);
     expect(retry.statusCode).toBe(409);
     expect(retry.json()).toEqual(firstBody);
+    await database.pool.query(
+      "UPDATE pets SET archived_at = NULL WHERE id = 'pet-booking-retry-loser'",
+    );
 
     const result = await database.pool.query<{
       idempotency_count: number;

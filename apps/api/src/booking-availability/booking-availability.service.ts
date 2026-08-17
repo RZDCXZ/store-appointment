@@ -8,6 +8,7 @@ import type {
   PetSize,
   StaffSkillId,
 } from "@rongguang/contracts";
+import type { PoolClient } from "pg";
 
 import { getDemoNow } from "../config/environment.js";
 import { DatabaseService } from "../database/database.service.js";
@@ -187,7 +188,10 @@ export class BookingAvailabilityService {
     @Inject(ServiceCatalogService) private readonly catalog: ServiceCatalogService,
   ) {}
 
-  async discover(input: DiscoveryInput): Promise<BookingAvailabilityResponse> {
+  async discover(
+    input: DiscoveryInput,
+    existingClient?: PoolClient,
+  ): Promise<BookingAvailabilityResponse> {
     const petId = requiredId(input.petId, "宠物");
     const primaryServiceId = requiredId(input.primaryServiceId, "主要服务");
     const addonIds = parseAddonIds(input.addonIds);
@@ -195,7 +199,8 @@ export class BookingAvailabilityService {
     const demoNow = getDemoNow();
     const window = bookingWindowFor(demoNow);
     const earliestStartsAt = earliestCustomerCandidate(demoNow);
-    const client = await this.database.pool.connect();
+    const client = existingClient ?? (await this.database.pool.connect());
+    const ownsClient = !existingClient;
 
     try {
       await client.query("BEGIN TRANSACTION ISOLATION LEVEL REPEATABLE READ READ ONLY");
@@ -495,7 +500,9 @@ export class BookingAvailabilityService {
       await client.query("ROLLBACK").catch(() => undefined);
       throw error;
     } finally {
-      client.release();
+      if (ownsClient) {
+        client.release();
+      }
     }
   }
 

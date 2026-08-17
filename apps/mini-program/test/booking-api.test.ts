@@ -129,4 +129,36 @@ describe("预约创建客户端", () => {
       suggestions,
     } satisfies Partial<CustomerApiError>);
   });
+
+  it("API 与持久化边界使用同一规则拒绝空员工标签的冲突建议", async () => {
+    const client: CustomerApiRequestClient = {
+      request(options) {
+        options.success({
+          statusCode: 409,
+          data: {
+            code: "BOOKING_TIME_CONFLICT",
+            message: "刚刚有人选走了这个时段。",
+            suggestions: [
+              {
+                date: "2026-08-26",
+                startsAt: "2026-08-26T07:00:00.000Z",
+                endsAt: "2026-08-26T08:15:00.000Z",
+                staff: { id: "zhaohang", displayName: "" },
+              },
+            ],
+          },
+        });
+      },
+    };
+
+    await expect(
+      fetchBookingDetail("booking-conflict", client, {
+        apiBaseUrl: "http://api.test",
+        accessToken: "token",
+      }),
+    ).rejects.toMatchObject({
+      code: "BOOKING_TIME_CONFLICT",
+      suggestions: [],
+    } satisfies Partial<CustomerApiError>);
+  });
 });

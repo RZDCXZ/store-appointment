@@ -1,6 +1,7 @@
 import type { BookingConflictSuggestion } from "@rongguang/contracts";
 
 import type { RongguangApp } from "../types/customer";
+import { parseBookingConflictSuggestions } from "./booking-conflict-suggestion";
 
 interface RequestResponse {
   statusCode: number;
@@ -44,39 +45,6 @@ export class CustomerApiError extends Error {
   ) {
     super(message);
   }
-}
-
-function bookingConflictSuggestions(value: unknown): BookingConflictSuggestion[] {
-  if (!Array.isArray(value) || value.length > 5) return [];
-  return value.flatMap((candidate) => {
-    if (!candidate || typeof candidate !== "object") return [];
-    const suggestion = candidate as Record<string, unknown>;
-    const staff =
-      suggestion.staff && typeof suggestion.staff === "object"
-        ? (suggestion.staff as Record<string, unknown>)
-        : null;
-    if (
-      typeof suggestion.date !== "string" ||
-      !/^\d{4}-\d{2}-\d{2}$/.test(suggestion.date) ||
-      typeof suggestion.startsAt !== "string" ||
-      !Number.isFinite(Date.parse(suggestion.startsAt)) ||
-      typeof suggestion.endsAt !== "string" ||
-      !Number.isFinite(Date.parse(suggestion.endsAt)) ||
-      Date.parse(suggestion.endsAt) <= Date.parse(suggestion.startsAt) ||
-      typeof staff?.id !== "string" ||
-      typeof staff.displayName !== "string"
-    ) {
-      return [];
-    }
-    return [
-      {
-        date: suggestion.date,
-        startsAt: suggestion.startsAt,
-        endsAt: suggestion.endsAt,
-        staff: { id: staff.id, displayName: staff.displayName },
-      },
-    ];
-  });
 }
 
 function defaultClient(): CustomerApiRequestClient {
@@ -154,7 +122,7 @@ export function requestCustomerApi<T>(
             typeof error.message === "string" ? error.message : "请求失败，请稍后重试。",
             stringRecord(error.fieldErrors),
             error.booking,
-            bookingConflictSuggestions(error.suggestions),
+            parseBookingConflictSuggestions(error.suggestions),
           ),
         );
       },

@@ -252,13 +252,13 @@ export class BookingService {
     const input = parseCreateInput(body);
     const digest = requestDigest(input);
     const client = await this.database.pool.connect();
-    let clientReleased = false;
+    const idempotencyLockKey = `${customerId}:create_booking:${input.idempotencyKey}`;
+    let idempotencyLockHeld = false;
 
     try {
+      await client.query("SELECT pg_advisory_lock(hashtextextended($1, 0))", [idempotencyLockKey]);
+      idempotencyLockHeld = true;
       await client.query("BEGIN TRANSACTION ISOLATION LEVEL READ COMMITTED");
-      await client.query("SELECT pg_advisory_xact_lock(hashtextextended($1, 0))", [
-        `${customerId}:create_booking:${input.idempotencyKey}`,
-      ]);
       const existing = await client.query<IdempotencyRow>(
         `
           SELECT request_digest, booking_id, response_status, response_body
@@ -425,16 +425,27 @@ export class BookingService {
         databaseError.code === "40001" ||
         databaseError.code === "40P01"
       ) {
-        client.release();
-        clientReleased = true;
-        await this.throwBookingTimeConflict(customerId, input, digest);
+        await this.throwBookingTimeConflict(customerId, input, digest, client);
       }
       if (error instanceof HttpException) throw error;
       throw error;
     } finally {
-      if (!clientReleased) {
-        client.release();
+      let releaseError: Error | undefined;
+      if (idempotencyLockHeld) {
+        try {
+          const unlocked = await client.query<{ unlocked: boolean }>(
+            "SELECT pg_advisory_unlock(hashtextextended($1, 0)) AS unlocked",
+            [idempotencyLockKey],
+          );
+          if (!unlocked.rows[0]?.unlocked) {
+            releaseError = new Error("预约幂等锁未能释放，连接不可复用。");
+          }
+        } catch (error) {
+          releaseError =
+            error instanceof Error ? error : new Error("预约幂等锁释放失败，连接不可复用。");
+        }
       }
+      client.release(releaseError);
     }
   }
 
@@ -450,15 +461,19 @@ export class BookingService {
     customerId: string,
     input: CreateBookingInput,
     digest: string,
+    client: PoolClient,
   ): Promise<never> {
-    const availability = await this.availability.discover({
-      customerId,
-      petId: input.petId,
-      primaryServiceId: input.primaryServiceId,
-      addonIds: input.addonIds.join(","),
-      staffId:
-        input.staffPreference.kind === "specified" ? input.staffPreference.staffId : undefined,
-    });
+    const availability = await this.availability.discover(
+      {
+        customerId,
+        petId: input.petId,
+        primaryServiceId: input.primaryServiceId,
+        addonIds: input.addonIds.join(","),
+        staffId:
+          input.staffPreference.kind === "specified" ? input.staffPreference.staffId : undefined,
+      },
+      client,
+    );
     const requestedStart = Date.parse(input.startsAt);
     const nearbySuggestions: BookingConflictSuggestion[] = availability.days
       .flatMap((day) =>
@@ -488,70 +503,32 @@ export class BookingService {
       nextStep: "conflict",
       suggestions,
     };
-    const client = await this.database.pool.connect();
-    let response = proposed;
-
     try {
       await client.query("BEGIN");
-      await client.query("SELECT pg_advisory_xact_lock(hashtextextended($1, 0))", [
-        `${customerId}:create_booking:${input.idempotencyKey}`,
-      ]);
-      const existing = await client.query<IdempotencyRow>(
+      await client.query(
         `
-          SELECT request_digest, booking_id, response_status, response_body
-          FROM booking_idempotency_keys
-          WHERE customer_id = $1
-            AND command_type = 'create_booking'
-            AND idempotency_key = $2
+          INSERT INTO booking_idempotency_keys (
+            customer_id, command_type, idempotency_key, request_digest,
+            booking_id, response_status, response_body, created_at
+          )
+          VALUES ($1, 'create_booking', $2, $3, NULL, $4, $5::jsonb, $6)
         `,
-        [customerId, input.idempotencyKey],
+        [
+          customerId,
+          input.idempotencyKey,
+          digest,
+          HttpStatus.CONFLICT,
+          JSON.stringify(proposed),
+          getDemoNow(),
+        ],
       );
-      const previous = existing.rows[0];
-
-      if (previous) {
-        if (previous.request_digest !== digest) {
-          businessError(
-            "IDEMPOTENCY_KEY_REUSED",
-            "这个幂等键已经用于另一份预约草稿，请重新提交。",
-            HttpStatus.CONFLICT,
-          );
-        }
-        if (
-          previous.response_status !== HttpStatus.CONFLICT ||
-          !previous.response_body ||
-          typeof previous.response_body !== "object"
-        ) {
-          throw new Error("冲突命令的幂等结果不是可重放的失败响应。");
-        }
-        response = previous.response_body as BookingConflictBody;
-      } else {
-        await client.query(
-          `
-            INSERT INTO booking_idempotency_keys (
-              customer_id, command_type, idempotency_key, request_digest,
-              booking_id, response_status, response_body, created_at
-            )
-            VALUES ($1, 'create_booking', $2, $3, NULL, $4, $5::jsonb, $6)
-          `,
-          [
-            customerId,
-            input.idempotencyKey,
-            digest,
-            HttpStatus.CONFLICT,
-            JSON.stringify(proposed),
-            getDemoNow(),
-          ],
-        );
-      }
       await client.query("COMMIT");
     } catch (error) {
       await client.query("ROLLBACK").catch(() => undefined);
       throw error;
-    } finally {
-      client.release();
     }
 
-    throw new HttpException(response, HttpStatus.CONFLICT);
+    throw new HttpException(proposed, HttpStatus.CONFLICT);
   }
 
   async detail(customerId: string, bookingId: string): Promise<BookingDetailResponse> {
