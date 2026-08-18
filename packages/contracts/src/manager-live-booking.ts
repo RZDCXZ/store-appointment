@@ -101,7 +101,7 @@ export interface ManagerCalendarResponse {
 
 export interface ManagerWorkbenchRisk {
   id: string;
-  kind: "pending_time_off" | "failed_notification" | "late_booking";
+  kind: "pending_time_off" | "pending_store_closure" | "failed_notification" | "late_booking";
   title: string;
   detail: string;
   href: string;

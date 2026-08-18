@@ -110,7 +110,9 @@ function RefreshNotice({ message, retry }: { message: string; retry: () => void 
 }
 
 function RiskIcon({ kind }: { kind: ManagerWorkbenchResponse["risks"][number]["kind"] }) {
-  if (kind === "pending_time_off") return <ExclamationTriangleIcon />;
+  if (kind === "pending_time_off" || kind === "pending_store_closure") {
+    return <ExclamationTriangleIcon />;
+  }
   if (kind === "failed_notification") return <BellIcon />;
   return <ClockIcon />;
 }
@@ -335,6 +337,7 @@ export function ManagerWorkbenchPage(): React.JSX.Element {
             <ReloadIcon />
             {resource.refreshing ? "更新中" : "刷新"}
           </button>
+          <Link to="/manager/schedule/capacity-changes/new">创建停班 / 临时闭店</Link>
         </div>
       </header>
 

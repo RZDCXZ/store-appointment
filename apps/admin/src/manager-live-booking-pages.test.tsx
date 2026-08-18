@@ -224,6 +224,10 @@ describe("店长即时预约页面", () => {
       "href",
       "/manager/appointments/calendar?date=2026-08-13",
     );
+    expect(screen.getByRole("link", { name: "创建停班 / 临时闭店" })).toHaveAttribute(
+      "href",
+      "/manager/schedule/capacity-changes/new",
+    );
 
     const events = FakeEventSource.instances[0];
     expect(events?.url).toContain("/backoffice/manager/events");

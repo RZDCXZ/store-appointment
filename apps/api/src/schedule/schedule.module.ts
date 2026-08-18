@@ -6,11 +6,13 @@ import { DatabaseModule } from "../database/database.module.js";
 import { ScheduleController } from "./schedule.controller.js";
 import { SchedulePlanningService } from "./schedule-planning.service.js";
 import { ScheduleService } from "./schedule.service.js";
+import { CapacityChangeController } from "./capacity-change.controller.js";
+import { CapacityChangeService } from "./capacity-change.service.js";
 
 @Module({
   imports: [AuthModule, AuditModule, DatabaseModule],
-  controllers: [ScheduleController],
-  providers: [ScheduleService, SchedulePlanningService],
+  controllers: [ScheduleController, CapacityChangeController],
+  providers: [ScheduleService, SchedulePlanningService, CapacityChangeService],
   exports: [ScheduleService],
 })
 export class ScheduleModule {}

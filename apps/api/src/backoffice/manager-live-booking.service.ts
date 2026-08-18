@@ -69,6 +69,16 @@ interface FailedNotificationRow {
   pet_name_snapshot: string;
 }
 
+interface PendingCapacityRiskRow {
+  id: string;
+  kind: "time_off" | "store_closure";
+  local_date: string;
+  starts_at: string;
+  ends_at: string;
+  staff_display_name: string | null;
+  affected_booking_count: number;
+}
+
 interface ManagerPetProfileRow {
   weight_kg: string;
   breed: string | null;
@@ -632,9 +642,10 @@ export class ManagerLiveBookingService {
   async workbench(): Promise<ManagerWorkbenchResponse> {
     const demoNow = getDemoNow();
     const localDate = getShanghaiLocalDate(demoNow);
-    const [calendar, failedNotifications] = await Promise.all([
+    const [calendar, failedNotifications, pendingCapacityRisks] = await Promise.all([
       this.calendar(localDate),
       this.failedNotifications(),
+      this.pendingCapacityRisks(localDate),
     ]);
     const bookings = calendar.staffDays.flatMap((day) => day.bookings);
     const summary = bookings.reduce((counts, booking) => {
@@ -643,18 +654,15 @@ export class ManagerLiveBookingService {
     }, emptyStatusSummary());
     const risks: ManagerWorkbenchRisk[] = [];
 
-    for (const day of calendar.staffDays) {
-      for (const block of day.blocks) {
-        if (block.kind !== "time_off" || block.status !== "pending") continue;
-        if (risks.some((risk) => risk.id === `time-off:${block.id}`)) continue;
-        risks.push({
-          id: `time-off:${block.id}`,
-          kind: "pending_time_off",
-          title: "待处理停班",
-          detail: `${day.staff.displayName} ${block.startsAt}–${block.endsAt}，影响 ${block.affectedBookingCount} 笔预约`,
-          href: `/manager/appointments/calendar?date=${localDate}`,
-        });
-      }
+    for (const change of pendingCapacityRisks) {
+      const isTimeOff = change.kind === "time_off";
+      risks.push({
+        id: `${change.kind}:${change.id}`,
+        kind: isTimeOff ? "pending_time_off" : "pending_store_closure",
+        title: isTimeOff ? "待处理停班" : "待处理临时闭店",
+        detail: `${change.local_date} ${isTimeOff ? `${change.staff_display_name ?? "员工"} ` : ""}${change.starts_at}–${change.ends_at}，影响 ${change.affected_booking_count} 笔预约`,
+        href: `/manager/appointments/calendar?date=${change.local_date}`,
+      });
     }
 
     for (const notification of failedNotifications) {
@@ -889,6 +897,53 @@ export class ManagerLiveBookingService {
         ORDER BY notification.available_at, notification.id
         LIMIT 5
       `,
+    );
+    return result.rows;
+  }
+
+  private async pendingCapacityRisks(localDate: string): Promise<PendingCapacityRiskRow[]> {
+    const result = await this.database.pool.query<PendingCapacityRiskRow>(
+      `SELECT time_off.id,
+              'time_off'::text AS kind,
+              to_char(time_off.local_date, 'YYYY-MM-DD') AS local_date,
+              to_char(time_off.starts_at, 'HH24:MI') AS starts_at,
+              to_char(time_off.ends_at, 'HH24:MI') AS ends_at,
+              account.display_name AS staff_display_name,
+              (
+                SELECT count(*)::int
+                FROM bookings AS booking
+                WHERE booking.status IN ('confirmed', 'checked_in')
+                  AND booking.staff_id = time_off.staff_id
+                  AND booking.occupancy_starts_at <
+                    ((time_off.local_date + time_off.ends_at) AT TIME ZONE 'Asia/Shanghai')
+                  AND booking.occupancy_ends_at >
+                    ((time_off.local_date + time_off.starts_at) AT TIME ZONE 'Asia/Shanghai')
+              ) AS affected_booking_count
+       FROM staff_time_off_intervals AS time_off
+       JOIN backoffice_accounts AS account ON account.id = time_off.staff_id
+       WHERE time_off.status = 'pending'
+         AND time_off.local_date BETWEEN $1::date AND ($1::date + 13)
+       UNION ALL
+       SELECT closure.id,
+              'store_closure'::text AS kind,
+              to_char(closure.local_date, 'YYYY-MM-DD') AS local_date,
+              to_char(closure.starts_at, 'HH24:MI') AS starts_at,
+              to_char(closure.ends_at, 'HH24:MI') AS ends_at,
+              NULL AS staff_display_name,
+              (
+                SELECT count(*)::int
+                FROM bookings AS booking
+                WHERE booking.status IN ('confirmed', 'checked_in')
+                  AND booking.occupancy_starts_at <
+                    ((closure.local_date + closure.ends_at) AT TIME ZONE 'Asia/Shanghai')
+                  AND booking.occupancy_ends_at >
+                    ((closure.local_date + closure.starts_at) AT TIME ZONE 'Asia/Shanghai')
+              ) AS affected_booking_count
+       FROM store_closure_intervals AS closure
+       WHERE closure.status = 'pending'
+         AND closure.local_date BETWEEN $1::date AND ($1::date + 13)
+       ORDER BY local_date, starts_at, id`,
+      [localDate],
     );
     return result.rows;
   }

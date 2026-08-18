@@ -18,7 +18,9 @@ export interface AppendAuditFact {
     | "schedule_drafts_generated"
     | "schedule_draft_updated"
     | "schedule_published"
-    | "schedule_exception_updated";
+    | "schedule_exception_updated"
+    | "capacity_change_created"
+    | "capacity_change_status_changed";
   actor: {
     type: "staff" | "manager";
     id: string;
@@ -31,7 +33,9 @@ export interface AppendAuditFact {
       | "staff"
       | "schedule_template"
       | "schedule_draft"
-      | "published_schedule";
+      | "published_schedule"
+      | "staff_time_off"
+      | "store_closure";
     id: string;
   };
   payload: Record<string, unknown>;

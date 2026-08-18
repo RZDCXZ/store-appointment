@@ -95,7 +95,7 @@ function RefreshNotice({ message, retry }: { message: string; retry: () => void 
 function CalendarBlock({ block }: { block: ManagerCalendarBlock }) {
   return (
     <div
-      className={`manager-calendar-block manager-calendar-block--${block.kind}`}
+      className={`manager-calendar-block manager-calendar-block--${block.kind} manager-calendar-block--${block.status}`}
       style={verticalPosition(clockMinutes(block.startsAt), clockMinutes(block.endsAt))}
     >
       <strong>{block.kind === "time_off" ? "停班" : "临时闭店"}</strong>
