@@ -21,5 +21,5 @@
 
 - ST-04：`/staff/appointments/:bookingId/check-in`
 - ST-05：`/staff/appointments/:bookingId/late`
-- API 使用 `DEMO_NOW` 注入时钟，并以员工身份、命令类型和幂等键持久化首次成功结果。
+- API 使用 `DEMO_NOW` 注入时钟，并以员工身份、命令类型和幂等键持久化首次成功或业务失败结果。
 - 爽约只截断实际占用结束时间；原计划与原占用快照保持不变。
