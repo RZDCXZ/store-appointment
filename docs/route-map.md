@@ -15,6 +15,7 @@
 | —         | 店长排班入口     | Web 后台   | `/manager/schedule`                            | `apps/admin/src/pages/manager/schedule-index-redirect.tsx` | 已完成 | 保留查询参数并重定向到 MG-09 已发布排班                   |
 | MG-09     | 已发布排班       | Web 后台   | `/manager/schedule/published?date=:date`       | `apps/admin/src/pages/manager/schedule-page.tsx`           | 已完成 | 指定日期直达、刷新恢复、角色边界与 history fallback 测试  |
 | MG-12     | 服务目录管理     | Web 后台   | `/manager/services`                            | `apps/admin/src/pages/manager/services-page.tsx`           | 已完成 | 目录读取、角色边界、直接路由刷新与恢复状态测试            |
+| MG-13     | 员工账号与技能   | Web 后台   | `/manager/services/staff`                      | `apps/admin/src/pages/manager/staff-page.tsx`              | 已完成 | 技能矩阵键盘操作、错误提示、角色边界与浏览器刷新测试      |
 | —         | 店长顾客入口     | Web 后台   | `/manager/customers`                           | `apps/admin/src/pages/manager/customers-page.tsx`          | 骨架   | Vite history fallback + 独立路由测试                      |
 | —         | 店长经营入口     | Web 后台   | `/manager/business`                            | `apps/admin/src/pages/manager/business-page.tsx`           | 骨架   | Vite history fallback + 独立路由测试                      |
 | —         | 店长系统入口     | Web 后台   | `/manager/system`                              | `apps/admin/src/pages/manager/system-page.tsx`             | 骨架   | Vite history fallback + 独立路由测试                      |

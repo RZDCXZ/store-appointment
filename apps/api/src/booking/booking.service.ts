@@ -3305,21 +3305,7 @@ export class BookingService {
     staffId: string,
     selection: BookingSelectionQuote,
   ): Promise<StaffRow> {
-    const result = await client.query<StaffRow>(
-      `
-        SELECT staff.id,
-               account.display_name,
-               coalesce(array_agg(skill.skill_id ORDER BY skill.skill_id)
-                 FILTER (WHERE skill.skill_id IS NOT NULL), '{}') AS skills
-        FROM staff_members AS staff
-        JOIN backoffice_accounts AS account ON account.id = staff.id
-        LEFT JOIN staff_skills AS skill ON skill.staff_id = staff.id
-        WHERE staff.id = $1 AND staff.active = true AND account.active = true
-        GROUP BY staff.id, account.display_name
-      `,
-      [staffId],
-    );
-    const staff = result.rows[0];
+    const staff = await this.lockCurrentStaffFacts(client, staffId);
     if (!staff || !hasAllSkills(staff, selection.requiredSkillIds)) {
       businessError(
         "STAFF_NOT_QUALIFIED",
@@ -3336,21 +3322,7 @@ export class BookingService {
     row: BookingRow,
     selection: BookingSelectionQuote,
   ): Promise<StaffRow> {
-    const result = await client.query<StaffRow>(
-      `
-        SELECT staff.id,
-               account.display_name,
-               coalesce(array_agg(skill.skill_id ORDER BY skill.skill_id)
-                 FILTER (WHERE skill.skill_id IS NOT NULL), '{}') AS skills
-        FROM staff_members AS staff
-        JOIN backoffice_accounts AS account ON account.id = staff.id
-        LEFT JOIN staff_skills AS skill ON skill.staff_id = staff.id
-        WHERE staff.id = $1 AND staff.active = true AND account.active = true
-        GROUP BY staff.id, account.display_name
-      `,
-      [row.staff_id],
-    );
-    const staff = result.rows[0];
+    const staff = await this.lockCurrentStaffFacts(client, row.staff_id);
     const currentSkills = new Set(staff?.skills ?? []);
     const missingSkillIds = selection.requiredSkillIds.filter((skill) => !currentSkills.has(skill));
     if (!staff || missingSkillIds.length > 0) {
@@ -3370,6 +3342,30 @@ export class BookingService {
       );
     }
     return staff;
+  }
+
+  private async lockCurrentStaffFacts(
+    client: PoolClient,
+    staffId: string,
+  ): Promise<StaffRow | undefined> {
+    const identity = await client.query<{ id: string; display_name: string }>(
+      `
+        SELECT staff.id, account.display_name
+        FROM staff_members AS staff
+        JOIN backoffice_accounts AS account ON account.id = staff.id
+        WHERE staff.id = $1 AND staff.active = true AND account.active = true
+        FOR SHARE OF staff, account
+      `,
+      [staffId],
+    );
+    const member = identity.rows[0];
+    if (!member) return undefined;
+
+    const skills = await client.query<{ skill_id: StaffSkillId }>(
+      "SELECT skill_id FROM staff_skills WHERE staff_id = $1 ORDER BY skill_id",
+      [staffId],
+    );
+    return { ...member, skills: skills.rows.map((skill) => skill.skill_id) };
   }
 
   private async requireCorrectionCapacity(

@@ -207,6 +207,56 @@ describe("后台登录与角色路由", () => {
     expect(router.state.location.pathname).toBe("/staff/today");
   });
 
+  it("店长新建的员工账号可通过自定义账号入口登录", async () => {
+    const createdStaffAccount = {
+      id: "staff-00006",
+      username: "tangyu",
+      displayName: "唐语",
+      role: "staff",
+    };
+    const fetchMock = vi
+      .spyOn(globalThis, "fetch")
+      .mockResolvedValueOnce(jsonResponse({ code: "UNAUTHENTICATED" }, 401))
+      .mockResolvedValueOnce(jsonResponse({ account: createdStaffAccount }, 201))
+      .mockResolvedValueOnce(
+        jsonResponse({
+          timeZone: "Asia/Shanghai",
+          demoNow: "2026-08-13T02:50:00.000Z",
+          localDate: "2026-08-13",
+          identity: { id: "staff-00006", displayName: "唐语" },
+          shifts: [],
+          nextBooking: null,
+          actionQueue: [],
+          bookings: [],
+        }),
+      );
+    const router = createMemoryRouter(routes, {
+      initialEntries: ["/login?returnTo=%2Fstaff%2F..%2Fmanager%2Fservices%2Fstaff%3Ftab%3Dskills"],
+    });
+
+    render(<RouterProvider router={router} />);
+    await screen.findByRole("heading", { name: "欢迎回来" });
+    fireEvent.change(screen.getByRole("combobox", { name: "演示账号" }), {
+      target: { value: "__other_staff__" },
+    });
+    fireEvent.change(screen.getByLabelText("其他员工账号"), {
+      target: { value: "tangyu" },
+    });
+    fireEvent.change(screen.getByLabelText("演示密码"), {
+      target: { value: "Ticket20-Demo!" },
+    });
+    fireEvent.submit(screen.getByRole("button", { name: "进入管理端" }).closest("form")!);
+
+    expect(await screen.findByRole("heading", { name: "我的今日工作" })).toBeVisible();
+    expect(router.state.location.pathname).toBe("/staff/today");
+    const loginRequest = fetchMock.mock.calls[1];
+    expect(loginRequest?.[0]).toBe("http://localhost:4100/auth/login");
+    expect(JSON.parse(String(loginRequest?.[1]?.body))).toEqual({
+      username: "tangyu",
+      password: "Ticket20-Demo!",
+    });
+  });
+
   it("员工直接打开店长路由会看到明确无权限结果", async () => {
     vi.spyOn(globalThis, "fetch").mockResolvedValue(jsonResponse({ account: staffAccount }));
     const router = createMemoryRouter(routes, { initialEntries: ["/manager/system"] });

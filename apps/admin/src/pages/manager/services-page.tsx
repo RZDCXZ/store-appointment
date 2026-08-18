@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { Link } from "react-router-dom";
 import type {
   ManagerPrimaryService,
   ManagerServiceAddon,
@@ -867,6 +868,12 @@ export function ManagerServicesPage(): React.JSX.Element {
         }}
         badge="仅店长可写"
       />
+      <nav className="staff-management-tabs" aria-label="服务管理页面">
+        <Link aria-current="page" to="/manager/services">
+          服务目录
+        </Link>
+        <Link to="/manager/services/staff">员工与技能</Link>
+      </nav>
 
       {state.loading ? <CatalogLoading /> : null}
       {!state.loading && !state.data && state.error ? (

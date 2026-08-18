@@ -12,14 +12,30 @@ const demoAccounts = [
   { username: "zhouning", label: "员工 · 周宁", detail: "今日工作与本人预约" },
   { username: "zhaohang", label: "员工 · 赵航", detail: "今日工作与本人预约" },
 ] as const;
+const otherStaffAccount = "__other_staff__";
 
 function landingPath(account: BackofficeAccount): string {
   return backofficeRoles[account.role].landingPath;
 }
 
 function safeTarget(value: string | null, account: BackofficeAccount): string {
-  if (value?.startsWith("/") && !value.startsWith("//")) {
-    return value;
+  if (!value?.startsWith("/") || value.startsWith("//")) {
+    return landingPath(account);
+  }
+
+  let target: URL;
+  try {
+    target = new URL(value, "http://backoffice.invalid");
+  } catch {
+    return landingPath(account);
+  }
+  if (target.origin !== "http://backoffice.invalid") {
+    return landingPath(account);
+  }
+
+  const roleRoot = `/${account.role}`;
+  if (target.pathname === roleRoot || target.pathname.startsWith(`${roleRoot}/`)) {
+    return `${target.pathname}${target.search}${target.hash}`;
   }
 
   return landingPath(account);
@@ -29,13 +45,17 @@ export function LoginPage(): React.JSX.Element {
   const auth = useAuth();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
-  const [username, setUsername] = useState("manager");
+  const [accountChoice, setAccountChoice] = useState("manager");
+  const [otherUsername, setOtherUsername] = useState("");
+  const [usernameError, setUsernameError] = useState("");
   const [password, setPassword] = useState("");
   const [passwordError, setPasswordError] = useState("");
   const [requestError, setRequestError] = useState("");
   const [submitting, setSubmitting] = useState(false);
+  const usernameRef = useRef<HTMLInputElement>(null);
   const passwordRef = useRef<HTMLInputElement>(null);
-  const selectedAccount = demoAccounts.find((account) => account.username === username);
+  const selectedAccount = demoAccounts.find((account) => account.username === accountChoice);
+  const usingOtherStaffAccount = accountChoice === otherStaffAccount;
   const checkingSession = auth.state.kind === "checking";
   const expired =
     searchParams.get("reason") === "expired" ||
@@ -47,8 +67,17 @@ export function LoginPage(): React.JSX.Element {
 
   async function submit(event: React.FormEvent<HTMLFormElement>): Promise<void> {
     event.preventDefault();
+    setUsernameError("");
     setPasswordError("");
     setRequestError("");
+
+    const username = usingOtherStaffAccount ? otherUsername.trim().toLowerCase() : accountChoice;
+
+    if (!username) {
+      setUsernameError("请输入店长新建的员工账号。");
+      usernameRef.current?.focus();
+      return;
+    }
 
     if (!password) {
       setPasswordError("请输入演示密码。");
@@ -109,7 +138,9 @@ export function LoginPage(): React.JSX.Element {
           </div>
           <p className="eyebrow">ST-01 · 演示账号登录</p>
           <h1>欢迎回来</h1>
-          <p className="login-intro">请选择店长或员工账号。身份和数据范围由服务端会话决定。</p>
+          <p className="login-intro">
+            请选择预置账号，或输入店长新建的员工账号。身份和数据范围由服务端会话决定。
+          </p>
 
           {expired ? (
             <div className="auth-notice auth-notice--warning" role="status">
@@ -132,18 +163,49 @@ export function LoginPage(): React.JSX.Element {
             <select
               id="demo-account"
               name="username"
-              value={username}
+              value={accountChoice}
               disabled={checkingSession}
-              onChange={(event) => setUsername(event.target.value)}
+              onChange={(event) => {
+                setAccountChoice(event.target.value);
+                setUsernameError("");
+              }}
             >
               {demoAccounts.map((account) => (
                 <option key={account.username} value={account.username}>
                   {account.label} · {account.username}
                 </option>
               ))}
+              <option value={otherStaffAccount}>其他员工账号</option>
             </select>
-            <small>{selectedAccount?.detail}</small>
+            <small>{selectedAccount?.detail ?? "使用店长在员工账号与技能页面创建的账号。"}</small>
           </div>
+
+          {usingOtherStaffAccount ? (
+            <div className="field">
+              <label htmlFor="other-staff-account">其他员工账号</label>
+              <input
+                id="other-staff-account"
+                ref={usernameRef}
+                type="text"
+                value={otherUsername}
+                autoComplete="username"
+                disabled={checkingSession}
+                aria-invalid={usernameError ? "true" : undefined}
+                aria-describedby={usernameError ? "username-error" : undefined}
+                onChange={(event) => {
+                  setOtherUsername(event.target.value);
+                  setUsernameError("");
+                }}
+              />
+              {usernameError ? (
+                <small id="username-error" className="field-error" role="alert">
+                  {usernameError}
+                </small>
+              ) : (
+                <small>输入创建员工账号时设置的登录名。</small>
+              )}
+            </div>
+          ) : null}
 
           <div className="field">
             <label htmlFor="demo-password">演示密码</label>
@@ -164,7 +226,11 @@ export function LoginPage(): React.JSX.Element {
                 {passwordError}
               </small>
             ) : (
-              <small>统一演示密码：Rongguang2026!</small>
+              <small>
+                {usingOtherStaffAccount
+                  ? "使用创建该员工账号时设置的演示密码。"
+                  : "预置账号统一演示密码：Rongguang2026!"}
+              </small>
             )}
           </div>
 

@@ -10,13 +10,16 @@ export interface AppendAuditFact {
     | "customer_phone_revealed"
     | "service_catalog_created"
     | "service_catalog_updated"
-    | "service_catalog_deactivated";
+    | "service_catalog_deactivated"
+    | "staff_account_created"
+    | "staff_skills_updated"
+    | "staff_account_deactivated";
   actor: {
     type: "staff" | "manager";
     id: string;
   };
   subject: {
-    type: "booking" | "primary_service" | "addon";
+    type: "booking" | "primary_service" | "addon" | "staff";
     id: string;
   };
   payload: Record<string, unknown>;

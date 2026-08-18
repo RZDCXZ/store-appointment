@@ -289,6 +289,33 @@ export interface ManagerServiceCatalogResponse {
   addons: ManagerServiceAddon[];
 }
 
+export interface ManagerStaffSkillColumn {
+  id: string;
+  name: string;
+  kind: "primary_service" | "addon";
+  status: ServiceCatalogItemStatus;
+  requiredSkillIds: StaffSkillId[];
+}
+
+export interface ManagerStaffAccount {
+  id: string;
+  username: string;
+  displayName: string;
+  employeeNumber: number;
+  status: "active" | "inactive";
+  skillIds: StaffSkillId[];
+  shiftSummary: {
+    publishedShiftCount: number;
+    scheduledMinutes: number;
+    nextShiftStartsAt: string | null;
+  };
+}
+
+export interface ManagerStaffResponse {
+  staff: ManagerStaffAccount[];
+  skillColumns: ManagerStaffSkillColumn[];
+}
+
 export interface ManagerServiceSpecificationInput {
   id?: string;
   petSize: PetSize;

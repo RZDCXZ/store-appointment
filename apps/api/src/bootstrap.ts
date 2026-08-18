@@ -14,6 +14,7 @@ export async function createApplication(): Promise<NestFastifyApplication> {
 
   app.enableCors({
     credentials: true,
+    methods: ["GET", "HEAD", "POST", "PATCH", "PUT", "DELETE", "OPTIONS"],
     origin: getAdminOrigin(),
   });
 
