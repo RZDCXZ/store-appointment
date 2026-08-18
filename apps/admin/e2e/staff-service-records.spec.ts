@@ -122,6 +122,7 @@ test("员工在 390px 填写原因终止服务并在刷新后恢复独立终态"
   await expect(page.getByRole("status")).toContainText("宠物持续应激");
   await page.reload();
   await expect(page.getByRole("status")).toContainText("服务已终止");
+  await expect(page.getByRole("status")).toContainText("宠物持续应激，无法安全继续服务");
   await expect(page.getByRole("status")).toContainText("15 分钟周转");
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(
     true,

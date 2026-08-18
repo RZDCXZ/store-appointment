@@ -482,6 +482,7 @@ export class BookingFulfilmentService {
           outcome: response.outcome,
           occurredAt: response.occurredAt,
           actor: response.actor,
+          reason: response.reason,
           actualOccupancy: response.actualOccupancy,
           originalSchedule: response.originalSchedule,
         });

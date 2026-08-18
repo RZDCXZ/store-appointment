@@ -369,6 +369,17 @@ describe("完成服务、服务终止与追加说明", () => {
     );
     expect(records.rows).toHaveLength(0);
     await expectStaffCapacityReleasedAt("2026-08-14T03:40:00.000Z");
+
+    const detail = await app.inject({
+      method: "GET",
+      url: `/backoffice/staff/bookings/${bookingId}`,
+      headers: { cookie: staffCookie },
+    });
+    const terminationEvent = detail
+      .json<{ statusHistory: Array<{ type: string; reason: string | null }> }>()
+      .statusHistory.find((event) => event.type === "booking_terminated");
+    expect(detail.statusCode).toBe(200);
+    expect(terminationEvent?.reason).toBe("宠物持续应激，无法安全继续服务");
   });
 
   it("改期到首次原计划之后的预约仍按当前计划终止并保留十五分钟周转", async () => {
@@ -729,6 +740,50 @@ describe("完成服务、服务终止与追加说明", () => {
     expect(persistedCopies).not.toContain("薄荷");
     expect(persistedCopies).not.toContain("含有宠物名称薄荷的内部记录。");
     expect(persistedCopies).not.toContain("补充中也可能包含顾客或宠物身份。");
+  });
+
+  it("服务终止原因在经营期可恢复，并在顾客匿名化时从事件与幂等副本清理", async () => {
+    vi.stubEnv("DEMO_NOW", "2026-08-14T03:25:00.000Z");
+    const termination = await app.inject({
+      method: "POST",
+      url: `/backoffice/bookings/${bookingId}/terminate`,
+      headers: { cookie: staffCookie, origin: adminOrigin },
+      payload: {
+        idempotencyKey: "terminate-before-customer-anonymization",
+        reason: "匿名化前需保留，匿名化后需清理的终止原因",
+      },
+    });
+    expect(termination.statusCode).toBe(201);
+
+    const eventBefore = await database.pool.query<{ payload: { reason?: string } }>(
+      `
+        SELECT payload
+        FROM booking_events
+        WHERE booking_id = $1 AND event_type = 'booking_terminated'
+      `,
+      [bookingId],
+    );
+    expect(eventBefore.rows[0]?.payload.reason).toBe("匿名化前需保留，匿名化后需清理的终止原因");
+
+    await database.pool.query("SELECT anonymize_store_service_records_for_customer($1)", [
+      "customer-cheng-mo",
+    ]);
+
+    const eventAfter = await database.pool.query<{ payload: { reason?: string } }>(
+      `
+        SELECT payload
+        FROM booking_events
+        WHERE booking_id = $1 AND event_type = 'booking_terminated'
+      `,
+      [bookingId],
+    );
+    const idempotencyAfter = await database.pool.query(
+      "SELECT response_body FROM booking_fulfilment_idempotency_keys WHERE booking_id = $1",
+      [bookingId],
+    );
+    expect(eventAfter.rows[0]?.payload).not.toHaveProperty("reason");
+    expect(idempotencyAfter.rows).toHaveLength(0);
+    expect(JSON.stringify(eventAfter.rows)).not.toContain("匿名化前需保留");
   });
 
   it("顾客预约详情只返回实际完成时间而不泄露门店服务记录或说明", async () => {
