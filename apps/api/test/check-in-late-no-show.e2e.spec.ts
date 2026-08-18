@@ -136,12 +136,29 @@ describe("到店核销、迟到与爽约", () => {
     });
   });
 
+  it("正常核销只允许分配员工，店长不能绕过六位码权限边界", async () => {
+    vi.stubEnv("DEMO_NOW", "2026-08-14T02:50:00.000Z");
+
+    const response = await app.inject({
+      method: "POST",
+      url: `/backoffice/bookings/${bookingId}/check-in`,
+      headers: { cookie: managerCookie, origin: adminOrigin },
+      payload: {
+        idempotencyKey: "manager-normal-check-in",
+        verificationCode: "000000",
+      },
+    });
+
+    expect(response.statusCode).toBe(403);
+    expect(response.json()).toMatchObject({ code: "FORBIDDEN" });
+  });
+
   it("窗口前后均拒绝正常核销，窗口内错误六位码也不会改变预约", async () => {
     vi.stubEnv("DEMO_NOW", "2026-08-14T02:29:59.999Z");
     const tooEarly = await app.inject({
       method: "POST",
       url: `/backoffice/bookings/${bookingId}/check-in`,
-      headers: { cookie: managerCookie, origin: adminOrigin },
+      headers: { cookie: staffCookie, origin: adminOrigin },
       payload: { idempotencyKey: "check-in-too-early", verificationCode: "000000" },
     });
     expect(tooEarly.statusCode).toBe(409);
@@ -172,6 +189,52 @@ describe("到店核销、迟到与爽约", () => {
       [bookingId],
     );
     expect(status.rows[0]?.status).toBe("confirmed");
+  });
+
+  it("相同幂等键重放首次失败，即使时间窗口随后已经改变", async () => {
+    const detail = await app.inject({
+      method: "GET",
+      url: `/miniapp/bookings/${bookingId}`,
+      headers: { authorization: customerAuth },
+    });
+    const request = {
+      method: "POST" as const,
+      url: `/backoffice/bookings/${bookingId}/check-in`,
+      headers: { cookie: staffCookie, origin: adminOrigin },
+      payload: {
+        idempotencyKey: "check-in-stable-failure",
+        verificationCode: detail.json<BookingDetailResponse>().verificationCode,
+      },
+    };
+    vi.stubEnv("DEMO_NOW", "2026-08-14T02:29:59.999Z");
+    const first = await app.inject(request);
+
+    vi.stubEnv("DEMO_NOW", "2026-08-14T02:50:00.000Z");
+    const retry = await app.inject(request);
+
+    expect(first.statusCode).toBe(409);
+    expect(first.json()).toMatchObject({ code: "CHECK_IN_TOO_EARLY" });
+    expect(retry.statusCode).toBe(first.statusCode);
+    expect(retry.json()).toEqual(first.json());
+
+    const stored = await database.pool.query<{
+      response_status: number;
+      response_body: { code: string };
+    }>(
+      `
+        SELECT response_status, response_body
+        FROM booking_fulfilment_idempotency_keys
+        WHERE actor_id = 'chenjia'
+          AND command_type = 'check_in'
+          AND idempotency_key = 'check-in-stable-failure'
+      `,
+    );
+    expect(stored.rows).toEqual([
+      {
+        response_status: 409,
+        response_body: expect.objectContaining({ code: "CHECK_IN_TOO_EARLY" }),
+      },
+    ]);
   });
 
   it("在窗口终点恰好允许核销，重复请求返回首次结果且不追加历史", async () => {

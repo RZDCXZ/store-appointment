@@ -9,6 +9,8 @@ import { StaffPageError, StaffPageLoading } from "../../staff-booking-components
 import { formatShanghaiDateTime, serviceLabel } from "../../staff-booking-presentation";
 import {
   commandIdempotencyKey,
+  discardCommandIdempotencyKey,
+  isFulfilmentFactConflict,
   recoveredFulfilment,
   StaffFulfilmentResult,
   type StaffFulfilmentCommand,
@@ -55,6 +57,12 @@ export function StaffLatePage(): React.JSX.Element {
         const apiError = await readApiError(response);
         if (apiError.status === 401) {
           markExpired();
+          return;
+        }
+        if (isFulfilmentFactConflict(apiError.status, apiError.code)) {
+          discardCommandIdempotencyKey(bookingId, command);
+          resource.refresh();
+          setError(`${apiError.message} 已重新读取预约当前状态。`);
           return;
         }
         throw apiError;
@@ -119,6 +127,11 @@ export function StaffLatePage(): React.JSX.Element {
           </section>
 
           {result ? <StaffFulfilmentResult result={result} /> : null}
+          {error ? (
+            <p className="staff-form-error" role="alert">
+              {error}
+            </p>
+          ) : null}
           {!result && booking?.action === "late" ? (
             <form
               className="staff-late-form"
@@ -137,6 +150,7 @@ export function StaffLatePage(): React.JSX.Element {
                     onChange={() => {
                       setMode("late_check_in");
                       setConfirmedNoShow(false);
+                      setError("");
                     }}
                   />
                   <span>
@@ -149,7 +163,10 @@ export function StaffLatePage(): React.JSX.Element {
                     type="radio"
                     name="late-mode"
                     checked={mode === "no_show"}
-                    onChange={() => setMode("no_show")}
+                    onChange={() => {
+                      setMode("no_show");
+                      setError("");
+                    }}
                   />
                   <span>
                     <strong>标记爽约</strong>
@@ -166,7 +183,13 @@ export function StaffLatePage(): React.JSX.Element {
                   maxLength={120}
                   rows={4}
                   value={reason}
-                  onChange={(event) => setReason(event.target.value)}
+                  onChange={(event) => {
+                    if (error) {
+                      discardCommandIdempotencyKey(bookingId, mode);
+                      setError("");
+                    }
+                    setReason(event.target.value);
+                  }}
                   placeholder={
                     mode === "no_show" ? "例如：多次联系未到店" : "例如：路上拥堵，已确认到店"
                   }
@@ -194,11 +217,6 @@ export function StaffLatePage(): React.JSX.Element {
                 </section>
               ) : null}
 
-              {error ? (
-                <p className="staff-form-error" role="alert">
-                  {error}
-                </p>
-              ) : null}
               <button
                 className={mode === "no_show" ? "staff-danger-button" : "staff-primary-link"}
                 type="submit"

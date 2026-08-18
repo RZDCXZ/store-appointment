@@ -27,10 +27,12 @@ interface FulfilmentBookingRow {
   verification_code_digest: string;
 }
 
+type FulfilmentCommandType = "check_in" | "late_check_in" | "no_show";
+
 interface FulfilmentIdempotencyRow {
-  booking_id: string;
   request_digest: string;
-  response_body: BookingFulfilmentResponse;
+  response_status: number;
+  response_body: BookingFulfilmentResponse | Record<string, unknown>;
 }
 
 const idempotencyPattern = /^[A-Za-z0-9][A-Za-z0-9._:-]{7,127}$/;
@@ -136,138 +138,64 @@ export class BookingFulfilmentService {
     body: unknown,
   ): Promise<BookingFulfilmentResponse> {
     const input = parseCheckInInput(body);
-    const client = await this.database.pool.connect();
-    const requestDigest = createHash("sha256")
-      .update(JSON.stringify({ bookingId, ...input }))
-      .digest("hex");
-    const lockKey = `${identity.id}:check_in:${input.idempotencyKey}`;
-    let lockHeld = false;
-
-    try {
-      await client.query("SELECT pg_advisory_lock(hashtextextended($1, 0))", [lockKey]);
-      lockHeld = true;
-      await client.query("BEGIN");
-      const idempotency = await client.query<FulfilmentIdempotencyRow>(
-        `
-          SELECT booking_id, request_digest, response_body
-          FROM booking_fulfilment_idempotency_keys
-          WHERE actor_id = $1
-            AND command_type = 'check_in'
-            AND idempotency_key = $2
-        `,
-        [identity.id, input.idempotencyKey],
-      );
-      const previous = idempotency.rows[0];
-      if (previous) {
-        if (previous.request_digest !== requestDigest || previous.booking_id !== bookingId) {
+    return this.executeIdempotentCommand(
+      identity,
+      bookingId,
+      "check_in",
+      input,
+      "这个幂等键已经用于另一条核销命令，请重新提交。",
+      async (client) => {
+        const row = await this.bookingForUpdate(client, bookingId);
+        if (identity.role !== "staff" || row.staff_id !== identity.id) {
           businessError(
-            "IDEMPOTENCY_KEY_REUSED",
-            "这个幂等键已经用于另一条核销命令，请重新提交。",
+            "FORBIDDEN",
+            "只有这笔预约的分配员工可以使用核销码。",
+            HttpStatus.FORBIDDEN,
+          );
+        }
+        if (row.status === "checked_in") return this.firstCheckInResult(client, row.id);
+        if (row.status !== "confirmed") {
+          businessError(
+            "BOOKING_CHECK_IN_NOT_ALLOWED",
+            "当前预约状态不允许到店核销。",
             HttpStatus.CONFLICT,
           );
         }
-        await client.query("COMMIT");
-        return previous.response_body;
-      }
 
-      const row = await this.bookingForUpdate(client, bookingId);
-      if (identity.role === "staff" && row.staff_id !== identity.id) {
-        businessError("FORBIDDEN", "当前员工不能处理未分配给自己的预约。", HttpStatus.FORBIDDEN);
-      }
-      if (row.status === "checked_in") {
-        const firstResult = await this.firstCheckInResult(client, row.id);
-        await this.storeIdempotencyResult(
-          client,
-          identity.id,
-          "check_in",
-          input.idempotencyKey,
-          bookingId,
-          requestDigest,
-          firstResult,
-        );
-        await client.query("COMMIT");
-        return firstResult;
-      }
-      if (row.status !== "confirmed") {
-        businessError(
-          "BOOKING_CHECK_IN_NOT_ALLOWED",
-          "当前预约状态不允许到店核销。",
-          HttpStatus.CONFLICT,
-        );
-      }
-
-      const occurredAt = getDemoNow();
-      const now = Date.parse(occurredAt);
-      const opensAt = row.starts_at.getTime() - 30 * 60_000;
-      const closesAt = row.starts_at.getTime() + 15 * 60_000;
-      if (now < opensAt) {
-        businessError(
-          "CHECK_IN_TOO_EARLY",
-          "核销窗口尚未开始，不能提前核销。",
-          HttpStatus.CONFLICT,
-          {
-            opensAt: new Date(opensAt).toISOString(),
-          },
-        );
-      }
-      if (now > closesAt) {
-        businessError(
-          "CHECK_IN_WINDOW_CLOSED",
-          "正常核销窗口已结束，请改为处理迟到。",
-          HttpStatus.CONFLICT,
-          { closesAt: new Date(closesAt).toISOString() },
-        );
-      }
-      if (!matchesVerificationCode(row, input.verificationCode)) {
-        businessError(
-          "INVALID_VERIFICATION_CODE",
-          "核销码不正确，请与顾客确认六位数字。",
-          HttpStatus.BAD_REQUEST,
-        );
-      }
-
-      await client.query("UPDATE bookings SET status = 'checked_in' WHERE id = $1", [row.id]);
-      const response = fulfilmentResponse(row, identity, occurredAt, null);
-      await client.query(
-        `
-          INSERT INTO booking_events (
-            id, booking_id, event_type, actor_type, actor_id, payload, occurred_at
-          )
-          VALUES ($1, $2, 'booking_checked_in', $3, $4, $5::jsonb, $6)
-        `,
-        [randomUUID(), row.id, identity.role, identity.id, JSON.stringify(response), occurredAt],
-      );
-      await this.storeIdempotencyResult(
-        client,
-        identity.id,
-        "check_in",
-        input.idempotencyKey,
-        bookingId,
-        requestDigest,
-        response,
-      );
-      await client.query("COMMIT");
-      return response;
-    } catch (error) {
-      await client.query("ROLLBACK").catch(() => undefined);
-      throw error;
-    } finally {
-      let releaseError: Error | undefined;
-      if (lockHeld) {
-        try {
-          const unlocked = await client.query<{ unlocked: boolean }>(
-            "SELECT pg_advisory_unlock(hashtextextended($1, 0)) AS unlocked",
-            [lockKey],
+        const occurredAt = getDemoNow();
+        const now = Date.parse(occurredAt);
+        const opensAt = row.starts_at.getTime() - 30 * 60_000;
+        const closesAt = row.starts_at.getTime() + 15 * 60_000;
+        if (now < opensAt) {
+          businessError(
+            "CHECK_IN_TOO_EARLY",
+            "核销窗口尚未开始，不能提前核销。",
+            HttpStatus.CONFLICT,
+            { opensAt: new Date(opensAt).toISOString() },
           );
-          if (!unlocked.rows[0]?.unlocked) {
-            releaseError = new Error("核销幂等锁未能释放，连接不可复用。");
-          }
-        } catch (error) {
-          releaseError = error instanceof Error ? error : new Error("核销幂等锁释放失败。");
         }
-      }
-      client.release(releaseError);
-    }
+        if (now > closesAt) {
+          businessError(
+            "CHECK_IN_WINDOW_CLOSED",
+            "正常核销窗口已结束，请改为处理迟到。",
+            HttpStatus.CONFLICT,
+            { closesAt: new Date(closesAt).toISOString() },
+          );
+        }
+        if (!matchesVerificationCode(row, input.verificationCode)) {
+          businessError(
+            "INVALID_VERIFICATION_CODE",
+            "核销码不正确，请与顾客确认六位数字。",
+            HttpStatus.BAD_REQUEST,
+          );
+        }
+
+        await client.query("UPDATE bookings SET status = 'checked_in' WHERE id = $1", [row.id]);
+        const response = fulfilmentResponse(row, identity, occurredAt, null);
+        await this.appendFulfilmentEvent(client, row.id, "booking_checked_in", identity, response);
+        return response;
+      },
+    );
   }
 
   async lateCheckIn(
@@ -276,118 +204,46 @@ export class BookingFulfilmentService {
     body: unknown,
   ): Promise<BookingFulfilmentResponse> {
     const input = parseLateActionInput(body);
-    const client = await this.database.pool.connect();
-    const requestDigest = createHash("sha256")
-      .update(JSON.stringify({ bookingId, ...input }))
-      .digest("hex");
-    const lockKey = `${identity.id}:late_check_in:${input.idempotencyKey}`;
-    let lockHeld = false;
-
-    try {
-      await client.query("SELECT pg_advisory_lock(hashtextextended($1, 0))", [lockKey]);
-      lockHeld = true;
-      await client.query("BEGIN");
-      const idempotency = await client.query<FulfilmentIdempotencyRow>(
-        `
-          SELECT booking_id, request_digest, response_body
-          FROM booking_fulfilment_idempotency_keys
-          WHERE actor_id = $1
-            AND command_type = 'late_check_in'
-            AND idempotency_key = $2
-        `,
-        [identity.id, input.idempotencyKey],
-      );
-      const previous = idempotency.rows[0];
-      if (previous) {
-        if (previous.request_digest !== requestDigest || previous.booking_id !== bookingId) {
+    return this.executeIdempotentCommand(
+      identity,
+      bookingId,
+      "late_check_in",
+      input,
+      "这个幂等键已经用于另一条迟到核销命令，请重新提交。",
+      async (client) => {
+        const row = await this.bookingForUpdate(client, bookingId);
+        this.requireLateActionAccess(identity, row);
+        if (row.status === "checked_in") return this.firstCheckInResult(client, row.id);
+        if (row.status !== "confirmed") {
           businessError(
-            "IDEMPOTENCY_KEY_REUSED",
-            "这个幂等键已经用于另一条迟到核销命令，请重新提交。",
+            "BOOKING_CHECK_IN_NOT_ALLOWED",
+            "当前预约状态不允许手动迟到核销。",
             HttpStatus.CONFLICT,
           );
         }
-        await client.query("COMMIT");
-        return previous.response_body;
-      }
 
-      const row = await this.bookingForUpdate(client, bookingId);
-      if (identity.role === "staff" && row.staff_id !== identity.id) {
-        businessError("FORBIDDEN", "当前员工不能处理未分配给自己的预约。", HttpStatus.FORBIDDEN);
-      }
-      if (row.status === "checked_in") {
-        const firstResult = await this.firstCheckInResult(client, row.id);
-        await this.storeIdempotencyResult(
-          client,
-          identity.id,
-          "late_check_in",
-          input.idempotencyKey,
-          bookingId,
-          requestDigest,
-          firstResult,
-        );
-        await client.query("COMMIT");
-        return firstResult;
-      }
-      if (row.status !== "confirmed") {
-        businessError(
-          "BOOKING_CHECK_IN_NOT_ALLOWED",
-          "当前预约状态不允许手动迟到核销。",
-          HttpStatus.CONFLICT,
-        );
-      }
-
-      const occurredAt = getDemoNow();
-      if (Date.parse(occurredAt) <= row.starts_at.getTime() + 15 * 60_000) {
-        businessError(
-          "LATE_CHECK_IN_TOO_EARLY",
-          "尚未超过迟到宽限，当前只能在正常窗口使用六位码核销。",
-          HttpStatus.CONFLICT,
-          { lateAfter: new Date(row.starts_at.getTime() + 15 * 60_000).toISOString() },
-        );
-      }
-
-      await client.query("UPDATE bookings SET status = 'checked_in' WHERE id = $1", [row.id]);
-      const response = fulfilmentResponse(row, identity, occurredAt, input.reason);
-      await client.query(
-        `
-          INSERT INTO booking_events (
-            id, booking_id, event_type, actor_type, actor_id, payload, occurred_at
-          )
-          VALUES ($1, $2, 'booking_late_checked_in', $3, $4, $5::jsonb, $6)
-        `,
-        [randomUUID(), row.id, identity.role, identity.id, JSON.stringify(response), occurredAt],
-      );
-      await this.storeIdempotencyResult(
-        client,
-        identity.id,
-        "late_check_in",
-        input.idempotencyKey,
-        bookingId,
-        requestDigest,
-        response,
-      );
-      await client.query("COMMIT");
-      return response;
-    } catch (error) {
-      await client.query("ROLLBACK").catch(() => undefined);
-      throw error;
-    } finally {
-      let releaseError: Error | undefined;
-      if (lockHeld) {
-        try {
-          const unlocked = await client.query<{ unlocked: boolean }>(
-            "SELECT pg_advisory_unlock(hashtextextended($1, 0)) AS unlocked",
-            [lockKey],
+        const occurredAt = getDemoNow();
+        if (Date.parse(occurredAt) <= row.starts_at.getTime() + 15 * 60_000) {
+          businessError(
+            "LATE_CHECK_IN_TOO_EARLY",
+            "尚未超过迟到宽限，当前只能在正常窗口使用六位码核销。",
+            HttpStatus.CONFLICT,
+            { lateAfter: new Date(row.starts_at.getTime() + 15 * 60_000).toISOString() },
           );
-          if (!unlocked.rows[0]?.unlocked) {
-            releaseError = new Error("迟到核销幂等锁未能释放，连接不可复用。");
-          }
-        } catch (error) {
-          releaseError = error instanceof Error ? error : new Error("迟到核销幂等锁释放失败。");
         }
-      }
-      client.release(releaseError);
-    }
+
+        await client.query("UPDATE bookings SET status = 'checked_in' WHERE id = $1", [row.id]);
+        const response = fulfilmentResponse(row, identity, occurredAt, input.reason);
+        await this.appendFulfilmentEvent(
+          client,
+          row.id,
+          "booking_late_checked_in",
+          identity,
+          response,
+        );
+        return response;
+      },
+    );
   }
 
   async markNoShow(
@@ -396,102 +252,146 @@ export class BookingFulfilmentService {
     body: unknown,
   ): Promise<BookingFulfilmentResponse> {
     const input = parseLateActionInput(body);
+    return this.executeIdempotentCommand(
+      identity,
+      bookingId,
+      "no_show",
+      input,
+      "这个幂等键已经用于另一条爽约命令，请重新提交。",
+      async (client) => {
+        const row = await this.bookingForUpdate(client, bookingId);
+        this.requireLateActionAccess(identity, row);
+        if (row.status !== "confirmed") {
+          businessError(
+            "BOOKING_NO_SHOW_NOT_ALLOWED",
+            "当前预约状态不允许标记爽约。",
+            HttpStatus.CONFLICT,
+          );
+        }
+
+        const occurredAt = getDemoNow();
+        const now = Date.parse(occurredAt);
+        if (now <= row.starts_at.getTime() + 15 * 60_000) {
+          businessError(
+            "NO_SHOW_TOO_EARLY",
+            "尚未超过迟到宽限，不能提前标记爽约。",
+            HttpStatus.CONFLICT,
+            { noShowAfter: new Date(row.starts_at.getTime() + 15 * 60_000).toISOString() },
+          );
+        }
+        if (!row.occupancy_starts_at || !row.occupancy_ends_at) {
+          throw new Error("已确认预约缺少实际占用区间。");
+        }
+
+        const releasedAt = new Date(Math.min(now, row.occupancy_ends_at.getTime()));
+        const updated = { ...row, occupancy_ends_at: releasedAt };
+        await client.query(
+          `
+            UPDATE bookings
+            SET status = 'no_show', occupancy_ends_at = $2
+            WHERE id = $1
+          `,
+          [row.id, releasedAt.toISOString()],
+        );
+        const response = fulfilmentResponse(updated, identity, occurredAt, input.reason, "no_show");
+        await this.appendFulfilmentEvent(client, row.id, "booking_no_show", identity, response);
+        return response;
+      },
+    );
+  }
+
+  private async executeIdempotentCommand<Input extends { idempotencyKey: string }>(
+    identity: BackofficeIdentity,
+    bookingId: string,
+    commandType: FulfilmentCommandType,
+    input: Input,
+    reusedKeyMessage: string,
+    execute: (client: PoolClient) => Promise<BookingFulfilmentResponse>,
+  ): Promise<BookingFulfilmentResponse> {
     const client = await this.database.pool.connect();
     const requestDigest = createHash("sha256")
       .update(JSON.stringify({ bookingId, ...input }))
       .digest("hex");
-    const lockKey = `${identity.id}:no_show:${input.idempotencyKey}`;
+    const lockKey = `${identity.id}:${commandType}:${input.idempotencyKey}`;
     let lockHeld = false;
+    let transactionOpen = false;
+    let shouldPersistError = false;
 
     try {
       await client.query("SELECT pg_advisory_lock(hashtextextended($1, 0))", [lockKey]);
       lockHeld = true;
       await client.query("BEGIN");
+      transactionOpen = true;
       const idempotency = await client.query<FulfilmentIdempotencyRow>(
         `
-          SELECT booking_id, request_digest, response_body
+          SELECT request_digest, response_status, response_body
           FROM booking_fulfilment_idempotency_keys
           WHERE actor_id = $1
-            AND command_type = 'no_show'
-            AND idempotency_key = $2
+            AND command_type = $2
+            AND idempotency_key = $3
         `,
-        [identity.id, input.idempotencyKey],
+        [identity.id, commandType, input.idempotencyKey],
       );
       const previous = idempotency.rows[0];
       if (previous) {
-        if (previous.request_digest !== requestDigest || previous.booking_id !== bookingId) {
-          businessError(
-            "IDEMPOTENCY_KEY_REUSED",
-            "这个幂等键已经用于另一条爽约命令，请重新提交。",
-            HttpStatus.CONFLICT,
-          );
+        if (previous.request_digest !== requestDigest) {
+          businessError("IDEMPOTENCY_KEY_REUSED", reusedKeyMessage, HttpStatus.CONFLICT);
         }
         await client.query("COMMIT");
-        return previous.response_body;
+        transactionOpen = false;
+        if (previous.response_status < 200 || previous.response_status >= 300) {
+          throw new HttpException(previous.response_body, previous.response_status);
+        }
+        return previous.response_body as BookingFulfilmentResponse;
       }
 
-      const row = await this.bookingForUpdate(client, bookingId);
-      if (identity.role === "staff" && row.staff_id !== identity.id) {
-        businessError("FORBIDDEN", "当前员工不能处理未分配给自己的预约。", HttpStatus.FORBIDDEN);
-      }
-      if (row.status !== "confirmed") {
-        businessError(
-          "BOOKING_NO_SHOW_NOT_ALLOWED",
-          "当前预约状态不允许标记爽约。",
-          HttpStatus.CONFLICT,
-        );
-      }
-
-      const occurredAt = getDemoNow();
-      const now = Date.parse(occurredAt);
-      if (now <= row.starts_at.getTime() + 15 * 60_000) {
-        businessError(
-          "NO_SHOW_TOO_EARLY",
-          "尚未超过迟到宽限，不能提前标记爽约。",
-          HttpStatus.CONFLICT,
-          { noShowAfter: new Date(row.starts_at.getTime() + 15 * 60_000).toISOString() },
-        );
-      }
-      if (!row.occupancy_starts_at || !row.occupancy_ends_at) {
-        throw new Error("已确认预约缺少实际占用区间。");
-      }
-
-      const releasedAt = new Date(Math.min(now, row.occupancy_ends_at.getTime()));
-      const updated = {
-        ...row,
-        occupancy_ends_at: releasedAt,
-      };
-      await client.query(
-        `
-          UPDATE bookings
-          SET status = 'no_show', occupancy_ends_at = $2
-          WHERE id = $1
-        `,
-        [row.id, releasedAt.toISOString()],
-      );
-      const response = fulfilmentResponse(updated, identity, occurredAt, input.reason, "no_show");
-      await client.query(
-        `
-          INSERT INTO booking_events (
-            id, booking_id, event_type, actor_type, actor_id, payload, occurred_at
-          )
-          VALUES ($1, $2, 'booking_no_show', $3, $4, $5::jsonb, $6)
-        `,
-        [randomUUID(), row.id, identity.role, identity.id, JSON.stringify(response), occurredAt],
-      );
+      shouldPersistError = true;
+      const response = await execute(client);
       await this.storeIdempotencyResult(
         client,
         identity.id,
-        "no_show",
+        commandType,
         input.idempotencyKey,
         bookingId,
         requestDigest,
+        HttpStatus.CREATED,
         response,
+        response.occurredAt,
       );
       await client.query("COMMIT");
+      transactionOpen = false;
       return response;
     } catch (error) {
-      await client.query("ROLLBACK").catch(() => undefined);
+      if (transactionOpen) {
+        await client.query("ROLLBACK").catch(() => undefined);
+        transactionOpen = false;
+      }
+      if (shouldPersistError && error instanceof HttpException) {
+        const response = error.getResponse();
+        if (response && typeof response === "object") {
+          try {
+            await client.query("BEGIN");
+            transactionOpen = true;
+            await this.storeIdempotencyResult(
+              client,
+              identity.id,
+              commandType,
+              input.idempotencyKey,
+              bookingId,
+              requestDigest,
+              error.getStatus(),
+              response as Record<string, unknown>,
+              getDemoNow(),
+              true,
+            );
+            await client.query("COMMIT");
+            transactionOpen = false;
+          } catch (persistError) {
+            if (transactionOpen) await client.query("ROLLBACK").catch(() => undefined);
+            throw persistError;
+          }
+        }
+      }
       throw error;
     } finally {
       let releaseError: Error | undefined;
@@ -502,14 +402,46 @@ export class BookingFulfilmentService {
             [lockKey],
           );
           if (!unlocked.rows[0]?.unlocked) {
-            releaseError = new Error("爽约幂等锁未能释放，连接不可复用。");
+            releaseError = new Error("履约命令幂等锁未能释放，连接不可复用。");
           }
         } catch (error) {
-          releaseError = error instanceof Error ? error : new Error("爽约幂等锁释放失败。");
+          releaseError = error instanceof Error ? error : new Error("履约命令幂等锁释放失败。");
         }
       }
       client.release(releaseError);
     }
+  }
+
+  private requireLateActionAccess(identity: BackofficeIdentity, row: FulfilmentBookingRow): void {
+    if (identity.role === "staff" && row.staff_id !== identity.id) {
+      businessError("FORBIDDEN", "当前员工不能处理未分配给自己的预约。", HttpStatus.FORBIDDEN);
+    }
+  }
+
+  private async appendFulfilmentEvent(
+    client: PoolClient,
+    bookingId: string,
+    eventType: "booking_checked_in" | "booking_late_checked_in" | "booking_no_show",
+    identity: BackofficeIdentity,
+    response: BookingFulfilmentResponse,
+  ): Promise<void> {
+    await client.query(
+      `
+        INSERT INTO booking_events (
+          id, booking_id, event_type, actor_type, actor_id, payload, occurred_at
+        )
+        VALUES ($1, $2, $3, $4, $5, $6::jsonb, $7)
+      `,
+      [
+        randomUUID(),
+        bookingId,
+        eventType,
+        identity.role,
+        identity.id,
+        JSON.stringify(response),
+        response.occurredAt,
+      ],
+    );
   }
 
   private async firstCheckInResult(
@@ -535,19 +467,26 @@ export class BookingFulfilmentService {
   private async storeIdempotencyResult(
     client: PoolClient,
     actorId: string,
-    commandType: "check_in" | "late_check_in" | "no_show",
+    commandType: FulfilmentCommandType,
     idempotencyKey: string,
     bookingId: string,
     requestDigest: string,
-    response: BookingFulfilmentResponse,
+    responseStatus: number,
+    responseBody: BookingFulfilmentResponse | Record<string, unknown>,
+    createdAt: string,
+    ignoreConflict = false,
   ): Promise<void> {
     await client.query(
       `
         INSERT INTO booking_fulfilment_idempotency_keys (
           actor_id, command_type, idempotency_key, booking_id,
-          request_digest, response_body, created_at
+          request_digest, response_status, response_body, created_at
         )
-        VALUES ($1, $2, $3, $4, $5, $6::jsonb, $7)
+        VALUES (
+          $1, $2, $3, (SELECT id FROM bookings WHERE id = $4),
+          $5, $6, $7::jsonb, $8
+        )
+        ${ignoreConflict ? "ON CONFLICT (actor_id, command_type, idempotency_key) DO NOTHING" : ""}
       `,
       [
         actorId,
@@ -555,8 +494,9 @@ export class BookingFulfilmentService {
         idempotencyKey,
         bookingId,
         requestDigest,
-        JSON.stringify(response),
-        response.occurredAt,
+        responseStatus,
+        JSON.stringify(responseBody),
+        createdAt,
       ],
     );
   }
@@ -579,9 +519,7 @@ export class BookingFulfilmentService {
       [bookingId],
     );
     const row = result.rows[0];
-    if (!row) {
-      businessError("BOOKING_NOT_FOUND", "找不到这笔预约。", HttpStatus.NOT_FOUND);
-    }
+    if (!row) businessError("BOOKING_NOT_FOUND", "找不到这笔预约。", HttpStatus.NOT_FOUND);
     return row;
   }
 }

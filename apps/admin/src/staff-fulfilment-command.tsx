@@ -21,6 +21,27 @@ export function commandIdempotencyKey(bookingId: string, command: StaffFulfilmen
   return generated;
 }
 
+export function discardCommandIdempotencyKey(
+  bookingId: string,
+  command: StaffFulfilmentCommand,
+): void {
+  sessionStorage.removeItem(`staff-fulfilment:${bookingId}:${command}`);
+}
+
+export function isFulfilmentFactConflict(status: number, code: string): boolean {
+  return (
+    status === 409 &&
+    [
+      "BOOKING_CHECK_IN_NOT_ALLOWED",
+      "BOOKING_NO_SHOW_NOT_ALLOWED",
+      "CHECK_IN_TOO_EARLY",
+      "CHECK_IN_WINDOW_CLOSED",
+      "LATE_CHECK_IN_TOO_EARLY",
+      "NO_SHOW_TOO_EARLY",
+    ].includes(code)
+  );
+}
+
 export function recoveredFulfilment(
   detail: StaffBookingDetailResponse,
 ): StaffFulfilmentResultData | null {

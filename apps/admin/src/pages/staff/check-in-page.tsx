@@ -9,6 +9,8 @@ import { StaffPageError, StaffPageLoading } from "../../staff-booking-components
 import { formatShanghaiDateTime, serviceLabel } from "../../staff-booking-presentation";
 import {
   commandIdempotencyKey,
+  discardCommandIdempotencyKey,
+  isFulfilmentFactConflict,
   recoveredFulfilment,
   StaffFulfilmentResult,
 } from "../../staff-fulfilment-command";
@@ -47,6 +49,12 @@ export function StaffCheckInPage(): React.JSX.Element {
         const apiError = await readApiError(response);
         if (apiError.status === 401) {
           markExpired();
+          return;
+        }
+        if (isFulfilmentFactConflict(apiError.status, apiError.code)) {
+          discardCommandIdempotencyKey(bookingId, "check_in");
+          resource.refresh();
+          setError(`${apiError.message} 已重新读取预约当前状态。`);
           return;
         }
         throw apiError;
@@ -111,6 +119,11 @@ export function StaffCheckInPage(): React.JSX.Element {
           </section>
 
           {result ? <StaffFulfilmentResult result={result} /> : null}
+          {error ? (
+            <p className="staff-form-error" role="alert">
+              {error}
+            </p>
+          ) : null}
           {!result && booking?.action === "late" ? (
             <section className="staff-state staff-state--empty">
               <h2>正常核销窗口已结束</h2>
@@ -148,15 +161,14 @@ export function StaffCheckInPage(): React.JSX.Element {
                   pattern="[0-9]{6}"
                   placeholder="000000"
                   value={verificationCode}
-                  onChange={(event) =>
-                    setVerificationCode(event.target.value.replace(/\D/g, "").slice(0, 6))
-                  }
+                  onChange={(event) => {
+                    if (error) {
+                      discardCommandIdempotencyKey(bookingId, "check_in");
+                      setError("");
+                    }
+                    setVerificationCode(event.target.value.replace(/\D/g, "").slice(0, 6));
+                  }}
                 />
-                {error ? (
-                  <p className="staff-form-error" role="alert">
-                    {error}
-                  </p>
-                ) : null}
                 <button
                   className="staff-primary-link"
                   type="submit"

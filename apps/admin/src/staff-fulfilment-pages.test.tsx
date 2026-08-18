@@ -252,4 +252,85 @@ describe("ST-04 / ST-05 员工履约命令页", () => {
     expect(screen.queryByLabelText("六位核销码")).not.toBeInTheDocument();
     expect(fetchMock).toHaveBeenCalledTimes(2);
   });
+
+  it("提交遇到状态冲突后刷新预约事实并引导到当前可用动作", async () => {
+    let detailReads = 0;
+    const fetchMock = vi.spyOn(globalThis, "fetch").mockImplementation(async (input) => {
+      const url = String(input);
+      if (url.endsWith("/auth/session")) return jsonResponse({ account: staffAccount });
+      if (url.endsWith(`/backoffice/staff/bookings/${bookingDetail.booking.id}`)) {
+        detailReads += 1;
+        return jsonResponse(
+          detailReads === 1
+            ? bookingDetail
+            : {
+                ...bookingDetail,
+                booking: { ...bookingDetail.booking, action: "late" },
+              },
+        );
+      }
+      if (url.endsWith(`/backoffice/bookings/${bookingDetail.booking.id}/check-in`)) {
+        return jsonResponse(
+          { code: "CHECK_IN_WINDOW_CLOSED", message: "正常核销窗口已结束，请改为处理迟到。" },
+          409,
+        );
+      }
+      throw new Error(`未处理的测试请求：${url}`);
+    });
+    const router = createMemoryRouter(routes, {
+      initialEntries: [`/staff/appointments/${bookingDetail.booking.id}/check-in`],
+    });
+
+    render(<RouterProvider router={router} />);
+
+    fireEvent.change(await screen.findByLabelText("六位核销码"), {
+      target: { value: "314159" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "确认到店核销" }));
+
+    expect(await screen.findByRole("alert")).toHaveTextContent("已重新读取预约当前状态");
+    expect(await screen.findByRole("link", { name: "前往迟到处理" })).toBeVisible();
+    expect(fetchMock).toHaveBeenCalledTimes(4);
+  });
+
+  it("服务端拒绝请求后更换幂等键，允许员工修正核销码重新提交", async () => {
+    const submittedKeys: string[] = [];
+    vi.spyOn(globalThis, "fetch").mockImplementation(async (input, init) => {
+      const url = String(input);
+      if (url.endsWith("/auth/session")) return jsonResponse({ account: staffAccount });
+      if (url.endsWith(`/backoffice/staff/bookings/${bookingDetail.booking.id}`)) {
+        return jsonResponse(bookingDetail);
+      }
+      if (url.endsWith(`/backoffice/bookings/${bookingDetail.booking.id}/check-in`)) {
+        const payload = JSON.parse(String(init?.body)) as {
+          idempotencyKey: string;
+          verificationCode: string;
+        };
+        submittedKeys.push(payload.idempotencyKey);
+        return payload.verificationCode === "314159"
+          ? jsonResponse(fulfilmentResponse("checked_in", null), 201)
+          : jsonResponse(
+              { code: "INVALID_VERIFICATION_CODE", message: "核销码不正确，请重新输入。" },
+              400,
+            );
+      }
+      throw new Error(`未处理的测试请求：${url}`);
+    });
+    const router = createMemoryRouter(routes, {
+      initialEntries: [`/staff/appointments/${bookingDetail.booking.id}/check-in`],
+    });
+
+    render(<RouterProvider router={router} />);
+
+    const input = await screen.findByLabelText("六位核销码");
+    fireEvent.change(input, { target: { value: "111111" } });
+    fireEvent.click(screen.getByRole("button", { name: "确认到店核销" }));
+    expect(await screen.findByRole("alert")).toHaveTextContent("核销码不正确");
+
+    fireEvent.change(input, { target: { value: "314159" } });
+    fireEvent.click(screen.getByRole("button", { name: "确认到店核销" }));
+    expect(await screen.findByText("已完成到店核销")).toBeVisible();
+    expect(submittedKeys).toHaveLength(2);
+    expect(submittedKeys[1]).not.toBe(submittedKeys[0]);
+  });
 });
