@@ -120,6 +120,7 @@ export interface ManagerWorkbenchResponse {
 
 export interface ManagerBookingDetailResponse {
   booking: ManagerBookingFact;
+  bookingRevision: number;
   managerActions: ManagerBookingActions;
   petProfile: {
     weightKg: number;
@@ -156,6 +157,7 @@ export interface ManagerBookingActions {
 
 export interface ManagerRescheduleBookingOptionsResponse {
   booking: ConfirmedBooking;
+  bookingRevision: number;
   managerActions: ManagerBookingActions;
   availability: BookingAvailabilityResponse | null;
 }
@@ -165,6 +167,7 @@ export interface ManagerRescheduleBookingInput {
   reason: string;
   expectedStaffId: string;
   expectedStartsAt: string;
+  expectedBookingRevision: number;
   staffId: string;
   startsAt: string;
 }
@@ -174,6 +177,7 @@ export interface ManagerCancelBookingInput {
   reason: string;
   expectedStaffId: string;
   expectedStartsAt: string;
+  expectedBookingRevision: number;
 }
 
 export interface ManagerBookingChange {
@@ -192,6 +196,7 @@ export interface ManagerBookingChange {
 
 export interface ManagerBookingChangeResponse {
   booking: ConfirmedBooking;
+  bookingRevision: number;
   managerActions: ManagerBookingActions;
   verificationCodeStatus: "rotated" | "invalidated";
   change: ManagerBookingChange;

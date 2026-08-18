@@ -63,7 +63,8 @@ export function ManagerRescheduleBookingPage(): React.JSX.Element {
   }
 
   async function submit(): Promise<void> {
-    if (!booking || !selected || !validReason) return;
+    const options = resource.data;
+    if (!options || !booking || !selected || !validReason) return;
     setError("");
     setSubmitting(true);
     try {
@@ -77,6 +78,7 @@ export function ManagerRescheduleBookingPage(): React.JSX.Element {
             reason: reason.trim(),
             expectedStaffId: booking.staff.id,
             expectedStartsAt: booking.startsAt,
+            expectedBookingRevision: options.bookingRevision,
             staffId: selected.staff.id,
             startsAt: selected.startsAt,
           }),

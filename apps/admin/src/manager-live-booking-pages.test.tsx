@@ -299,6 +299,7 @@ describe("店长即时预约页面", () => {
       if (url.endsWith("/backoffice/manager/bookings/booking-live")) {
         return jsonResponse({
           booking,
+          bookingRevision: 1,
           managerActions: {
             canReschedule: true,
             canCancel: true,

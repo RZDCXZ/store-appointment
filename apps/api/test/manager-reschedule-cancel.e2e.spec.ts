@@ -144,6 +144,7 @@ describe("店长改期与店长取消", () => {
     expect(response.statusCode).toBe(200);
     expect(response.headers["cache-control"]).toBe("no-store");
     expect(response.json()).toMatchObject({
+      bookingRevision: expect.any(Number),
       booking: {
         id: "booking-bohe-future",
         pet: { id: "pet-bohe", name: "薄荷" },
@@ -204,6 +205,8 @@ describe("店长改期与店长取消", () => {
         reason: "已经与顾客电话确认新的到店时间",
         expectedStaffId: created.booking.staff.id,
         expectedStartsAt: created.booking.startsAt,
+        expectedBookingRevision:
+          optionsResponse.json<ManagerRescheduleBookingOptionsResponse>().bookingRevision,
         staffId: target?.staff.id,
         startsAt: target?.startsAt,
       },
@@ -314,6 +317,7 @@ describe("店长改期与店长取消", () => {
         reason: "顾客希望改到这个已经被占用的时间",
         expectedStaffId: original.booking.staff.id,
         expectedStartsAt: original.booking.startsAt,
+        expectedBookingRevision: 1,
         staffId: blocker.booking.staff.id,
         startsAt: blocker.booking.startsAt,
       },
@@ -366,7 +370,7 @@ describe("店长改期与店长取消", () => {
     expect(sideEffects.rows[0]).toEqual({ event_count: 0, notification_count: 0 });
   });
 
-  it("不同幂等键仍不能用旧页面事实覆盖先成立的同状态改期", async () => {
+  it("不同幂等键仍不能用经历 A→B→A 的旧页面事实覆盖先成立的改期", async () => {
     const created = await createCustomerBooking(
       "pet-manager-change-stale",
       "manager-change-create-stale",
@@ -388,9 +392,16 @@ describe("店长改期与店长取消", () => {
     );
     expect(firstTarget).toBeDefined();
     expect(staleTarget).toBeDefined();
+    const initialRevisionResult = await database.pool.query<{ verification_code_version: number }>(
+      "SELECT verification_code_version FROM bookings WHERE id = $1",
+      [created.booking.id],
+    );
+    const initialRevision = initialRevisionResult.rows[0]?.verification_code_version;
+    expect(initialRevision).toBeDefined();
     const expectedCurrent = {
       expectedStaffId: created.booking.staff.id,
       expectedStartsAt: created.booking.startsAt,
+      expectedBookingRevision: initialRevision,
     };
 
     const first = await app.inject({
@@ -403,6 +414,27 @@ describe("店长改期与店长取消", () => {
         staffId: firstTarget?.staff.id,
         startsAt: firstTarget?.startsAt,
         ...expectedCurrent,
+      },
+    });
+    expect(first.statusCode).toBe(201);
+    const firstRevisionResult = await database.pool.query<{ verification_code_version: number }>(
+      "SELECT verification_code_version FROM bookings WHERE id = $1",
+      [created.booking.id],
+    );
+    const firstRevision = firstRevisionResult.rows[0]?.verification_code_version;
+    expect(firstRevision).toBeGreaterThan(initialRevision ?? 0);
+    const restored = await app.inject({
+      method: "POST",
+      url: `/backoffice/manager/bookings/${created.booking.id}/reschedule`,
+      headers: { cookie: managerCookie, origin: adminOrigin },
+      payload: {
+        idempotencyKey: "manager-reschedule-stale-restore",
+        reason: "第二个店长把安排改回原员工和原时间",
+        expectedStaffId: firstTarget?.staff.id,
+        expectedStartsAt: firstTarget?.startsAt,
+        expectedBookingRevision: firstRevision,
+        staffId: created.booking.staff.id,
+        startsAt: created.booking.startsAt,
       },
     });
     const staleReschedule = await app.inject({
@@ -428,15 +460,15 @@ describe("店长改期与店长取消", () => {
       },
     });
 
-    expect(first.statusCode).toBe(201);
+    expect(restored.statusCode).toBe(201);
     for (const response of [staleReschedule, staleCancellation]) {
       expect(response.statusCode).toBe(409);
       expect(response.json()).toMatchObject({
         code: "BOOKING_FACT_CHANGED",
         booking: {
           id: created.booking.id,
-          staff: { id: firstTarget?.staff.id },
-          startsAt: firstTarget?.startsAt,
+          staff: created.booking.staff,
+          startsAt: created.booking.startsAt,
         },
         managerActions: { canReschedule: true, canCancel: true },
       });
@@ -473,11 +505,11 @@ describe("店长改期与店长取消", () => {
     );
     expect(sideEffects.rows[0]).toMatchObject({
       status: "confirmed",
-      staff_id: firstTarget?.staff.id,
-      starts_at: new Date(firstTarget?.startsAt ?? 0),
-      reschedule_count: 1,
+      staff_id: created.booking.staff.id,
+      starts_at: new Date(created.booking.startsAt),
+      reschedule_count: 2,
       cancel_count: 0,
-      reschedule_notification_count: 1,
+      reschedule_notification_count: 2,
       cancel_notification_count: 0,
     });
   });
@@ -496,6 +528,7 @@ describe("店长改期与店长取消", () => {
         reason: "门店临时无法按线下约定提供服务",
         expectedStaffId: created.booking.staff.id,
         expectedStartsAt: created.booking.startsAt,
+        expectedBookingRevision: 1,
       },
     };
 
@@ -588,6 +621,7 @@ describe("店长改期与店长取消", () => {
         reason: "不能覆盖已经成立的到店事实",
         expectedStaffId: created.booking.staff.id,
         expectedStartsAt: created.booking.startsAt,
+        expectedBookingRevision: 1,
       },
     });
     const reschedule = await app.inject({
@@ -599,6 +633,7 @@ describe("店长改期与店长取消", () => {
         reason: "不能覆盖已经成立的到店事实",
         expectedStaffId: created.booking.staff.id,
         expectedStartsAt: created.booking.startsAt,
+        expectedBookingRevision: 1,
         staffId: created.booking.staff.id,
         startsAt: "2026-08-14T05:00:00.000Z",
       },
@@ -639,6 +674,7 @@ describe("店长改期与店长取消", () => {
         reason: " ",
         expectedStaffId: "chenjia",
         expectedStartsAt: "2026-08-14T03:00:00.000Z",
+        expectedBookingRevision: 1,
         staffId: "zhouning",
         startsAt: "2026-08-14T05:00:00.000Z",
       },
@@ -652,6 +688,7 @@ describe("店长改期与店长取消", () => {
         reason: " ",
         expectedStaffId: "chenjia",
         expectedStartsAt: "2026-08-14T03:00:00.000Z",
+        expectedBookingRevision: 1,
       },
     });
 

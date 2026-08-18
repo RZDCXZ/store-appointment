@@ -541,6 +541,7 @@ function parseManagerCancelInput(body: unknown): ManagerCancelBookingInput {
 function parseManagerExpectedFact(input: Record<string, unknown>): {
   expectedStaffId: string;
   expectedStartsAt: string;
+  expectedBookingRevision: number;
 } {
   const fieldErrors: Record<string, string> = {};
   if (typeof input.expectedStaffId !== "string" || !idPattern.test(input.expectedStaffId)) {
@@ -552,10 +553,18 @@ function parseManagerExpectedFact(input: Record<string, unknown>): {
   ) {
     fieldErrors.expectedStartsAt = "请提供页面读取时的当前开始时间。";
   }
+  if (
+    typeof input.expectedBookingRevision !== "number" ||
+    !Number.isInteger(input.expectedBookingRevision) ||
+    input.expectedBookingRevision <= 0
+  ) {
+    fieldErrors.expectedBookingRevision = "请提供页面读取时的预约修订版本。";
+  }
   if (Object.keys(fieldErrors).length > 0) validationError(fieldErrors);
   return {
     expectedStaffId: input.expectedStaffId as string,
     expectedStartsAt: new Date(input.expectedStartsAt as string).toISOString(),
+    expectedBookingRevision: input.expectedBookingRevision as number,
   };
 }
 
@@ -1372,6 +1381,7 @@ export class BookingService {
       };
       const response: ManagerBookingChangeResponse = {
         booking: asBooking(applied.booking),
+        bookingRevision: applied.booking.verification_code_version,
         managerActions: managerBookingActions(applied.booking.status),
         verificationCodeStatus: "invalidated",
         change,
@@ -1488,6 +1498,7 @@ export class BookingService {
     if (!actions.canReschedule) {
       return {
         booking: asBooking(row),
+        bookingRevision: row.verification_code_version,
         managerActions: actions,
         availability: null,
       };
@@ -1503,6 +1514,7 @@ export class BookingService {
     });
     return {
       booking: asBooking(row),
+      bookingRevision: row.verification_code_version,
       managerActions: actions,
       availability: {
         ...availability,
@@ -1590,6 +1602,7 @@ export class BookingService {
       };
       const response: ManagerBookingChangeResponse = {
         booking: asBooking(applied.booking),
+        bookingRevision: applied.booking.verification_code_version,
         managerActions: managerBookingActions(applied.booking.status),
         verificationCodeStatus: "rotated",
         change,
@@ -2601,16 +2614,25 @@ export class BookingService {
         "BOOKING_CHANGE_NOT_ALLOWED",
         managerBookingActions(row.status).message,
         HttpStatus.CONFLICT,
-        { managerActions: managerBookingActions(row.status), booking: asBooking(row) },
+        {
+          managerActions: managerBookingActions(row.status),
+          booking: asBooking(row),
+          bookingRevision: row.verification_code_version,
+        },
       );
     }
   }
 
   private requireManagerExpectedFact(
     row: BookingRow,
-    expected: { expectedStaffId: string; expectedStartsAt: string },
+    expected: {
+      expectedStaffId: string;
+      expectedStartsAt: string;
+      expectedBookingRevision: number;
+    },
   ): void {
     if (
+      row.verification_code_version !== expected.expectedBookingRevision ||
       row.staff_id !== expected.expectedStaffId ||
       row.starts_at.toISOString() !== expected.expectedStartsAt
     ) {
@@ -2621,6 +2643,7 @@ export class BookingService {
         {
           managerActions: managerBookingActions(row.status),
           booking: asBooking(row),
+          bookingRevision: row.verification_code_version,
         },
       );
     }

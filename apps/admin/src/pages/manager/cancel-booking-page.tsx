@@ -57,6 +57,7 @@ export function ManagerCancelBookingPage(): React.JSX.Element {
             reason: reason.trim(),
             expectedStaffId: booking.staff.id,
             expectedStartsAt: booking.startsAt,
+            expectedBookingRevision: detail.bookingRevision,
           }),
         },
       );

@@ -129,6 +129,7 @@ function detailResponse(status: "confirmed" | "checked_in" | "cancelled" = "conf
         };
   return {
     booking: { ...managerBooking, status },
+    bookingRevision: 1,
     managerActions: actions,
     petProfile: {
       weightKg: 4.8,
@@ -156,7 +157,12 @@ describe("店长改期与店长取消页面", () => {
       const url = String(input);
       if (url.endsWith("/auth/session")) return jsonResponse({ account: managerAccount });
       if (url.endsWith(`/backoffice/manager/bookings/${customerBooking.id}/reschedule-options`)) {
-        return jsonResponse({ booking: customerBooking, managerActions, availability });
+        return jsonResponse({
+          booking: customerBooking,
+          bookingRevision: 1,
+          managerActions,
+          availability,
+        });
       }
       if (
         url.endsWith(`/backoffice/manager/bookings/${customerBooking.id}/reschedule`) &&
@@ -172,6 +178,7 @@ describe("店长改期与店长取消页面", () => {
               endsAt: "2026-08-14T06:30:00.000Z",
               turnoverEndsAt: "2026-08-14T06:45:00.000Z",
             },
+            bookingRevision: 2,
             managerActions,
             verificationCodeStatus: "rotated",
             change: {
@@ -226,6 +233,7 @@ describe("店长改期与店长取消页面", () => {
       reason: "顾客电话确认稍晚到店",
       expectedStaffId: "chenjia",
       expectedStartsAt: customerBooking.startsAt,
+      expectedBookingRevision: 1,
       staffId: "zhouning",
       startsAt: "2026-08-14T05:00:00.000Z",
     });
@@ -239,7 +247,12 @@ describe("店长改期与店长取消页面", () => {
       const url = String(input);
       if (url.endsWith("/auth/session")) return jsonResponse({ account: managerAccount });
       if (url.endsWith(`/backoffice/manager/bookings/${customerBooking.id}/reschedule-options`)) {
-        return jsonResponse({ booking: customerBooking, managerActions, availability });
+        return jsonResponse({
+          booking: customerBooking,
+          bookingRevision: 1,
+          managerActions,
+          availability,
+        });
       }
       if (
         url.endsWith(`/backoffice/manager/bookings/${customerBooking.id}/reschedule`) &&
@@ -294,7 +307,12 @@ describe("店长改期与店长取消页面", () => {
       const url = String(input);
       if (url.endsWith("/auth/session")) return jsonResponse({ account: managerAccount });
       if (url.endsWith(`/backoffice/manager/bookings/${customerBooking.id}/reschedule-options`)) {
-        return jsonResponse({ booking: customerBooking, managerActions, availability });
+        return jsonResponse({
+          booking: customerBooking,
+          bookingRevision: 1,
+          managerActions,
+          availability,
+        });
       }
       if (
         url.endsWith(`/backoffice/manager/bookings/${customerBooking.id}/reschedule`) &&
@@ -384,6 +402,7 @@ describe("店长改期与店长取消页面", () => {
       reason: "门店临时无法提供服务",
       expectedStaffId: "chenjia",
       expectedStartsAt: customerBooking.startsAt,
+      expectedBookingRevision: 1,
     });
   });
 

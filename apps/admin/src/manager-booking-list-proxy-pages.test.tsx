@@ -147,6 +147,7 @@ describe("店长预约列表与代客预约页面", () => {
       if (url.endsWith("/backoffice/manager/bookings/booking-bohe-future")) {
         return jsonResponse({
           booking,
+          bookingRevision: 1,
           managerActions: {
             canReschedule: true,
             canCancel: true,

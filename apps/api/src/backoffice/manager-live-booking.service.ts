@@ -49,6 +49,7 @@ interface BookingRow {
   total_price_cents: number;
   service_duration_minutes: number;
   turnover_minutes: number;
+  verification_code_version: number;
 }
 
 interface CapacityBlockRow {
@@ -167,7 +168,8 @@ const bookingSelect = `
   booking.occupancy_ends_at,
   booking.total_price_cents,
   booking.service_duration_minutes,
-  booking.turnover_minutes
+  booking.turnover_minutes,
+  booking.verification_code_version
 `;
 
 function phoneMasked(phone: string): string {
@@ -780,6 +782,7 @@ export class ManagerLiveBookingService {
 
     return {
       booking: bookingRead(row).fact,
+      bookingRevision: row.verification_code_version,
       managerActions: managerBookingActions(row.status),
       petProfile: {
         weightKg,
