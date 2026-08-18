@@ -7,12 +7,18 @@ import { DatabaseModule } from "../database/database.module.js";
 import { LiveRefreshModule } from "../live-refresh/live-refresh.module.js";
 import { ScheduleModule } from "../schedule/schedule.module.js";
 import { BackofficeController } from "./backoffice.controller.js";
+import { BookingFulfilmentService } from "./booking-fulfilment.service.js";
 import { ManagerLiveBookingService } from "./manager-live-booking.service.js";
 import { StaffFulfilmentService } from "./staff-fulfilment.service.js";
 
 @Module({
   imports: [AuditModule, AuthModule, DatabaseModule, LiveRefreshModule, ScheduleModule],
   controllers: [BackofficeController],
-  providers: [ManagerGuard, ManagerLiveBookingService, StaffFulfilmentService],
+  providers: [
+    ManagerGuard,
+    ManagerLiveBookingService,
+    StaffFulfilmentService,
+    BookingFulfilmentService,
+  ],
 })
 export class BackofficeModule {}

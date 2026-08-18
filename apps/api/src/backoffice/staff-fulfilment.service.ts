@@ -57,6 +57,11 @@ interface BookingEventRow {
   id: string;
   event_type: string;
   actor_type: "customer" | "staff" | "manager" | "system";
+  actor_id: string | null;
+  payload: {
+    actor?: { displayName?: string };
+    reason?: string | null;
+  };
   occurred_at: Date;
 }
 
@@ -324,7 +329,7 @@ export class StaffFulfilmentService {
     const [eventResult, historyResult] = await Promise.all([
       this.database.pool.query<BookingEventRow>(
         `
-          SELECT id, event_type, actor_type, occurred_at
+          SELECT id, event_type, actor_type, actor_id, payload, occurred_at
           FROM booking_events
           WHERE booking_id = $1
           ORDER BY occurred_at, id
@@ -368,6 +373,9 @@ export class StaffFulfilmentService {
         id: event.id,
         type: event.event_type,
         actorType: event.actor_type,
+        actorId: event.actor_id,
+        actorDisplayName: event.payload.actor?.displayName ?? null,
+        reason: event.payload.reason ?? null,
         occurredAt: event.occurred_at.toISOString(),
       })),
       petServiceHistory: historyResult.rows.map((history) => ({

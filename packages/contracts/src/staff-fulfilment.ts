@@ -73,6 +73,9 @@ export interface StaffBookingDetailResponse {
     id: string;
     type: string;
     actorType: "customer" | "staff" | "manager" | "system";
+    actorId: string | null;
+    actorDisplayName: string | null;
+    reason: string | null;
     occurredAt: string;
   }>;
   petServiceHistory: Array<{
@@ -88,4 +91,37 @@ export interface StaffPhoneRevealResponse {
   bookingId: string;
   phone: string;
   revealedAt: string;
+}
+
+export interface BookingCheckInInput {
+  idempotencyKey: string;
+  verificationCode: string;
+}
+
+export interface BookingLateActionInput {
+  idempotencyKey: string;
+  reason: string;
+}
+
+export interface BookingFulfilmentResponse {
+  bookingId: string;
+  status: "checked_in" | "no_show";
+  outcome: "checked_in" | "no_show";
+  occurredAt: string;
+  actor: {
+    type: "staff" | "manager";
+    id: string;
+    displayName: string;
+  };
+  reason: string | null;
+  actualOccupancy: {
+    startsAt: string;
+    endsAt: string;
+  } | null;
+  originalSchedule: {
+    startsAt: string;
+    endsAt: string;
+    occupancyStartsAt: string;
+    occupancyEndsAt: string;
+  };
 }

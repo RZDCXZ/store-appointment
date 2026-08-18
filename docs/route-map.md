@@ -7,6 +7,9 @@
 | ST-01     | 后台登录         | Web 后台   | `/login`                                       | `apps/admin/src/login-page.tsx`                            | 已完成 | Vite history fallback + 登录路由测试                      |
 | ST-02     | 员工今日工作     | Web 后台   | `/staff/today`                                 | `apps/admin/src/pages/staff/today-page.tsx`                | 骨架   | Vite history fallback + 角色路由测试                      |
 | —         | 员工本人预约     | Web 后台   | `/staff/appointments`                          | `apps/admin/src/pages/staff/appointments-page.tsx`         | 骨架   | 会话回跳测试 + Vite history fallback                      |
+| ST-03     | 员工预约详情     | Web 后台   | `/staff/appointments/:bookingId`               | `apps/admin/src/pages/staff/appointment-detail-page.tsx`   | 已完成 | 分配权限、独立路由测试 + Vite history fallback            |
+| ST-04     | 到店核销         | Web 后台   | `/staff/appointments/:bookingId/check-in`      | `apps/admin/src/pages/staff/check-in-page.tsx`             | 已完成 | 直达、提交、结果恢复测试 + Vite history fallback          |
+| ST-05     | 迟到与爽约处理   | Web 后台   | `/staff/appointments/:bookingId/late`          | `apps/admin/src/pages/staff/late-page.tsx`                 | 已完成 | 直达、危险操作确认、结果恢复测试 + Vite history fallback  |
 | MG-01     | 店长今日工作台   | Web 后台   | `/manager/workbench`                           | `apps/admin/src/pages/manager/workbench-page.tsx`          | 骨架   | Vite history fallback + 角色路由测试                      |
 | —         | 店长预约入口     | Web 后台   | `/manager/appointments`                        | `apps/admin/src/pages/manager/appointments-page.tsx`       | 骨架   | Vite history fallback + 独立路由测试                      |
 | —         | 店长排班入口     | Web 后台   | `/manager/schedule`                            | `apps/admin/src/pages/manager/schedule-index-redirect.tsx` | 已完成 | 保留查询参数并重定向到 MG-09 已发布排班                   |

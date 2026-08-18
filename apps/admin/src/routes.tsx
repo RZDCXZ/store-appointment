@@ -14,6 +14,8 @@ import { ManagerSystemPage } from "./pages/manager/system-page";
 import { ManagerWorkbenchPage } from "./pages/manager/workbench-page";
 import { StaffAppointmentsPage } from "./pages/staff/appointments-page";
 import { StaffAppointmentDetailPage } from "./pages/staff/appointment-detail-page";
+import { StaffCheckInPage } from "./pages/staff/check-in-page";
+import { StaffLatePage } from "./pages/staff/late-page";
 import { StaffPhoneRevealPage } from "./pages/staff/phone-reveal-page";
 import { StaffTodayPage } from "./pages/staff/today-page";
 import { RoleBoundary, RootRedirect } from "./protected-route";
@@ -73,6 +75,8 @@ export const routes: RouteObject[] = [
           { path: "today", element: <StaffTodayPage /> },
           { path: "appointments", element: <StaffAppointmentsPage /> },
           { path: "appointments/:bookingId", element: <StaffAppointmentDetailPage /> },
+          { path: "appointments/:bookingId/check-in", element: <StaffCheckInPage /> },
+          { path: "appointments/:bookingId/late", element: <StaffLatePage /> },
           { path: "appointments/:bookingId/phone", element: <StaffPhoneRevealPage /> },
         ],
       },

@@ -47,6 +47,9 @@ describe("管理端浏览器路由 history fallback", () => {
     "/manager/system",
     "/staff/today",
     "/staff/appointments",
+    "/staff/appointments/booking-direct-route",
+    "/staff/appointments/booking-direct-route/check-in",
+    "/staff/appointments/booking-direct-route/late",
   ])("%s 可直接访问并在刷新后恢复应用入口", async (path) => {
     for (let attempt = 0; attempt < 2; attempt += 1) {
       const response = await fetch(`${origin}${path}`, { headers: { connection: "close" } });

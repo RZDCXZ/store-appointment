@@ -38,6 +38,9 @@ const eventLabels: Record<string, string> = {
   booking_confirmed: "预约已确认",
   booking_rescheduled: "预约已改期",
   booking_cancelled: "预约已取消",
+  booking_checked_in: "已使用六位码到店核销",
+  booking_late_checked_in: "已手动迟到核销",
+  booking_no_show: "已人工标记爽约",
 };
 
 export function StaffAppointmentDetailPage(): React.JSX.Element {
@@ -112,6 +115,14 @@ export function StaffAppointmentDetailPage(): React.JSX.Element {
                 }).format(new Date(booking.endsAt))}
               </p>
             </span>
+            {booking.status === "confirmed" ? (
+              <Link
+                className="staff-primary-link staff-current-action__link"
+                to={`/staff/appointments/${booking.id}/${booking.action === "late" ? "late" : "check-in"}`}
+              >
+                {booking.action === "late" ? "处理迟到" : "输入核销码"}
+              </Link>
+            ) : null}
           </section>
 
           <section className="staff-detail-section staff-pet-profile">
@@ -230,7 +241,10 @@ export function StaffAppointmentDetailPage(): React.JSX.Element {
                 {data.statusHistory.map((event) => (
                   <li key={event.id}>
                     <time>{formatShanghaiDateTime(event.occurredAt)}</time>
-                    <p>{eventLabels[event.type] ?? event.type}</p>
+                    <p>
+                      {eventLabels[event.type] ?? event.type}
+                      {event.reason ? ` · ${event.reason}` : ""}
+                    </p>
                   </li>
                 ))}
               </ol>

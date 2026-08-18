@@ -196,7 +196,7 @@ describe("后台登录与角色路由", () => {
     fireEvent.submit(screen.getByRole("button", { name: "进入管理端" }).closest("form")!);
 
     expect(await screen.findByRole("heading", { name: "我的今日工作" })).toBeVisible();
-    expect(screen.getByText("林夏 · 员工")).toBeVisible();
+    expect(await screen.findByText("林夏 · 员工")).toBeVisible();
     expect(screen.getByRole("heading", { name: "今天没有待履约预约" })).toBeVisible();
     expect(
       within(screen.getByRole("navigation", { name: "员工导航" }))

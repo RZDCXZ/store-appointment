@@ -18,6 +18,7 @@ import { ApiOperation, ApiTags } from "@nestjs/swagger";
 import {
   backofficeNavigation,
   type BackofficeLandingResponse,
+  type BookingFulfilmentResponse,
   type ManagerBookingDetailResponse,
   type ManagerCalendarResponse,
   type ManagerWorkbenchResponse,
@@ -35,6 +36,7 @@ import { RequestOriginGuard } from "../auth/request-origin.guard.js";
 import { SessionGuard } from "../auth/session.guard.js";
 import { SessionService } from "../auth/session.service.js";
 import { LiveRefreshService } from "../live-refresh/live-refresh.service.js";
+import { BookingFulfilmentService } from "./booking-fulfilment.service.js";
 import { ManagerLiveBookingService } from "./manager-live-booking.service.js";
 import { StaffFulfilmentService } from "./staff-fulfilment.service.js";
 
@@ -55,6 +57,8 @@ export class BackofficeController {
     private readonly managerBookings: ManagerLiveBookingService,
     @Inject(StaffFulfilmentService)
     private readonly staffFulfilment: StaffFulfilmentService,
+    @Inject(BookingFulfilmentService)
+    private readonly bookingFulfilment: BookingFulfilmentService,
     @Inject(LiveRefreshService) private readonly liveRefresh: LiveRefreshService,
   ) {}
 
@@ -105,6 +109,39 @@ export class BackofficeController {
   ): Promise<StaffTodayResponse> {
     reply.header("Cache-Control", "no-store");
     return this.staffFulfilment.today(request.backofficeIdentity);
+  }
+
+  @Post("bookings/:bookingId/check-in")
+  @UseGuards(RequestOriginGuard)
+  @ApiOperation({ summary: "在正常窗口内使用六位码幂等核销到店" })
+  checkInBooking(
+    @Param("bookingId") bookingId: string,
+    @Body() body: unknown,
+    @Req() request: AuthenticatedRequest,
+  ): Promise<BookingFulfilmentResponse> {
+    return this.bookingFulfilment.checkIn(request.backofficeIdentity, bookingId, body);
+  }
+
+  @Post("bookings/:bookingId/late-check-in")
+  @UseGuards(RequestOriginGuard)
+  @ApiOperation({ summary: "超过迟到宽限后填写原因手动核销到店" })
+  lateCheckInBooking(
+    @Param("bookingId") bookingId: string,
+    @Body() body: unknown,
+    @Req() request: AuthenticatedRequest,
+  ): Promise<BookingFulfilmentResponse> {
+    return this.bookingFulfilment.lateCheckIn(request.backofficeIdentity, bookingId, body);
+  }
+
+  @Post("bookings/:bookingId/no-show")
+  @UseGuards(RequestOriginGuard)
+  @ApiOperation({ summary: "超过迟到宽限后填写原因人工标记爽约" })
+  markBookingNoShow(
+    @Param("bookingId") bookingId: string,
+    @Body() body: unknown,
+    @Req() request: AuthenticatedRequest,
+  ): Promise<BookingFulfilmentResponse> {
+    return this.bookingFulfilment.markNoShow(request.backofficeIdentity, bookingId, body);
   }
 
   @Get("staff/bookings")
