@@ -744,7 +744,7 @@ async function seed(client: PoolClient): Promise<void> {
 async function reset(client: PoolClient): Promise<void> {
   await withTransaction(client, async () => {
     await client.query(
-      "TRUNCATE TABLE app_metadata, notification_outbox, audit_events, booking_events, booking_idempotency_keys, booking_fulfilment_idempotency_keys, manager_proxy_booking_idempotency_keys, manager_proxy_booking_records, store_service_record_notes, store_service_records, staff_time_off_intervals, store_closure_intervals, staff_schedule_breaks, staff_schedule_shifts, staff_schedule_days, weekly_shift_template_breaks, weekly_shift_templates, store_business_hours, staff_skills, staff_members, privacy_consents, privacy_notices, bookings, pet_care_tags, pets, pet_photos, customer_sessions, demo_customer_profiles, customers, backoffice_sessions, backoffice_accounts",
+      "TRUNCATE TABLE app_metadata, notification_outbox, audit_events, booking_events, booking_idempotency_keys, booking_fulfilment_idempotency_keys, manager_booking_change_idempotency_keys, manager_proxy_booking_idempotency_keys, manager_proxy_booking_records, store_service_record_notes, store_service_records, staff_time_off_intervals, store_closure_intervals, staff_schedule_breaks, staff_schedule_shifts, staff_schedule_days, weekly_shift_template_breaks, weekly_shift_templates, store_business_hours, staff_skills, staff_members, privacy_consents, privacy_notices, bookings, pet_care_tags, pets, pet_photos, customer_sessions, demo_customer_profiles, customers, backoffice_sessions, backoffice_accounts",
     );
     await seed(client);
   });

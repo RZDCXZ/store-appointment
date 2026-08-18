@@ -531,9 +531,9 @@ export interface CustomerBookingSchedule {
 
 export interface CustomerBookingChange {
   id: string;
-  kind: "customer_cancelled" | "customer_rescheduled";
+  kind: "customer_cancelled" | "customer_rescheduled" | "manager_cancelled" | "manager_rescheduled";
   actor: {
-    type: "customer";
+    type: "customer" | "manager";
     id: string;
   };
   reason: string;

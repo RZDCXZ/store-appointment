@@ -5,7 +5,10 @@ import { LoginPage } from "./login-page";
 import { ManagerAppointmentsPage } from "./pages/manager/appointments-page";
 import { ManagerAppointmentDetailPage } from "./pages/manager/appointment-detail-page";
 import { ManagerAppointmentListPage } from "./pages/manager/appointment-list-page";
+import { ManagerCancelBookingPage } from "./pages/manager/cancel-booking-page";
 import { ManagerProxyBookingPage } from "./pages/manager/proxy-booking-page";
+import { ManagerRescheduleBookingPage } from "./pages/manager/reschedule-booking-page";
+import { ManagerTerminateBookingPage } from "./pages/manager/terminate-booking-page";
 import { ManagerBusinessPage } from "./pages/manager/business-page";
 import { ManagerCalendarPage } from "./pages/manager/calendar-page";
 import { ManagerCustomersPage } from "./pages/manager/customers-page";
@@ -60,6 +63,15 @@ export const routes: RouteObject[] = [
           { path: "appointments/list", element: <ManagerAppointmentListPage /> },
           { path: "appointments/calendar", element: <ManagerCalendarPage /> },
           { path: "appointments/proxy", element: <ManagerProxyBookingPage /> },
+          {
+            path: "appointments/:bookingId/reschedule",
+            element: <ManagerRescheduleBookingPage />,
+          },
+          { path: "appointments/:bookingId/cancel", element: <ManagerCancelBookingPage /> },
+          {
+            path: "appointments/:bookingId/terminate",
+            element: <ManagerTerminateBookingPage />,
+          },
           { path: "appointments/:bookingId", element: <ManagerAppointmentDetailPage /> },
           {
             path: "schedule",

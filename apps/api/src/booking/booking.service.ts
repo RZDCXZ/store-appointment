@@ -22,8 +22,13 @@ import type {
   CustomerMessageDetailResponse,
   CustomerMessageKind,
   CustomerMessagesResponse,
+  ManagerBookingChange,
+  ManagerBookingChangeResponse,
   ManagerOfflineConsentSource,
+  ManagerBookingActions,
   ManagerProxyBookingResponse,
+  ManagerRescheduleBookingOptionsResponse,
+  ManagerRescheduleBookingInput,
   PetSize,
   RescheduleBookingOptionsResponse,
   RescheduleBookingInput,
@@ -118,6 +123,13 @@ interface IdempotencyRow {
   response_body: unknown | null;
 }
 
+interface ManagerChangeIdempotencyRow {
+  request_digest: string;
+  booking_id: string | null;
+  response_status: number;
+  response_body: unknown;
+}
+
 interface ManagerProxyIdempotencyRow {
   request_digest: string;
   booking_id: string | null;
@@ -167,7 +179,7 @@ interface StoredRescheduleSuccess {
 interface BookingChangeRow {
   id: string;
   event_type: "booking_cancelled" | "booking_rescheduled";
-  actor_type: "customer";
+  actor_type: "customer" | "manager";
   actor_id: string;
   payload: {
     reason: string;
@@ -190,6 +202,23 @@ interface RescheduleConflictBody extends BookingConflictBody {
     staffId: string;
     startsAt: string;
   };
+}
+
+interface AppliedReschedule {
+  booking: BookingRow;
+  verificationCode: string;
+  verificationCodeVersion: number;
+  eventId: string;
+  occurredAt: string;
+  previous: CustomerBookingSchedule;
+  next: CustomerBookingSchedule;
+}
+
+interface AppliedCancellation {
+  booking: BookingRow;
+  eventId: string;
+  occurredAt: string;
+  previous: CustomerBookingSchedule;
 }
 
 interface DatabaseError {
@@ -483,6 +512,22 @@ function parseRescheduleInput(body: unknown): RescheduleBookingInput {
   };
 }
 
+function parseManagerRescheduleInput(body: unknown): ManagerRescheduleBookingInput {
+  const input = body && typeof body === "object" ? (body as Record<string, unknown>) : {};
+  const schedule = parseRescheduleInput(body);
+  if (
+    typeof input.reason !== "string" ||
+    input.reason.trim().length < 2 ||
+    input.reason.trim().length > 120
+  ) {
+    validationError({ reason: "请填写 2–120 字的改期原因。" });
+  }
+  return {
+    ...schedule,
+    reason: (input.reason as string).trim(),
+  };
+}
+
 function verificationCode(
   customerId: string,
   bookingId: string,
@@ -576,6 +621,19 @@ function customerActions(row: BookingRow): CustomerBookingActions {
       : row.status === "confirmed"
         ? "开始前已不足 12 小时，请联系门店处理。"
         : "当前预约状态不支持顾客自行改期或取消，如需帮助请联系门店。",
+  };
+}
+
+function managerActions(row: BookingRow): ManagerBookingActions {
+  const allowed = row.status === "confirmed";
+  return {
+    canReschedule: allowed,
+    canCancel: allowed,
+    message: allowed
+      ? "可依据已经与顾客达成的线下约定改期或取消。"
+      : row.status === "checked_in"
+        ? "预约已经到店核销，不能改期或取消；请继续完成服务或记录服务终止。"
+        : "当前预约状态不支持店长改期或取消。",
   };
 }
 
@@ -1142,18 +1200,12 @@ export class BookingService {
 
       const row = await this.findBookingRow(client, customerId, bookingId, true);
       this.requireCustomerChangeAllowed(row);
-      const occurredAt = getDemoNow();
-      const previous = currentSchedule(row);
-      const payload = { reason: input.reason, previous, next: null };
-
-      await client.query(
-        `
-          UPDATE bookings
-          SET status = 'cancelled', occupancy_starts_at = NULL, occupancy_ends_at = NULL
-          WHERE id = $1 AND customer_id = $2
-        `,
-        [bookingId, customerId],
-      );
+      const applied = await this.applyAtomicCancellation(client, row, {
+        actorType: "customer",
+        actorId: customerId,
+        reason: input.reason,
+        auditEventType: "customer_booking_cancelled",
+      });
       await client.query(
         `
           INSERT INTO booking_idempotency_keys (
@@ -1161,39 +1213,9 @@ export class BookingService {
           )
           VALUES ($1, 'customer_cancel', $2, $3, $4, $5)
         `,
-        [customerId, input.idempotencyKey, digest, bookingId, occurredAt],
+        [customerId, input.idempotencyKey, digest, bookingId, applied.occurredAt],
       );
-      await client.query(
-        `
-          INSERT INTO booking_events (
-            id, booking_id, event_type, actor_type, actor_id, payload, occurred_at
-          )
-          VALUES ($1, $2, 'booking_cancelled', 'customer', $3, $4::jsonb, $5)
-        `,
-        [randomUUID(), bookingId, customerId, JSON.stringify(payload), occurredAt],
-      );
-      await client.query(
-        `
-          INSERT INTO audit_events (
-            id, event_type, actor_type, actor_id, subject_type, subject_id, payload, occurred_at
-          )
-          VALUES (
-            $1, 'customer_booking_cancelled', 'customer', $2, 'booking', $3, $4::jsonb, $5
-          )
-        `,
-        [randomUUID(), customerId, bookingId, JSON.stringify(payload), occurredAt],
-      );
-      await client.query(
-        `
-          INSERT INTO notification_outbox (
-            id, booking_id, customer_id, notification_type, payload,
-            status, available_at, created_at
-          )
-          VALUES ($1, $2, $3, 'booking_cancelled', $4::jsonb, 'pending', $5, $5)
-        `,
-        [randomUUID(), bookingId, customerId, JSON.stringify(payload), occurredAt],
-      );
-      const cancelled = await this.findBookingRow(client, customerId, bookingId);
+      const cancelled = applied.booking;
       const response = await this.detailResponse(client, cancelled);
       await client.query(
         `
@@ -1260,6 +1282,133 @@ export class BookingService {
     }
   }
 
+  async managerCancel(
+    manager: BackofficeIdentity,
+    bookingId: string,
+    body: unknown,
+  ): Promise<ManagerBookingChangeResponse> {
+    this.requireManager(manager);
+    this.requireBookingId(bookingId);
+    const input = parseCancelInput(body);
+    const digest = requestDigest({ bookingId, ...input });
+    const client = await this.database.pool.connect();
+    const lockKey = `${manager.id}:manager_cancel:${input.idempotencyKey}`;
+    let lockHeld = false;
+    let replayedFailure = false;
+
+    try {
+      await client.query("SELECT pg_advisory_lock(hashtextextended($1, 0))", [lockKey]);
+      lockHeld = true;
+      await client.query("BEGIN TRANSACTION ISOLATION LEVEL READ COMMITTED");
+      const existing = await client.query<ManagerChangeIdempotencyRow>(
+        `
+          SELECT request_digest, booking_id, response_status, response_body
+          FROM manager_booking_change_idempotency_keys
+          WHERE manager_id = $1
+            AND command_type = 'manager_cancel'
+            AND idempotency_key = $2
+        `,
+        [manager.id, input.idempotencyKey],
+      );
+      const previousResult = existing.rows[0];
+      if (previousResult) {
+        if (previousResult.request_digest !== digest) {
+          businessError(
+            "IDEMPOTENCY_KEY_REUSED",
+            "这个幂等键已经用于另一条店长取消命令，请重新提交。",
+            HttpStatus.CONFLICT,
+          );
+        }
+        await client.query("COMMIT");
+        if (previousResult.booking_id && previousResult.response_status < 300) {
+          return previousResult.response_body as ManagerBookingChangeResponse;
+        }
+        if (!previousResult.response_body || typeof previousResult.response_body !== "object") {
+          throw new Error("店长取消幂等结果缺少失败响应。");
+        }
+        replayedFailure = true;
+        throw new HttpException(previousResult.response_body, previousResult.response_status);
+      }
+
+      const row = await this.findManagerBookingRow(client, bookingId, true);
+      this.requireManagerChangeAllowed(row);
+      const applied = await this.applyAtomicCancellation(client, row, {
+        actorType: "manager",
+        actorId: manager.id,
+        reason: input.reason,
+        auditEventType: "manager_booking_cancelled",
+      });
+      const change: ManagerBookingChange = {
+        id: applied.eventId,
+        kind: "manager_cancelled",
+        actor: {
+          type: "manager",
+          id: manager.id,
+          displayName: manager.displayName,
+        },
+        reason: input.reason,
+        previous: applied.previous,
+        next: null,
+        occurredAt: applied.occurredAt,
+      };
+      const response: ManagerBookingChangeResponse = {
+        booking: asBooking(applied.booking),
+        managerActions: managerActions(applied.booking),
+        verificationCodeStatus: "invalidated",
+        change,
+      };
+      await client.query(
+        `
+          INSERT INTO manager_booking_change_idempotency_keys (
+            manager_id, command_type, idempotency_key, request_digest,
+            booking_id, response_status, response_body, created_at
+          )
+          VALUES ($1, 'manager_cancel', $2, $3, $4, $5, $6::jsonb, $7)
+        `,
+        [
+          manager.id,
+          input.idempotencyKey,
+          digest,
+          bookingId,
+          HttpStatus.CREATED,
+          JSON.stringify(response),
+          applied.occurredAt,
+        ],
+      );
+      await client.query("COMMIT");
+      return response;
+    } catch (error) {
+      await client.query("ROLLBACK").catch(() => undefined);
+      if (!replayedFailure && error instanceof HttpException) {
+        await this.persistManagerChangeFailure(
+          client,
+          manager.id,
+          "manager_cancel",
+          input.idempotencyKey,
+          digest,
+          error,
+        );
+      }
+      throw error;
+    } finally {
+      let releaseError: Error | undefined;
+      if (lockHeld) {
+        try {
+          const unlocked = await client.query<{ unlocked: boolean }>(
+            "SELECT pg_advisory_unlock(hashtextextended($1, 0)) AS unlocked",
+            [lockKey],
+          );
+          if (!unlocked.rows[0]?.unlocked) {
+            releaseError = new Error("店长取消幂等锁未能释放，连接不可复用。");
+          }
+        } catch (error) {
+          releaseError = error instanceof Error ? error : new Error("店长取消幂等锁释放失败。");
+        }
+      }
+      client.release(releaseError);
+    }
+  }
+
   async rescheduleOptions(
     customerId: string,
     bookingId: string,
@@ -1303,6 +1452,188 @@ export class BookingService {
         })),
       },
     };
+  }
+
+  async managerRescheduleOptions(
+    bookingId: string,
+  ): Promise<ManagerRescheduleBookingOptionsResponse> {
+    this.requireBookingId(bookingId);
+    const client = await this.database.pool.connect();
+    let row: BookingRow;
+    try {
+      row = await this.findManagerBookingRow(client, bookingId);
+    } finally {
+      client.release();
+    }
+    const actions = managerActions(row);
+    if (!actions.canReschedule) {
+      return {
+        booking: asBooking(row),
+        managerActions: actions,
+        availability: null,
+      };
+    }
+    const availability = await this.availability.discover({
+      customerId: row.customer_id,
+      petId: row.pet_id,
+      primaryServiceId: row.primary_service_id_snapshot,
+      addonIds: row.addon_snapshots.map((addon) => addon.id).join(","),
+      excludeBookingId: row.id,
+      selectionOverride: currentSelection(row),
+      earliestStartsAtOverride: earliestManagerCandidate(getDemoNow()),
+    });
+    return {
+      booking: asBooking(row),
+      managerActions: actions,
+      availability: {
+        ...availability,
+        days: availability.days.map((day) => ({
+          ...day,
+          slots: day.slots.filter(
+            (slot) =>
+              !(slot.staff.id === row.staff_id && slot.startsAt === row.starts_at.toISOString()),
+          ),
+        })),
+      },
+    };
+  }
+
+  async managerReschedule(
+    manager: BackofficeIdentity,
+    bookingId: string,
+    body: unknown,
+  ): Promise<ManagerBookingChangeResponse> {
+    this.requireManager(manager);
+    this.requireBookingId(bookingId);
+    const input = parseManagerRescheduleInput(body);
+    const digest = requestDigest({ bookingId, ...input });
+    const client = await this.database.pool.connect();
+    const lockKey = `${manager.id}:manager_reschedule:${input.idempotencyKey}`;
+    let lockHeld = false;
+    let replayedFailure = false;
+
+    try {
+      await client.query("SELECT pg_advisory_lock(hashtextextended($1, 0))", [lockKey]);
+      lockHeld = true;
+      await client.query("BEGIN TRANSACTION ISOLATION LEVEL READ COMMITTED");
+      const existing = await client.query<ManagerChangeIdempotencyRow>(
+        `
+          SELECT request_digest, booking_id, response_status, response_body
+          FROM manager_booking_change_idempotency_keys
+          WHERE manager_id = $1
+            AND command_type = 'manager_reschedule'
+            AND idempotency_key = $2
+        `,
+        [manager.id, input.idempotencyKey],
+      );
+      const previousResult = existing.rows[0];
+      if (previousResult) {
+        if (previousResult.request_digest !== digest) {
+          businessError(
+            "IDEMPOTENCY_KEY_REUSED",
+            "这个幂等键已经用于另一条店长改期命令，请重新提交。",
+            HttpStatus.CONFLICT,
+          );
+        }
+        await client.query("COMMIT");
+        if (previousResult.booking_id && previousResult.response_status < 300) {
+          return previousResult.response_body as ManagerBookingChangeResponse;
+        }
+        if (!previousResult.response_body || typeof previousResult.response_body !== "object") {
+          throw new Error("店长改期幂等结果缺少失败响应。");
+        }
+        replayedFailure = true;
+        throw new HttpException(previousResult.response_body, previousResult.response_status);
+      }
+
+      const row = await this.findManagerBookingRow(client, bookingId, true);
+      this.requireManagerChangeAllowed(row);
+      const applied = await this.applyAtomicReschedule(client, row, input, {
+        actorType: "manager",
+        actorId: manager.id,
+        reason: input.reason,
+        auditEventType: "manager_booking_rescheduled",
+        availabilityActor: "manager",
+      });
+      const change: ManagerBookingChange = {
+        id: applied.eventId,
+        kind: "manager_rescheduled",
+        actor: {
+          type: "manager",
+          id: manager.id,
+          displayName: manager.displayName,
+        },
+        reason: input.reason,
+        previous: applied.previous,
+        next: applied.next,
+        occurredAt: applied.occurredAt,
+      };
+      const response: ManagerBookingChangeResponse = {
+        booking: asBooking(applied.booking),
+        managerActions: managerActions(applied.booking),
+        verificationCodeStatus: "rotated",
+        change,
+      };
+      await client.query(
+        `
+          INSERT INTO manager_booking_change_idempotency_keys (
+            manager_id, command_type, idempotency_key, request_digest,
+            booking_id, response_status, response_body, created_at
+          )
+          VALUES ($1, 'manager_reschedule', $2, $3, $4, $5, $6::jsonb, $7)
+        `,
+        [
+          manager.id,
+          input.idempotencyKey,
+          digest,
+          bookingId,
+          HttpStatus.CREATED,
+          JSON.stringify(response),
+          applied.occurredAt,
+        ],
+      );
+      await client.query("COMMIT");
+      return response;
+    } catch (error) {
+      await client.query("ROLLBACK").catch(() => undefined);
+      const databaseError = error as DatabaseError;
+      if (
+        !replayedFailure &&
+        (this.isBookingTimeConflict(error) ||
+          databaseError.code === "23P01" ||
+          databaseError.code === "40001" ||
+          databaseError.code === "40P01")
+      ) {
+        await this.throwManagerRescheduleTimeConflict(manager, bookingId, input, digest, client);
+      }
+      if (!replayedFailure && error instanceof HttpException) {
+        await this.persistManagerChangeFailure(
+          client,
+          manager.id,
+          "manager_reschedule",
+          input.idempotencyKey,
+          digest,
+          error,
+        );
+      }
+      throw error;
+    } finally {
+      let releaseError: Error | undefined;
+      if (lockHeld) {
+        try {
+          const unlocked = await client.query<{ unlocked: boolean }>(
+            "SELECT pg_advisory_unlock(hashtextextended($1, 0)) AS unlocked",
+            [lockKey],
+          );
+          if (!unlocked.rows[0]?.unlocked) {
+            releaseError = new Error("店长改期幂等锁未能释放，连接不可复用。");
+          }
+        } catch (error) {
+          releaseError = error instanceof Error ? error : new Error("店长改期幂等锁释放失败。");
+        }
+      }
+      client.release(releaseError);
+    }
   }
 
   async reschedule(
@@ -1394,72 +1725,13 @@ export class BookingService {
 
       const row = await this.findBookingRow(client, customerId, bookingId, true);
       this.requireCustomerChangeAllowed(row);
-      if (row.staff_id === input.staffId && row.starts_at.toISOString() === input.startsAt) {
-        businessError(
-          "BOOKING_SCHEDULE_UNCHANGED",
-          "新安排与当前安排相同，请选择其他员工或时段。",
-          HttpStatus.BAD_REQUEST,
-        );
-      }
-      const selection = currentSelection(row);
-      const staff = await this.requireQualifiedStaff(client, input.staffId, selection);
-      const interval = await this.requireAvailableInterval(
-        client,
-        {
-          idempotencyKey: input.idempotencyKey,
-          petId: row.pet_id,
-          primaryServiceId: row.primary_service_id_snapshot,
-          addonIds: row.addon_snapshots.map((addon) => addon.id),
-          staffId: input.staffId,
-          staffPreference: { kind: "specified", staffId: input.staffId },
-          startsAt: input.startsAt,
-        },
-        selection,
-        row.id,
-      );
-      const previousCode = activeVerificationCode(row);
-      if (!previousCode) {
-        throw new Error("当前预约核销码摘要与服务端派生值不一致。");
-      }
-      let codeVersion = row.verification_code_version + 1;
-      let code = verificationCode(customerId, bookingId, row.verification_code_seed, codeVersion);
-      while (code === previousCode) {
-        codeVersion += 1;
-        code = verificationCode(customerId, bookingId, row.verification_code_seed, codeVersion);
-      }
-      const occurredAt = getDemoNow();
-      const previous = currentSchedule(row);
-      const next: CustomerBookingSchedule = {
-        staff: { id: staff.id, displayName: staff.display_name },
-        ...interval,
-      };
-      const payload = { reason: "顾客自行改期", previous, next };
-
-      await client.query(
-        `
-          UPDATE bookings
-          SET staff_id = $2,
-              staff_display_name_snapshot = $3,
-              starts_at = $4,
-              ends_at = $5,
-              occupancy_starts_at = $4,
-              occupancy_ends_at = $6,
-              verification_code_version = $7,
-              verification_code_digest = $8
-          WHERE id = $1 AND customer_id = $9
-        `,
-        [
-          bookingId,
-          staff.id,
-          staff.display_name,
-          interval.startsAt,
-          interval.endsAt,
-          interval.turnoverEndsAt,
-          codeVersion,
-          verificationCodeDigest(bookingId, code),
-          customerId,
-        ],
-      );
+      const applied = await this.applyAtomicReschedule(client, row, input, {
+        actorType: "customer",
+        actorId: customerId,
+        reason: "顾客自行改期",
+        auditEventType: "customer_booking_rescheduled",
+        availabilityActor: "customer",
+      });
       await client.query(
         `
           INSERT INTO booking_idempotency_keys (
@@ -1467,43 +1739,13 @@ export class BookingService {
           )
           VALUES ($1, 'customer_reschedule', $2, $3, $4, $5)
         `,
-        [customerId, input.idempotencyKey, digest, bookingId, occurredAt],
+        [customerId, input.idempotencyKey, digest, bookingId, applied.occurredAt],
       );
-      await client.query(
-        `
-          INSERT INTO booking_events (
-            id, booking_id, event_type, actor_type, actor_id, payload, occurred_at
-          )
-          VALUES ($1, $2, 'booking_rescheduled', 'customer', $3, $4::jsonb, $5)
-        `,
-        [randomUUID(), bookingId, customerId, JSON.stringify(payload), occurredAt],
-      );
-      await client.query(
-        `
-          INSERT INTO audit_events (
-            id, event_type, actor_type, actor_id, subject_type, subject_id, payload, occurred_at
-          )
-          VALUES (
-            $1, 'customer_booking_rescheduled', 'customer', $2, 'booking', $3, $4::jsonb, $5
-          )
-        `,
-        [randomUUID(), customerId, bookingId, JSON.stringify(payload), occurredAt],
-      );
-      await client.query(
-        `
-          INSERT INTO notification_outbox (
-            id, booking_id, customer_id, notification_type, payload,
-            status, available_at, created_at
-          )
-          VALUES ($1, $2, $3, 'booking_rescheduled', $4::jsonb, 'pending', $5, $5)
-        `,
-        [randomUUID(), bookingId, customerId, JSON.stringify(payload), occurredAt],
-      );
-      const rescheduled = await this.findBookingRow(client, customerId, bookingId);
+      const rescheduled = applied.booking;
       const response = await this.detailResponse(client, rescheduled);
       const result: RescheduleBookingResponse = {
         ...response,
-        verificationCode: code,
+        verificationCode: applied.verificationCode,
         verificationWindow: verificationWindow(rescheduled),
       };
       const storedResult: StoredRescheduleSuccess = {
@@ -1512,7 +1754,7 @@ export class BookingService {
         verificationWindow: result.verificationWindow,
         customerActions: result.customerActions,
         changeHistory: result.changeHistory,
-        verificationCodeVersion: codeVersion,
+        verificationCodeVersion: applied.verificationCodeVersion,
       };
       await client.query(
         `
@@ -1790,6 +2032,302 @@ export class BookingService {
     return { bookingId, code };
   }
 
+  private async applyAtomicCancellation(
+    client: PoolClient,
+    row: BookingRow,
+    context: {
+      actorType: "customer" | "manager";
+      actorId: string;
+      reason: string;
+      auditEventType: "customer_booking_cancelled" | "manager_booking_cancelled";
+    },
+  ): Promise<AppliedCancellation> {
+    const occurredAt = getDemoNow();
+    const previous = currentSchedule(row);
+    const payload = { reason: context.reason, previous, next: null };
+    const eventId = randomUUID();
+    await client.query(
+      `
+        UPDATE bookings
+        SET status = 'cancelled', occupancy_starts_at = NULL, occupancy_ends_at = NULL
+        WHERE id = $1
+      `,
+      [row.id],
+    );
+    await client.query(
+      `
+        INSERT INTO booking_events (
+          id, booking_id, event_type, actor_type, actor_id, payload, occurred_at
+        )
+        VALUES ($1, $2, 'booking_cancelled', $3, $4, $5::jsonb, $6)
+      `,
+      [eventId, row.id, context.actorType, context.actorId, JSON.stringify(payload), occurredAt],
+    );
+    await client.query(
+      `
+        INSERT INTO audit_events (
+          id, event_type, actor_type, actor_id, subject_type, subject_id, payload, occurred_at
+        )
+        VALUES ($1, $2, $3, $4, 'booking', $5, $6::jsonb, $7)
+      `,
+      [
+        randomUUID(),
+        context.auditEventType,
+        context.actorType,
+        context.actorId,
+        row.id,
+        JSON.stringify(payload),
+        occurredAt,
+      ],
+    );
+    await client.query(
+      `
+        INSERT INTO notification_outbox (
+          id, booking_id, customer_id, notification_type, payload,
+          status, available_at, created_at
+        )
+        VALUES ($1, $2, $3, 'booking_cancelled', $4::jsonb, 'pending', $5, $5)
+      `,
+      [randomUUID(), row.id, row.customer_id, JSON.stringify(payload), occurredAt],
+    );
+    return {
+      booking: await this.findManagerBookingRow(client, row.id),
+      eventId,
+      occurredAt,
+      previous,
+    };
+  }
+
+  private async applyAtomicReschedule(
+    client: PoolClient,
+    row: BookingRow,
+    input: RescheduleBookingInput,
+    context: {
+      actorType: "customer" | "manager";
+      actorId: string;
+      reason: string;
+      auditEventType: "customer_booking_rescheduled" | "manager_booking_rescheduled";
+      availabilityActor: "customer" | "manager";
+    },
+  ): Promise<AppliedReschedule> {
+    if (row.staff_id === input.staffId && row.starts_at.toISOString() === input.startsAt) {
+      businessError(
+        "BOOKING_SCHEDULE_UNCHANGED",
+        "新安排与当前安排相同，请选择其他员工或时段。",
+        HttpStatus.BAD_REQUEST,
+      );
+    }
+    const selection = currentSelection(row);
+    const staff = await this.requireQualifiedStaff(client, input.staffId, selection);
+    const interval = await this.requireAvailableInterval(
+      client,
+      {
+        idempotencyKey: input.idempotencyKey,
+        petId: row.pet_id,
+        primaryServiceId: row.primary_service_id_snapshot,
+        addonIds: row.addon_snapshots.map((addon) => addon.id),
+        staffId: input.staffId,
+        staffPreference: { kind: "specified", staffId: input.staffId },
+        startsAt: input.startsAt,
+      },
+      selection,
+      row.id,
+      context.availabilityActor,
+    );
+    const previousCode = activeVerificationCode(row);
+    if (!previousCode) {
+      throw new Error("当前预约核销码摘要与服务端派生值不一致。");
+    }
+    let verificationCodeVersion = row.verification_code_version + 1;
+    let nextVerificationCode = verificationCode(
+      row.customer_id,
+      row.id,
+      row.verification_code_seed,
+      verificationCodeVersion,
+    );
+    while (nextVerificationCode === previousCode) {
+      verificationCodeVersion += 1;
+      nextVerificationCode = verificationCode(
+        row.customer_id,
+        row.id,
+        row.verification_code_seed,
+        verificationCodeVersion,
+      );
+    }
+    const occurredAt = getDemoNow();
+    const previous = currentSchedule(row);
+    const next: CustomerBookingSchedule = {
+      staff: { id: staff.id, displayName: staff.display_name },
+      ...interval,
+    };
+    const payload = { reason: context.reason, previous, next };
+    const eventId = randomUUID();
+
+    await client.query(
+      `
+        UPDATE bookings
+        SET staff_id = $2,
+            staff_display_name_snapshot = $3,
+            starts_at = $4,
+            ends_at = $5,
+            occupancy_starts_at = $4,
+            occupancy_ends_at = $6,
+            verification_code_version = $7,
+            verification_code_digest = $8
+        WHERE id = $1
+      `,
+      [
+        row.id,
+        staff.id,
+        staff.display_name,
+        interval.startsAt,
+        interval.endsAt,
+        interval.turnoverEndsAt,
+        verificationCodeVersion,
+        verificationCodeDigest(row.id, nextVerificationCode),
+      ],
+    );
+    await client.query(
+      `
+        INSERT INTO booking_events (
+          id, booking_id, event_type, actor_type, actor_id, payload, occurred_at
+        )
+        VALUES ($1, $2, 'booking_rescheduled', $3, $4, $5::jsonb, $6)
+      `,
+      [eventId, row.id, context.actorType, context.actorId, JSON.stringify(payload), occurredAt],
+    );
+    await client.query(
+      `
+        INSERT INTO audit_events (
+          id, event_type, actor_type, actor_id, subject_type, subject_id, payload, occurred_at
+        )
+        VALUES ($1, $2, $3, $4, 'booking', $5, $6::jsonb, $7)
+      `,
+      [
+        randomUUID(),
+        context.auditEventType,
+        context.actorType,
+        context.actorId,
+        row.id,
+        JSON.stringify(payload),
+        occurredAt,
+      ],
+    );
+    await client.query(
+      `
+        INSERT INTO notification_outbox (
+          id, booking_id, customer_id, notification_type, payload,
+          status, available_at, created_at
+        )
+        VALUES ($1, $2, $3, 'booking_rescheduled', $4::jsonb, 'pending', $5, $5)
+      `,
+      [randomUUID(), row.id, row.customer_id, JSON.stringify(payload), occurredAt],
+    );
+    const booking = await this.findManagerBookingRow(client, row.id);
+    return {
+      booking,
+      verificationCode: nextVerificationCode,
+      verificationCodeVersion,
+      eventId,
+      occurredAt,
+      previous,
+      next,
+    };
+  }
+
+  private async throwManagerRescheduleTimeConflict(
+    manager: BackofficeIdentity,
+    bookingId: string,
+    input: ManagerRescheduleBookingInput,
+    digest: string,
+    client: PoolClient,
+  ): Promise<never> {
+    const row = await this.findManagerBookingRow(client, bookingId);
+    const availability = await this.availability.discover(
+      {
+        customerId: row.customer_id,
+        petId: row.pet_id,
+        primaryServiceId: row.primary_service_id_snapshot,
+        addonIds: row.addon_snapshots.map((addon) => addon.id).join(","),
+        excludeBookingId: row.id,
+        selectionOverride: currentSelection(row),
+        earliestStartsAtOverride: earliestManagerCandidate(getDemoNow()),
+      },
+      client,
+    );
+    const proposed: RescheduleConflictBody = {
+      code: "BOOKING_TIME_CONFLICT",
+      message: "新安排刚刚被占用，原安排和核销码保持不变，请选择相近可用安排。",
+      nextStep: "conflict",
+      booking: asBooking(row),
+      requested: { staffId: input.staffId, startsAt: input.startsAt },
+      suggestions: nearbySuggestions(availability, input.startsAt),
+    };
+    try {
+      await client.query("BEGIN");
+      await client.query(
+        `
+          INSERT INTO manager_booking_change_idempotency_keys (
+            manager_id, command_type, idempotency_key, request_digest,
+            booking_id, response_status, response_body, created_at
+          )
+          VALUES ($1, 'manager_reschedule', $2, $3, NULL, $4, $5::jsonb, $6)
+        `,
+        [
+          manager.id,
+          input.idempotencyKey,
+          digest,
+          HttpStatus.CONFLICT,
+          JSON.stringify(proposed),
+          getDemoNow(),
+        ],
+      );
+      await client.query("COMMIT");
+    } catch (error) {
+      await client.query("ROLLBACK").catch(() => undefined);
+      throw error;
+    }
+    throw new HttpException(proposed, HttpStatus.CONFLICT);
+  }
+
+  private async persistManagerChangeFailure(
+    client: PoolClient,
+    managerId: string,
+    commandType: "manager_reschedule" | "manager_cancel",
+    idempotencyKey: string,
+    digest: string,
+    error: HttpException,
+  ): Promise<void> {
+    const response = error.getResponse();
+    if (!response || typeof response !== "object") return;
+    try {
+      await client.query("BEGIN");
+      await client.query(
+        `
+          INSERT INTO manager_booking_change_idempotency_keys (
+            manager_id, command_type, idempotency_key, request_digest,
+            booking_id, response_status, response_body, created_at
+          )
+          VALUES ($1, $2, $3, $4, NULL, $5, $6::jsonb, $7)
+          ON CONFLICT (manager_id, command_type, idempotency_key) DO NOTHING
+        `,
+        [
+          managerId,
+          commandType,
+          idempotencyKey,
+          digest,
+          error.getStatus(),
+          JSON.stringify(response),
+          getDemoNow(),
+        ],
+      );
+      await client.query("COMMIT");
+    } catch (persistError) {
+      await client.query("ROLLBACK").catch(() => undefined);
+      throw persistError;
+    }
+  }
+
   private async throwRescheduleTimeConflict(
     customerId: string,
     bookingId: string,
@@ -2009,9 +2547,42 @@ export class BookingService {
     return row;
   }
 
+  private async findManagerBookingRow(
+    client: PoolClient,
+    bookingId: string,
+    forUpdate = false,
+  ): Promise<BookingRow> {
+    const result = await client.query<BookingRow>(
+      `SELECT ${bookingColumns} FROM bookings WHERE id = $1${forUpdate ? " FOR UPDATE" : ""}`,
+      [bookingId],
+    );
+    const row = result.rows[0];
+    if (!row) {
+      businessError("BOOKING_NOT_FOUND", "找不到这笔预约。", HttpStatus.NOT_FOUND);
+    }
+    return row;
+  }
+
   private requireBookingId(bookingId: string): void {
     if (!idPattern.test(bookingId) && !/^[0-9a-f-]{36}$/.test(bookingId)) {
       businessError("BOOKING_NOT_FOUND", "找不到这笔预约。", HttpStatus.NOT_FOUND);
+    }
+  }
+
+  private requireManager(identity: BackofficeIdentity): void {
+    if (identity.role !== "manager") {
+      businessError("FORBIDDEN", "只有店长可以变更门店预约。", HttpStatus.FORBIDDEN);
+    }
+  }
+
+  private requireManagerChangeAllowed(row: BookingRow): void {
+    if (row.status !== "confirmed") {
+      businessError(
+        "BOOKING_CHANGE_NOT_ALLOWED",
+        managerActions(row).message,
+        HttpStatus.CONFLICT,
+        { managerActions: managerActions(row), booking: asBooking(row) },
+      );
     }
   }
 
@@ -2051,8 +2622,14 @@ export class BookingService {
     const changeHistory: CustomerBookingChange[] = changes.rows.map((change) => ({
       id: change.id,
       kind:
-        change.event_type === "booking_cancelled" ? "customer_cancelled" : "customer_rescheduled",
-      actor: { type: "customer", id: change.actor_id },
+        change.actor_type === "manager"
+          ? change.event_type === "booking_cancelled"
+            ? "manager_cancelled"
+            : "manager_rescheduled"
+          : change.event_type === "booking_cancelled"
+            ? "customer_cancelled"
+            : "customer_rescheduled",
+      actor: { type: change.actor_type, id: change.actor_id },
       reason: change.payload.reason,
       previous: change.payload.previous,
       next: change.payload.next,

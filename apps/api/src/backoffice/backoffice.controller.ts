@@ -25,6 +25,8 @@ import {
   type ManagerBookingListResponse,
   type ManagerProxyBookingResponse,
   type ManagerProxyBookingOptionsResponse,
+  type ManagerBookingChangeResponse,
+  type ManagerRescheduleBookingOptionsResponse,
   type ManagerCalendarResponse,
   type ManagerWorkbenchResponse,
   type StaffBookingDetailResponse,
@@ -135,6 +137,39 @@ export class BackofficeController {
   ): Promise<ManagerBookingDetailResponse> {
     reply.header("Cache-Control", "no-store");
     return this.managerBookings.bookingDetail(bookingId);
+  }
+
+  @Get("manager/bookings/:bookingId/reschedule-options")
+  @UseGuards(ManagerGuard)
+  @ApiOperation({ summary: "按预约身份恢复店长改期原安排与真实可用建议" })
+  managerRescheduleBookingOptions(
+    @Param("bookingId") bookingId: string,
+    @Res({ passthrough: true }) reply: FastifyReply,
+  ): Promise<ManagerRescheduleBookingOptionsResponse> {
+    reply.header("Cache-Control", "no-store");
+    return this.bookings.managerRescheduleOptions(bookingId);
+  }
+
+  @Post("manager/bookings/:bookingId/reschedule")
+  @UseGuards(ManagerGuard, RequestOriginGuard)
+  @ApiOperation({ summary: "店长填写线下约定原因并原子改期" })
+  managerRescheduleBooking(
+    @Param("bookingId") bookingId: string,
+    @Body() body: unknown,
+    @Req() request: AuthenticatedRequest,
+  ): Promise<ManagerBookingChangeResponse> {
+    return this.bookings.managerReschedule(request.backofficeIdentity, bookingId, body);
+  }
+
+  @Post("manager/bookings/:bookingId/cancel")
+  @UseGuards(ManagerGuard, RequestOriginGuard)
+  @ApiOperation({ summary: "店长在到店核销前填写原因并幂等取消预约" })
+  managerCancelBooking(
+    @Param("bookingId") bookingId: string,
+    @Body() body: unknown,
+    @Req() request: AuthenticatedRequest,
+  ): Promise<ManagerBookingChangeResponse> {
+    return this.bookings.managerCancel(request.backofficeIdentity, bookingId, body);
   }
 
   @Sse("manager/events")

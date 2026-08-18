@@ -1,5 +1,6 @@
 import type {
   PetSpecies,
+  BookingAvailabilityResponse,
   BookingVerificationWindow,
   ConfirmedBooking,
   CustomerBookingSchedule,
@@ -119,6 +120,7 @@ export interface ManagerWorkbenchResponse {
 
 export interface ManagerBookingDetailResponse {
   booking: ManagerBookingFact;
+  managerActions: ManagerBookingActions;
   petProfile: {
     weightKg: number;
     petSize: "small" | "medium" | "large";
@@ -144,6 +146,51 @@ export interface ManagerBookingDetailResponse {
     attemptCount: number;
     createdAt: string;
   }>;
+}
+
+export interface ManagerBookingActions {
+  canReschedule: boolean;
+  canCancel: boolean;
+  message: string;
+}
+
+export interface ManagerRescheduleBookingOptionsResponse {
+  booking: ConfirmedBooking;
+  managerActions: ManagerBookingActions;
+  availability: BookingAvailabilityResponse | null;
+}
+
+export interface ManagerRescheduleBookingInput {
+  idempotencyKey: string;
+  reason: string;
+  staffId: string;
+  startsAt: string;
+}
+
+export interface ManagerCancelBookingInput {
+  idempotencyKey: string;
+  reason: string;
+}
+
+export interface ManagerBookingChange {
+  id: string;
+  kind: "manager_rescheduled" | "manager_cancelled";
+  actor: {
+    type: "manager";
+    id: string;
+    displayName: string;
+  };
+  reason: string;
+  previous: CustomerBookingSchedule;
+  next: CustomerBookingSchedule | null;
+  occurredAt: string;
+}
+
+export interface ManagerBookingChangeResponse {
+  booking: ConfirmedBooking;
+  managerActions: ManagerBookingActions;
+  verificationCodeStatus: "rotated" | "invalidated";
+  change: ManagerBookingChange;
 }
 
 export interface ManagerBookingListFilters {
