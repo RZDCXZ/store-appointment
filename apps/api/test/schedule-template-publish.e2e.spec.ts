@@ -138,6 +138,16 @@ describe("排班模板、草稿、发布与日期例外", () => {
         actor_id: "manager",
         payload: { staffId: "zhaohang", weekday: 0, shifts: payload.shifts },
       });
+
+      const availability = await app.inject({
+        method: "GET",
+        url: "/miniapp/available-slots?petId=pet-tuanzi&primaryServiceId=dog-basic-care&staffId=zhaohang",
+        headers: { authorization: customerToken },
+      });
+      const sunday = availability
+        .json()
+        .days.find((day: { date: string }) => day.date === "2026-08-16");
+      expect(sunday.slots).toHaveLength(0);
     } finally {
       await app.inject({
         method: "PUT",
@@ -448,6 +458,22 @@ describe("排班模板、草稿、发布与日期例外", () => {
     expect(overtime.statusCode).toBe(200);
 
     try {
+      const missingBreak = await app.inject({
+        method: "PUT",
+        url: "/backoffice/manager/schedule/published/zhaohang/2026-08-16/exception",
+        headers: { cookie: managerCookie, origin: adminOrigin },
+        payload: {
+          kind: "special_break",
+          note: "休息例外必须包含休息区间。",
+          shifts: [{ startsAt: "09:30", endsAt: "13:00", breaks: [] }],
+        },
+      });
+      expect(missingBreak.statusCode).toBe(400);
+      expect(missingBreak.json()).toMatchObject({
+        code: "VALIDATION_ERROR",
+        message: "休息例外至少需要一个有效休息区间。",
+      });
+
       const saved = await app.inject({
         method: "PUT",
         url: "/backoffice/manager/schedule/published/zhaohang/2026-08-16/exception",

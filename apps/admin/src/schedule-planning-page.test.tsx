@@ -195,8 +195,11 @@ describe("MG-08 排班模板与十四天草稿页面", () => {
     });
     render(<RouterProvider router={router} />);
 
-    fireEvent.click(await screen.findByRole("button", { name: "编辑林夏周四模板" }));
+    const editButton = await screen.findByRole("button", { name: "编辑林夏周四模板" });
+    editButton.focus();
+    fireEvent.click(editButton);
     const dialog = screen.getByRole("dialog", { name: "编辑林夏周四模板" });
+    expect(within(dialog).getByRole("checkbox", { name: "该员工当天工作" })).toHaveFocus();
     fireEvent.change(within(dialog).getByLabelText("班次开始"), {
       target: { value: "10:00" },
     });
@@ -224,6 +227,7 @@ describe("MG-08 排班模板与十四天草稿页面", () => {
       }),
     );
     expect(await screen.findByText("林夏周四的排班模板已保存。")).toBeVisible();
+    expect(editButton).toHaveFocus();
   });
 
   it("可为单个员工修改具体日期草稿并记录日期例外", async () => {
@@ -420,5 +424,30 @@ describe("MG-08 排班模板与十四天草稿页面", () => {
     expect(screen.getByRole("heading", { name: "排班模板" })).toBeVisible();
     expect(screen.getByRole("button", { name: "编辑林夏周四模板" })).toBeVisible();
     expect(screen.getByText("最近成功读取的模板与草稿仍保留在页面中。")).toBeVisible();
+  });
+
+  it("首次查询失败时提供原位重试并恢复工作区", async () => {
+    let planningReads = 0;
+    vi.spyOn(globalThis, "fetch").mockImplementation(async (input) => {
+      const url = String(input);
+      if (url.endsWith("/auth/session")) return jsonResponse({ account: managerAccount });
+      if (url.endsWith("/backoffice/manager/schedule/planning")) {
+        planningReads += 1;
+        return planningReads === 1
+          ? jsonResponse({ code: "SCHEDULE_UNAVAILABLE", message: "排班工作区暂时不可用。" }, 503)
+          : jsonResponse(planningFixture());
+      }
+      throw new Error(`未处理请求：${url}`);
+    });
+    const router = createMemoryRouter(routes, {
+      initialEntries: ["/manager/schedule/planning"],
+    });
+    render(<RouterProvider router={router} />);
+
+    expect(await screen.findByRole("heading", { name: "暂时无法读取排班工作区" })).toBeVisible();
+    fireEvent.click(screen.getByRole("button", { name: "重新读取" }));
+
+    expect(await screen.findByRole("heading", { name: "排班模板" })).toBeVisible();
+    expect(planningReads).toBe(2);
   });
 });

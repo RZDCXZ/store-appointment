@@ -19,10 +19,21 @@ import type {
   ManagerSchedulePublishResponse,
 } from "@rongguang/contracts";
 
-import type { AuthenticatedRequest } from "../auth/auth.types.js";
+import type { AuthenticatedRequest, BackofficeIdentity } from "../auth/auth.types.js";
 import { SessionGuard } from "../auth/session.guard.js";
 import { ScheduleService } from "./schedule.service.js";
 import { SchedulePlanningService } from "./schedule-planning.service.js";
+
+function managerIdentity(request: AuthenticatedRequest): BackofficeIdentity {
+  if (request.backofficeIdentity.role !== "manager") {
+    throw new HttpException(
+      { code: "FORBIDDEN", message: "员工不能访问排班管理或完整门店容量。" },
+      HttpStatus.FORBIDDEN,
+    );
+  }
+
+  return request.backofficeIdentity;
+}
 
 @ApiTags("schedule and capacity")
 @Controller("backoffice/manager/schedule")
@@ -38,12 +49,7 @@ export class ScheduleController {
   async schedulePlanning(
     @Req() request: AuthenticatedRequest,
   ): Promise<ManagerSchedulePlanningResponse> {
-    if (request.backofficeIdentity.role !== "manager") {
-      throw new HttpException(
-        { code: "FORBIDDEN", message: "员工不能访问排班管理或完整门店容量。" },
-        HttpStatus.FORBIDDEN,
-      );
-    }
+    managerIdentity(request);
 
     return this.planning.read();
   }
@@ -56,27 +62,13 @@ export class ScheduleController {
     @Param("weekday") weekday: string,
     @Body() body: unknown,
   ): Promise<ManagerSchedulePlanningResponse> {
-    if (request.backofficeIdentity.role !== "manager") {
-      throw new HttpException(
-        { code: "FORBIDDEN", message: "员工不能访问排班管理或完整门店容量。" },
-        HttpStatus.FORBIDDEN,
-      );
-    }
-
-    return this.planning.updateTemplate(request.backofficeIdentity, staffId, weekday, body);
+    return this.planning.updateTemplate(managerIdentity(request), staffId, weekday, body);
   }
 
   @Post("drafts/generate")
   @ApiOperation({ summary: "从当前每周模板生成上海未来十四日排班草稿" })
   generateDrafts(@Req() request: AuthenticatedRequest): Promise<ManagerSchedulePlanningResponse> {
-    if (request.backofficeIdentity.role !== "manager") {
-      throw new HttpException(
-        { code: "FORBIDDEN", message: "员工不能访问排班管理或完整门店容量。" },
-        HttpStatus.FORBIDDEN,
-      );
-    }
-
-    return this.planning.generateDrafts(request.backofficeIdentity);
+    return this.planning.generateDrafts(managerIdentity(request));
   }
 
   @Post("drafts/publish")
@@ -85,14 +77,7 @@ export class ScheduleController {
     @Req() request: AuthenticatedRequest,
     @Body() body: unknown,
   ): Promise<ManagerSchedulePublishResponse> {
-    if (request.backofficeIdentity.role !== "manager") {
-      throw new HttpException(
-        { code: "FORBIDDEN", message: "员工不能访问排班管理或完整门店容量。" },
-        HttpStatus.FORBIDDEN,
-      );
-    }
-
-    return this.planning.publishDrafts(request.backofficeIdentity, body);
+    return this.planning.publishDrafts(managerIdentity(request), body);
   }
 
   @Put("drafts/:staffId/:date")
@@ -103,14 +88,7 @@ export class ScheduleController {
     @Param("date") date: string,
     @Body() body: unknown,
   ): Promise<ManagerSchedulePlanningResponse> {
-    if (request.backofficeIdentity.role !== "manager") {
-      throw new HttpException(
-        { code: "FORBIDDEN", message: "员工不能访问排班管理或完整门店容量。" },
-        HttpStatus.FORBIDDEN,
-      );
-    }
-
-    return this.planning.updateDraft(request.backofficeIdentity, staffId, date, body);
+    return this.planning.updateDraft(managerIdentity(request), staffId, date, body);
   }
 
   @Put("published/:staffId/:date/exception")
@@ -121,14 +99,7 @@ export class ScheduleController {
     @Param("date") date: string,
     @Body() body: unknown,
   ): Promise<{ updated: true }> {
-    if (request.backofficeIdentity.role !== "manager") {
-      throw new HttpException(
-        { code: "FORBIDDEN", message: "员工不能访问排班管理或完整门店容量。" },
-        HttpStatus.FORBIDDEN,
-      );
-    }
-
-    return this.planning.updatePublishedException(request.backofficeIdentity, staffId, date, body);
+    return this.planning.updatePublishedException(managerIdentity(request), staffId, date, body);
   }
 
   @Get()
@@ -137,12 +108,7 @@ export class ScheduleController {
     @Query("date") date: string | undefined,
     @Req() request: AuthenticatedRequest,
   ): Promise<ManagerPublishedScheduleResponse> {
-    if (request.backofficeIdentity.role !== "manager") {
-      throw new HttpException(
-        { code: "FORBIDDEN", message: "员工不能访问排班管理或完整门店容量。" },
-        HttpStatus.FORBIDDEN,
-      );
-    }
+    managerIdentity(request);
 
     return this.schedules.getPublishedSchedule(date);
   }

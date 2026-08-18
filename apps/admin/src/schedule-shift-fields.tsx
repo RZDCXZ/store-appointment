@@ -11,10 +11,12 @@ function breakLabel(index: number, field: "开始" | "结束"): string {
 export function ScheduleShiftFields({
   shifts,
   businessHours,
+  errorId,
   onChange,
 }: {
   shifts: EditableScheduleShift[];
   businessHours: ScheduleBusinessHours;
+  errorId?: string;
   onChange: (shifts: EditableScheduleShift[]) => void;
 }): React.JSX.Element {
   function updateShift(index: number, patch: Partial<EditableScheduleShift>): void {
@@ -38,7 +40,7 @@ export function ScheduleShiftFields({
   return (
     <div className="schedule-shift-editor-list">
       {shifts.map((shift, shiftIndex) => (
-        <fieldset key={shiftIndex} className="schedule-shift-editor-row">
+        <fieldset key={shiftIndex} className="schedule-shift-editor-row" aria-describedby={errorId}>
           <legend>班次 {shiftIndex + 1}</legend>
           <label>
             {shiftLabel(shiftIndex, "开始")}

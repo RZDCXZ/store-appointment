@@ -194,6 +194,9 @@ function parseException(
   if (input.kind !== "day_off" && shifts.length === 0) {
     validationError("调班、加班或休息例外至少需要一个有效班次。");
   }
+  if (input.kind === "special_break" && !shifts.some((shift) => shift.breaks.length > 0)) {
+    validationError("休息例外至少需要一个有效休息区间。");
+  }
 
   return { kind: input.kind as ScheduleExceptionKind, note, shifts };
 }
@@ -294,6 +297,34 @@ function finishShifts(builders: Map<string, ShiftBuilder>): EditableScheduleShif
         left.startsAt.localeCompare(right.startsAt),
       ),
     }));
+}
+
+async function insertScheduleShifts(
+  client: PoolClient,
+  scheduleDayId: string,
+  shifts: EditableScheduleShift[],
+  publicationStatus: "draft" | "published",
+): Promise<void> {
+  for (const shift of shifts) {
+    const shiftId = `${publicationStatus}-shift-${randomUUID()}`;
+    await client.query(
+      `INSERT INTO staff_schedule_shifts (id, schedule_day_id, starts_at, ends_at)
+       VALUES ($1, $2, $3, $4)`,
+      [shiftId, scheduleDayId, shift.startsAt, shift.endsAt],
+    );
+    for (const shiftBreak of shift.breaks) {
+      await client.query(
+        `INSERT INTO staff_schedule_breaks (id, schedule_shift_id, starts_at, ends_at)
+         VALUES ($1, $2, $3, $4)`,
+        [
+          `${publicationStatus}-break-${randomUUID()}`,
+          shiftId,
+          shiftBreak.startsAt,
+          shiftBreak.endsAt,
+        ],
+      );
+    }
+  }
 }
 
 @Injectable()
@@ -452,23 +483,7 @@ export class SchedulePlanningService {
                 templateBuilders.get(`${member.id}:${weekday}`) ?? new Map<string, ShiftBuilder>(),
               )
             : [];
-          for (const shift of shifts) {
-            const shiftId = `draft-shift-${randomUUID()}`;
-            await client.query(
-              `INSERT INTO staff_schedule_shifts
-                 (id, schedule_day_id, starts_at, ends_at)
-               VALUES ($1, $2, $3, $4)`,
-              [shiftId, dayId, shift.startsAt, shift.endsAt],
-            );
-            for (const shiftBreak of shift.breaks) {
-              await client.query(
-                `INSERT INTO staff_schedule_breaks
-                   (id, schedule_shift_id, starts_at, ends_at)
-                 VALUES ($1, $2, $3, $4)`,
-                [`draft-break-${randomUUID()}`, shiftId, shiftBreak.startsAt, shiftBreak.endsAt],
-              );
-            }
-          }
+          await insertScheduleShifts(client, dayId, shifts, "draft");
         }
       }
 
@@ -549,21 +564,7 @@ export class SchedulePlanningService {
          WHERE id = $1`,
         [draft.rows[0].id, input.kind, input.note],
       );
-      for (const shift of input.shifts) {
-        const shiftId = `draft-shift-${randomUUID()}`;
-        await client.query(
-          `INSERT INTO staff_schedule_shifts (id, schedule_day_id, starts_at, ends_at)
-           VALUES ($1, $2, $3, $4)`,
-          [shiftId, draft.rows[0].id, shift.startsAt, shift.endsAt],
-        );
-        for (const shiftBreak of shift.breaks) {
-          await client.query(
-            `INSERT INTO staff_schedule_breaks (id, schedule_shift_id, starts_at, ends_at)
-             VALUES ($1, $2, $3, $4)`,
-            [`draft-break-${randomUUID()}`, shiftId, shiftBreak.startsAt, shiftBreak.endsAt],
-          );
-        }
-      }
+      await insertScheduleShifts(client, draft.rows[0].id, input.shifts, "draft");
       await this.audits.append(
         {
           eventType: "schedule_draft_updated",
@@ -758,21 +759,7 @@ export class SchedulePlanningService {
          WHERE id = $1`,
         [scheduleDayId, input.kind, input.note],
       );
-      for (const shift of input.shifts) {
-        const shiftId = `published-shift-${randomUUID()}`;
-        await client.query(
-          `INSERT INTO staff_schedule_shifts (id, schedule_day_id, starts_at, ends_at)
-           VALUES ($1, $2, $3, $4)`,
-          [shiftId, scheduleDayId, shift.startsAt, shift.endsAt],
-        );
-        for (const shiftBreak of shift.breaks) {
-          await client.query(
-            `INSERT INTO staff_schedule_breaks (id, schedule_shift_id, starts_at, ends_at)
-             VALUES ($1, $2, $3, $4)`,
-            [`published-break-${randomUUID()}`, shiftId, shiftBreak.startsAt, shiftBreak.endsAt],
-          );
-        }
-      }
+      await insertScheduleShifts(client, scheduleDayId, input.shifts, "published");
 
       const affectedBookings = await this.affectedBookings(client, [date], [staffId], "published");
       if (affectedBookings.length > 0) {

@@ -19,6 +19,7 @@ import {
 } from "../../schedule-exception-editor";
 import { ScheduleNavigation } from "../../schedule-navigation";
 import { ScheduleShiftFields } from "../../schedule-shift-fields";
+import { useDialogFocus } from "../../use-dialog-focus";
 
 const weekdayLabels = ["周日", "周一", "周二", "周三", "周四", "周五", "周六"] as const;
 
@@ -30,8 +31,10 @@ interface PlanningState {
 
 function useSchedulePlanning(): PlanningState & {
   replaceData: (data: ManagerSchedulePlanningResponse) => void;
+  retry: () => void;
 } {
   const { markExpired } = useAuth();
+  const [attempt, setAttempt] = useState(0);
   const [state, setState] = useState<PlanningState>({ data: null, error: null, loading: true });
 
   useEffect(() => {
@@ -69,11 +72,15 @@ function useSchedulePlanning(): PlanningState & {
 
     void load();
     return () => controller.abort();
-  }, [markExpired]);
+  }, [attempt, markExpired]);
 
   return {
     ...state,
     replaceData: (data) => setState({ data, error: null, loading: false }),
+    retry: () => {
+      setState((current) => ({ ...current, error: null, loading: current.data === null }));
+      setAttempt((current) => current + 1);
+    },
   };
 }
 
@@ -184,6 +191,7 @@ function TemplateEditor({
   onCancel: () => void;
   onSave: (body: { shifts: EditableScheduleShift[] }) => void;
 }): React.JSX.Element {
+  const dialogRef = useDialogFocus<HTMLElement>();
   const initialShift = selection.day.shifts[0];
   const [working, setWorking] = useState(Boolean(initialShift));
   const [shifts, setShifts] = useState<EditableScheduleShift[]>(
@@ -203,6 +211,7 @@ function TemplateEditor({
   return (
     <div className="schedule-editor-backdrop">
       <section
+        ref={dialogRef}
         className="schedule-editor"
         role="dialog"
         aria-modal="true"
@@ -222,6 +231,7 @@ function TemplateEditor({
         ) : (
           <label className="schedule-editor-toggle">
             <input
+              data-dialog-initial-focus
               type="checkbox"
               checked={working}
               onChange={(event) => setWorking(event.target.checked)}
@@ -235,10 +245,15 @@ function TemplateEditor({
               shifts={shifts}
               businessHours={selection.day.businessHours}
               onChange={setShifts}
+              errorId={error ? "template-editor-error" : undefined}
             />
           </div>
         ) : null}
-        {error ? <p role="alert">{error}</p> : null}
+        {error ? (
+          <p id="template-editor-error" role="alert">
+            {error}
+          </p>
+        ) : null}
         <footer>
           <button type="button" onClick={onCancel} disabled={pending}>
             取消
@@ -271,9 +286,11 @@ function PublishConfirmation({
   onCancel: () => void;
   onConfirm: () => void;
 }): React.JSX.Element {
+  const dialogRef = useDialogFocus<HTMLElement>();
   return (
     <div className="schedule-editor-backdrop">
       <section
+        ref={dialogRef}
         className="schedule-editor schedule-publish-confirmation"
         role="alertdialog"
         aria-modal="true"
@@ -286,7 +303,7 @@ function PublishConfirmation({
           {formatDate(data.window.endsOn)} 的排班草稿。
         </p>
         <footer>
-          <button type="button" disabled={pending} onClick={onCancel}>
+          <button type="button" disabled={pending} onClick={onCancel} data-dialog-initial-focus>
             返回检查
           </button>
           <button type="button" disabled={pending} onClick={onConfirm}>
@@ -611,6 +628,9 @@ export function ManagerSchedulePlanningPage(): React.JSX.Element {
         <section className="schedule-state schedule-state--error" role="alert">
           <h2>暂时无法读取排班工作区</h2>
           <p>{state.error}</p>
+          <button className="primary-button" type="button" onClick={state.retry}>
+            重新读取
+          </button>
         </section>
       ) : null}
       {state.data ? (
