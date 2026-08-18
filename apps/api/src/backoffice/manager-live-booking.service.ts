@@ -21,6 +21,7 @@ import {
   bookingWindowFor,
   earliestManagerCandidate,
 } from "../booking-availability/availability.js";
+import { managerBookingActions } from "../booking/manager-booking-actions.js";
 import { DatabaseService } from "../database/database.service.js";
 import { getShanghaiLocalDate, isLocalDate } from "../schedule/schedule-date.js";
 import { ScheduleService } from "../schedule/schedule.service.js";
@@ -322,19 +323,6 @@ function emptyStatusSummary(): ManagerBookingStatusSummary {
     cancelled: 0,
     no_show: 0,
     terminated: 0,
-  };
-}
-
-function managerActions(status: ManagerBookingStatus) {
-  const allowed = status === "confirmed";
-  return {
-    canReschedule: allowed,
-    canCancel: allowed,
-    message: allowed
-      ? "可依据已经与顾客达成的线下约定改期或取消。"
-      : status === "checked_in"
-        ? "预约已经到店核销，不能改期或取消；请继续完成服务或记录服务终止。"
-        : "当前预约状态不支持店长改期或取消。",
   };
 }
 
@@ -792,7 +780,7 @@ export class ManagerLiveBookingService {
 
     return {
       booking: bookingRead(row).fact,
-      managerActions: managerActions(row.status),
+      managerActions: managerBookingActions(row.status),
       petProfile: {
         weightKg,
         petSize: petSize(weightKg),

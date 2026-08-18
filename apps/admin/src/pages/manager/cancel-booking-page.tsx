@@ -43,7 +43,7 @@ export function ManagerCancelBookingPage(): React.JSX.Element {
   const validReason = reason.trim().length >= 2 && reason.trim().length <= 120;
 
   async function submit(): Promise<void> {
-    if (!validReason) return;
+    if (!validReason || !booking) return;
     setError("");
     setSubmitting(true);
     try {
@@ -55,6 +55,8 @@ export function ManagerCancelBookingPage(): React.JSX.Element {
           body: JSON.stringify({
             idempotencyKey: managerChangeIdempotencyKey(bookingId, "cancel"),
             reason: reason.trim(),
+            expectedStaffId: booking.staff.id,
+            expectedStartsAt: booking.startsAt,
           }),
         },
       );

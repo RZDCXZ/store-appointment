@@ -20,5 +20,7 @@ export function discardManagerChangeIdempotencyKey(
 }
 
 export function isManagerBookingFactConflict(status: number, code: string): boolean {
-  return status === 409 && code === "BOOKING_CHANGE_NOT_ALLOWED";
+  return (
+    status === 409 && (code === "BOOKING_CHANGE_NOT_ALLOWED" || code === "BOOKING_FACT_CHANGED")
+  );
 }

@@ -55,6 +55,7 @@ describe("店长改期与店长取消", () => {
     "pet-manager-change-blocker",
     "pet-manager-change-cancel",
     "pet-manager-change-checked-in",
+    "pet-manager-change-stale",
   ];
   const createdBookingIds: string[] = [];
 
@@ -115,7 +116,8 @@ describe("店长改期与店长取消", () => {
           ('pet-manager-change-conflict', 'customer-cheng-mo', '保留原安排', 'cat', 4.8),
           ('pet-manager-change-blocker', 'customer-cheng-mo', '占用新安排', 'cat', 4.8),
           ('pet-manager-change-cancel', 'customer-cheng-mo', '店长取消宠物', 'cat', 4.8),
-          ('pet-manager-change-checked-in', 'customer-cheng-mo', '已经到店宠物', 'cat', 4.8)
+          ('pet-manager-change-checked-in', 'customer-cheng-mo', '已经到店宠物', 'cat', 4.8),
+          ('pet-manager-change-stale', 'customer-cheng-mo', '并发旧事实宠物', 'cat', 4.8)
       `,
     );
   });
@@ -200,6 +202,8 @@ describe("店长改期与店长取消", () => {
       payload: {
         idempotencyKey: "manager-reschedule-success-20260813",
         reason: "已经与顾客电话确认新的到店时间",
+        expectedStaffId: created.booking.staff.id,
+        expectedStartsAt: created.booking.startsAt,
         staffId: target?.staff.id,
         startsAt: target?.startsAt,
       },
@@ -308,6 +312,8 @@ describe("店长改期与店长取消", () => {
       payload: {
         idempotencyKey: "manager-reschedule-conflict-20260813",
         reason: "顾客希望改到这个已经被占用的时间",
+        expectedStaffId: original.booking.staff.id,
+        expectedStartsAt: original.booking.startsAt,
         staffId: blocker.booking.staff.id,
         startsAt: blocker.booking.startsAt,
       },
@@ -360,6 +366,122 @@ describe("店长改期与店长取消", () => {
     expect(sideEffects.rows[0]).toEqual({ event_count: 0, notification_count: 0 });
   });
 
+  it("不同幂等键仍不能用旧页面事实覆盖先成立的同状态改期", async () => {
+    const created = await createCustomerBooking(
+      "pet-manager-change-stale",
+      "manager-change-create-stale",
+    );
+    const optionsResponse = await app.inject({
+      method: "GET",
+      url: `/backoffice/manager/bookings/${created.booking.id}/reschedule-options`,
+      headers: { cookie: managerCookie },
+    });
+    const slots = optionsResponse
+      .json<ManagerRescheduleBookingOptionsResponse>()
+      .availability?.days.flatMap((day) => day.slots);
+    const firstTarget = slots?.[0];
+    const staleTarget = slots?.find(
+      (slot) =>
+        firstTarget &&
+        slot.startsAt !== firstTarget.startsAt &&
+        Date.parse(slot.startsAt) >= Date.parse(firstTarget.endsAt),
+    );
+    expect(firstTarget).toBeDefined();
+    expect(staleTarget).toBeDefined();
+    const expectedCurrent = {
+      expectedStaffId: created.booking.staff.id,
+      expectedStartsAt: created.booking.startsAt,
+    };
+
+    const first = await app.inject({
+      method: "POST",
+      url: `/backoffice/manager/bookings/${created.booking.id}/reschedule`,
+      headers: { cookie: managerCookie, origin: adminOrigin },
+      payload: {
+        idempotencyKey: "manager-reschedule-stale-first",
+        reason: "第一个店长已经与顾客确认",
+        staffId: firstTarget?.staff.id,
+        startsAt: firstTarget?.startsAt,
+        ...expectedCurrent,
+      },
+    });
+    const staleReschedule = await app.inject({
+      method: "POST",
+      url: `/backoffice/manager/bookings/${created.booking.id}/reschedule`,
+      headers: { cookie: managerCookie, origin: adminOrigin },
+      payload: {
+        idempotencyKey: "manager-reschedule-stale-second",
+        reason: "第二个店长仍基于旧页面提交",
+        staffId: staleTarget?.staff.id,
+        startsAt: staleTarget?.startsAt,
+        ...expectedCurrent,
+      },
+    });
+    const staleCancellation = await app.inject({
+      method: "POST",
+      url: `/backoffice/manager/bookings/${created.booking.id}/cancel`,
+      headers: { cookie: managerCookie, origin: adminOrigin },
+      payload: {
+        idempotencyKey: "manager-cancel-stale-after-reschedule",
+        reason: "旧页面不能取消新的安排",
+        ...expectedCurrent,
+      },
+    });
+
+    expect(first.statusCode).toBe(201);
+    for (const response of [staleReschedule, staleCancellation]) {
+      expect(response.statusCode).toBe(409);
+      expect(response.json()).toMatchObject({
+        code: "BOOKING_FACT_CHANGED",
+        booking: {
+          id: created.booking.id,
+          staff: { id: firstTarget?.staff.id },
+          startsAt: firstTarget?.startsAt,
+        },
+        managerActions: { canReschedule: true, canCancel: true },
+      });
+    }
+    const sideEffects = await database.pool.query<{
+      status: string;
+      staff_id: string;
+      starts_at: Date;
+      reschedule_count: number;
+      cancel_count: number;
+      reschedule_notification_count: number;
+      cancel_notification_count: number;
+    }>(
+      `
+        SELECT booking.status,
+               booking.staff_id,
+               booking.starts_at,
+               (SELECT count(*)::int FROM booking_events
+                WHERE booking_id = booking.id AND event_type = 'booking_rescheduled')
+                 AS reschedule_count,
+               (SELECT count(*)::int FROM booking_events
+                WHERE booking_id = booking.id AND event_type = 'booking_cancelled')
+                 AS cancel_count,
+               (SELECT count(*)::int FROM notification_outbox
+                WHERE booking_id = booking.id AND notification_type = 'booking_rescheduled')
+                 AS reschedule_notification_count,
+               (SELECT count(*)::int FROM notification_outbox
+                WHERE booking_id = booking.id AND notification_type = 'booking_cancelled')
+                 AS cancel_notification_count
+        FROM bookings AS booking
+        WHERE booking.id = $1
+      `,
+      [created.booking.id],
+    );
+    expect(sideEffects.rows[0]).toMatchObject({
+      status: "confirmed",
+      staff_id: firstTarget?.staff.id,
+      starts_at: new Date(firstTarget?.startsAt ?? 0),
+      reschedule_count: 1,
+      cancel_count: 0,
+      reschedule_notification_count: 1,
+      cancel_notification_count: 0,
+    });
+  });
+
   it("店长取消在核销前释放实际占用、作废核销码，并幂等追加历史与通知", async () => {
     const created = await createCustomerBooking(
       "pet-manager-change-cancel",
@@ -372,6 +494,8 @@ describe("店长改期与店长取消", () => {
       payload: {
         idempotencyKey: "manager-cancel-success-20260813",
         reason: "门店临时无法按线下约定提供服务",
+        expectedStaffId: created.booking.staff.id,
+        expectedStartsAt: created.booking.startsAt,
       },
     };
 
@@ -462,6 +586,8 @@ describe("店长改期与店长取消", () => {
       payload: {
         idempotencyKey: "manager-cancel-after-check-in",
         reason: "不能覆盖已经成立的到店事实",
+        expectedStaffId: created.booking.staff.id,
+        expectedStartsAt: created.booking.startsAt,
       },
     });
     const reschedule = await app.inject({
@@ -471,6 +597,8 @@ describe("店长改期与店长取消", () => {
       payload: {
         idempotencyKey: "manager-reschedule-after-check-in",
         reason: "不能覆盖已经成立的到店事实",
+        expectedStaffId: created.booking.staff.id,
+        expectedStartsAt: created.booking.startsAt,
         staffId: created.booking.staff.id,
         startsAt: "2026-08-14T05:00:00.000Z",
       },
@@ -509,6 +637,8 @@ describe("店长改期与店长取消", () => {
       payload: {
         idempotencyKey: "manager-reschedule-reason-required",
         reason: " ",
+        expectedStaffId: "chenjia",
+        expectedStartsAt: "2026-08-14T03:00:00.000Z",
         staffId: "zhouning",
         startsAt: "2026-08-14T05:00:00.000Z",
       },
@@ -520,6 +650,8 @@ describe("店长改期与店长取消", () => {
       payload: {
         idempotencyKey: "manager-cancel-reason-required",
         reason: " ",
+        expectedStaffId: "chenjia",
+        expectedStartsAt: "2026-08-14T03:00:00.000Z",
       },
     });
 

@@ -147,6 +147,11 @@ describe("店长预约列表与代客预约页面", () => {
       if (url.endsWith("/backoffice/manager/bookings/booking-bohe-future")) {
         return jsonResponse({
           booking,
+          managerActions: {
+            canReschedule: true,
+            canCancel: true,
+            message: "可依据已经与顾客达成的线下约定改期或取消。",
+          },
           petProfile: {
             weightKg: 4.2,
             petSize: "small",

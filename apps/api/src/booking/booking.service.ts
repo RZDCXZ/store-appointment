@@ -22,10 +22,10 @@ import type {
   CustomerMessageDetailResponse,
   CustomerMessageKind,
   CustomerMessagesResponse,
+  ManagerCancelBookingInput,
   ManagerBookingChange,
   ManagerBookingChangeResponse,
   ManagerOfflineConsentSource,
-  ManagerBookingActions,
   ManagerProxyBookingResponse,
   ManagerRescheduleBookingOptionsResponse,
   ManagerRescheduleBookingInput,
@@ -48,6 +48,7 @@ import { DatabaseService } from "../database/database.service.js";
 import { getShanghaiLocalDate } from "../schedule/schedule-date.js";
 import { ServiceCatalogService } from "../service-catalog/service-catalog.service.js";
 import type { BackofficeIdentity } from "../auth/auth.types.js";
+import { managerBookingActions } from "./manager-booking-actions.js";
 
 interface PetRow {
   id: string;
@@ -525,6 +526,36 @@ function parseManagerRescheduleInput(body: unknown): ManagerRescheduleBookingInp
   return {
     ...schedule,
     reason: (input.reason as string).trim(),
+    ...parseManagerExpectedFact(input),
+  };
+}
+
+function parseManagerCancelInput(body: unknown): ManagerCancelBookingInput {
+  const input = body && typeof body === "object" ? (body as Record<string, unknown>) : {};
+  return {
+    ...parseCancelInput(body),
+    ...parseManagerExpectedFact(input),
+  };
+}
+
+function parseManagerExpectedFact(input: Record<string, unknown>): {
+  expectedStaffId: string;
+  expectedStartsAt: string;
+} {
+  const fieldErrors: Record<string, string> = {};
+  if (typeof input.expectedStaffId !== "string" || !idPattern.test(input.expectedStaffId)) {
+    fieldErrors.expectedStaffId = "请提供页面读取时的当前员工。";
+  }
+  if (
+    typeof input.expectedStartsAt !== "string" ||
+    !Number.isFinite(Date.parse(input.expectedStartsAt))
+  ) {
+    fieldErrors.expectedStartsAt = "请提供页面读取时的当前开始时间。";
+  }
+  if (Object.keys(fieldErrors).length > 0) validationError(fieldErrors);
+  return {
+    expectedStaffId: input.expectedStaffId as string,
+    expectedStartsAt: new Date(input.expectedStartsAt as string).toISOString(),
   };
 }
 
@@ -621,19 +652,6 @@ function customerActions(row: BookingRow): CustomerBookingActions {
       : row.status === "confirmed"
         ? "开始前已不足 12 小时，请联系门店处理。"
         : "当前预约状态不支持顾客自行改期或取消，如需帮助请联系门店。",
-  };
-}
-
-function managerActions(row: BookingRow): ManagerBookingActions {
-  const allowed = row.status === "confirmed";
-  return {
-    canReschedule: allowed,
-    canCancel: allowed,
-    message: allowed
-      ? "可依据已经与顾客达成的线下约定改期或取消。"
-      : row.status === "checked_in"
-        ? "预约已经到店核销，不能改期或取消；请继续完成服务或记录服务终止。"
-        : "当前预约状态不支持店长改期或取消。",
   };
 }
 
@@ -1289,7 +1307,7 @@ export class BookingService {
   ): Promise<ManagerBookingChangeResponse> {
     this.requireManager(manager);
     this.requireBookingId(bookingId);
-    const input = parseCancelInput(body);
+    const input = parseManagerCancelInput(body);
     const digest = requestDigest({ bookingId, ...input });
     const client = await this.database.pool.connect();
     const lockKey = `${manager.id}:manager_cancel:${input.idempotencyKey}`;
@@ -1332,6 +1350,7 @@ export class BookingService {
 
       const row = await this.findManagerBookingRow(client, bookingId, true);
       this.requireManagerChangeAllowed(row);
+      this.requireManagerExpectedFact(row, input);
       const applied = await this.applyAtomicCancellation(client, row, {
         actorType: "manager",
         actorId: manager.id,
@@ -1353,7 +1372,7 @@ export class BookingService {
       };
       const response: ManagerBookingChangeResponse = {
         booking: asBooking(applied.booking),
-        managerActions: managerActions(applied.booking),
+        managerActions: managerBookingActions(applied.booking.status),
         verificationCodeStatus: "invalidated",
         change,
       };
@@ -1465,7 +1484,7 @@ export class BookingService {
     } finally {
       client.release();
     }
-    const actions = managerActions(row);
+    const actions = managerBookingActions(row.status);
     if (!actions.canReschedule) {
       return {
         booking: asBooking(row),
@@ -1548,6 +1567,7 @@ export class BookingService {
 
       const row = await this.findManagerBookingRow(client, bookingId, true);
       this.requireManagerChangeAllowed(row);
+      this.requireManagerExpectedFact(row, input);
       const applied = await this.applyAtomicReschedule(client, row, input, {
         actorType: "manager",
         actorId: manager.id,
@@ -1570,7 +1590,7 @@ export class BookingService {
       };
       const response: ManagerBookingChangeResponse = {
         booking: asBooking(applied.booking),
-        managerActions: managerActions(applied.booking),
+        managerActions: managerBookingActions(applied.booking.status),
         verificationCodeStatus: "rotated",
         change,
       };
@@ -2579,9 +2599,29 @@ export class BookingService {
     if (row.status !== "confirmed") {
       businessError(
         "BOOKING_CHANGE_NOT_ALLOWED",
-        managerActions(row).message,
+        managerBookingActions(row.status).message,
         HttpStatus.CONFLICT,
-        { managerActions: managerActions(row), booking: asBooking(row) },
+        { managerActions: managerBookingActions(row.status), booking: asBooking(row) },
+      );
+    }
+  }
+
+  private requireManagerExpectedFact(
+    row: BookingRow,
+    expected: { expectedStaffId: string; expectedStartsAt: string },
+  ): void {
+    if (
+      row.staff_id !== expected.expectedStaffId ||
+      row.starts_at.toISOString() !== expected.expectedStartsAt
+    ) {
+      businessError(
+        "BOOKING_FACT_CHANGED",
+        "预约安排已被其他操作者更新，已保留对方成立的事实；请重新读取后再操作。",
+        HttpStatus.CONFLICT,
+        {
+          managerActions: managerBookingActions(row.status),
+          booking: asBooking(row),
+        },
       );
     }
   }

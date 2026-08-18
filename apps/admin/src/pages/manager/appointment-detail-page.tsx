@@ -86,26 +86,26 @@ export function ManagerAppointmentDetailPage(): React.JSX.Element {
           <section className="manager-detail-actions" aria-label="店长预约操作">
             <span>
               <small>当前可执行操作</small>
-              <strong>
-                {booking.status === "confirmed"
-                  ? "到店前可改期或取消"
-                  : (detail.managerActions?.message ?? "当前状态没有预约变更操作")}
-              </strong>
+              <strong>{detail.managerActions.message}</strong>
             </span>
-            {booking.status === "confirmed" ? (
+            {detail.managerActions.canCancel || detail.managerActions.canReschedule ? (
               <div>
-                <Link
-                  className="manager-secondary-link"
-                  to={`/manager/appointments/${booking.id}/cancel`}
-                >
-                  取消预约
-                </Link>
-                <Link
-                  className="manager-primary-link"
-                  to={`/manager/appointments/${booking.id}/reschedule`}
-                >
-                  店长改期
-                </Link>
+                {detail.managerActions.canCancel ? (
+                  <Link
+                    className="manager-secondary-link"
+                    to={`/manager/appointments/${booking.id}/cancel`}
+                  >
+                    取消预约
+                  </Link>
+                ) : null}
+                {detail.managerActions.canReschedule ? (
+                  <Link
+                    className="manager-primary-link"
+                    to={`/manager/appointments/${booking.id}/reschedule`}
+                  >
+                    店长改期
+                  </Link>
+                ) : null}
               </div>
             ) : null}
             {booking.status === "checked_in" ? (

@@ -224,6 +224,8 @@ describe("店长改期与店长取消页面", () => {
     expect(submittedBody).toMatchObject({
       idempotencyKey: expect.stringMatching(/^manager-reschedule-/),
       reason: "顾客电话确认稍晚到店",
+      expectedStaffId: "chenjia",
+      expectedStartsAt: customerBooking.startsAt,
       staffId: "zhouning",
       startsAt: "2026-08-14T05:00:00.000Z",
     });
@@ -286,6 +288,44 @@ describe("店长改期与店长取消页面", () => {
     expect(screen.getByRole("button", { name: "确认新安排" })).toBeEnabled();
   });
 
+  it("改期请求结果不明后修改原因会轮换幂等键", async () => {
+    const submittedBodies: Array<Record<string, unknown>> = [];
+    vi.spyOn(globalThis, "fetch").mockImplementation(async (input, init) => {
+      const url = String(input);
+      if (url.endsWith("/auth/session")) return jsonResponse({ account: managerAccount });
+      if (url.endsWith(`/backoffice/manager/bookings/${customerBooking.id}/reschedule-options`)) {
+        return jsonResponse({ booking: customerBooking, managerActions, availability });
+      }
+      if (
+        url.endsWith(`/backoffice/manager/bookings/${customerBooking.id}/reschedule`) &&
+        init?.method === "POST"
+      ) {
+        submittedBodies.push(JSON.parse(String(init.body)) as Record<string, unknown>);
+        return jsonResponse({ code: "REQUEST_FAILED", message: "响应暂时无法确认" }, 503);
+      }
+      throw new Error(`未处理请求：${url}`);
+    });
+    const router = createMemoryRouter(routes, {
+      initialEntries: [`/manager/appointments/${customerBooking.id}/reschedule`],
+    });
+    render(<RouterProvider router={router} />);
+
+    fireEvent.click(await screen.findByRole("radio", { name: /周宁.*13:00/ }));
+    fireEvent.change(screen.getByLabelText("改期原因"), {
+      target: { value: "第一次电话确认" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "确认新安排" }));
+    expect(await screen.findByRole("alert")).toHaveTextContent("响应暂时无法确认");
+
+    fireEvent.change(screen.getByLabelText("改期原因"), {
+      target: { value: "第二次电话确认" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "确认新安排" }));
+    await waitFor(() => expect(submittedBodies).toHaveLength(2));
+    expect(submittedBodies[1]?.idempotencyKey).not.toBe(submittedBodies[0]?.idempotencyKey);
+    expect(submittedBodies[1]).toMatchObject({ reason: "第二次电话确认" });
+  });
+
   it("取消确认路由恢复当前事实、要求原因，并在成功后显示通知后果", async () => {
     let submittedBody: Record<string, unknown> | undefined;
     vi.spyOn(globalThis, "fetch").mockImplementation(async (input, init) => {
@@ -332,7 +372,7 @@ describe("店长改期与店长取消页面", () => {
     expect(await screen.findByRole("heading", { name: "取消预约" })).toBeInTheDocument();
     expect(await screen.findByText(/取消后将立即释放实际占用/)).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "确认取消预约" })).toBeDisabled();
-    fireEvent.change(screen.getByLabelText("取消原因"), {
+    fireEvent.change(await screen.findByLabelText("取消原因"), {
       target: { value: "门店临时无法提供服务" },
     });
     fireEvent.click(screen.getByRole("button", { name: "确认取消预约" }));
@@ -342,6 +382,8 @@ describe("店长改期与店长取消页面", () => {
     expect(submittedBody).toMatchObject({
       idempotencyKey: expect.stringMatching(/^manager-cancel-/),
       reason: "门店临时无法提供服务",
+      expectedStaffId: "chenjia",
+      expectedStartsAt: customerBooking.startsAt,
     });
   });
 
@@ -376,7 +418,7 @@ describe("店长改期与店长取消页面", () => {
     render(<RouterProvider router={router} />);
 
     await screen.findByRole("heading", { name: "取消预约" });
-    fireEvent.change(screen.getByLabelText("取消原因"), {
+    fireEvent.change(await screen.findByLabelText("取消原因"), {
       target: { value: "尝试覆盖并发状态" },
     });
     fireEvent.click(screen.getByRole("button", { name: "确认取消预约" }));

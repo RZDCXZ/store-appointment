@@ -163,6 +163,8 @@ export interface ManagerRescheduleBookingOptionsResponse {
 export interface ManagerRescheduleBookingInput {
   idempotencyKey: string;
   reason: string;
+  expectedStaffId: string;
+  expectedStartsAt: string;
   staffId: string;
   startsAt: string;
 }
@@ -170,6 +172,8 @@ export interface ManagerRescheduleBookingInput {
 export interface ManagerCancelBookingInput {
   idempotencyKey: string;
   reason: string;
+  expectedStaffId: string;
+  expectedStartsAt: string;
 }
 
 export interface ManagerBookingChange {

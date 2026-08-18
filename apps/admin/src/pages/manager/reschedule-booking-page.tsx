@@ -63,7 +63,7 @@ export function ManagerRescheduleBookingPage(): React.JSX.Element {
   }
 
   async function submit(): Promise<void> {
-    if (!selected || !validReason) return;
+    if (!booking || !selected || !validReason) return;
     setError("");
     setSubmitting(true);
     try {
@@ -75,6 +75,8 @@ export function ManagerRescheduleBookingPage(): React.JSX.Element {
           body: JSON.stringify({
             idempotencyKey: managerChangeIdempotencyKey(bookingId, "reschedule"),
             reason: reason.trim(),
+            expectedStaffId: booking.staff.id,
+            expectedStartsAt: booking.startsAt,
             staffId: selected.staff.id,
             startsAt: selected.startsAt,
           }),
@@ -268,6 +270,7 @@ export function ManagerRescheduleBookingPage(): React.JSX.Element {
                   onChange={(event) => {
                     setReason(event.target.value);
                     setError("");
+                    discardManagerChangeIdempotencyKey(bookingId, "reschedule");
                   }}
                   placeholder="记录已经与顾客达成的线下约定"
                 />
