@@ -228,6 +228,7 @@ export interface PrimaryService {
   description: string;
   applicableSpecies: PetSpecies[];
   availableAddonIds: string[];
+  requiredSkillIds?: StaffSkillId[];
   specifications: ServiceSpecification[];
 }
 
@@ -236,6 +237,7 @@ export interface ServiceAddon {
   name: string;
   description: string;
   applicableSpecies: PetSpecies[];
+  requiredSkillIds?: StaffSkillId[];
   specifications: ServiceSpecification[];
 }
 
@@ -247,6 +249,72 @@ export interface StorefrontCatalogResponse {
 
 export type StaffSkillId =
   "dog-basic-care" | "dog-styling" | "cat-care" | "nail-care" | "deshedding-care" | "oral-care";
+
+export type ServiceCatalogItemStatus = "active" | "inactive";
+
+export interface ManagerServiceSpecification extends ServiceSpecification {
+  id: string;
+  status: ServiceCatalogItemStatus;
+  referencedByBookings: boolean;
+}
+
+export interface ManagerPrimaryService {
+  id: string;
+  name: string;
+  description: string;
+  applicableSpecies: PetSpecies[];
+  requiredSkillIds: StaffSkillId[];
+  availableAddonIds: string[];
+  specifications: ManagerServiceSpecification[];
+  status: ServiceCatalogItemStatus;
+  referencedByBookings: boolean;
+  updatedAt: string;
+}
+
+export interface ManagerServiceAddon {
+  id: string;
+  name: string;
+  description: string;
+  applicableSpecies: PetSpecies[];
+  requiredSkillIds: StaffSkillId[];
+  specifications: ManagerServiceSpecification[];
+  status: ServiceCatalogItemStatus;
+  referencedByBookings: boolean;
+  updatedAt: string;
+}
+
+export interface ManagerServiceCatalogResponse {
+  revision: number;
+  primaryServices: ManagerPrimaryService[];
+  addons: ManagerServiceAddon[];
+}
+
+export interface ManagerServiceSpecificationInput {
+  id?: string;
+  petSize: PetSize;
+  priceCents: number;
+  durationMinutes: number;
+  active?: boolean;
+}
+
+export interface ManagerPrimaryServiceInput {
+  expectedRevision: number;
+  name: string;
+  description: string;
+  applicableSpecies: PetSpecies[];
+  requiredSkillIds: StaffSkillId[];
+  availableAddonIds: string[];
+  specifications: ManagerServiceSpecificationInput[];
+}
+
+export interface ManagerServiceAddonInput {
+  expectedRevision: number;
+  name: string;
+  description: string;
+  applicableSpecies: PetSpecies[];
+  requiredSkillIds: StaffSkillId[];
+  specifications: ManagerServiceSpecificationInput[];
+}
 
 export interface ScheduleBusinessHours {
   status: "open" | "closed";
@@ -397,7 +465,13 @@ export function quoteBookingSelection(
     serviceDurationMinutes:
       primaryLine.durationMinutes +
       addons.reduce((total, addon) => total + addon.durationMinutes, 0),
-    requiredSkillIds: [primaryService.id, ...addonIds] as StaffSkillId[],
+    requiredSkillIds: [
+      ...(primaryService.requiredSkillIds ?? [primaryService.id as StaffSkillId]),
+      ...addons.flatMap((line) => {
+        const addon = catalog.addons.find((item) => item.id === line.id);
+        return addon?.requiredSkillIds ?? [line.id as StaffSkillId];
+      }),
+    ].filter((skill, index, skills) => skills.indexOf(skill) === index),
   };
 }
 

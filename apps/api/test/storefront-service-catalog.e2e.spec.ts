@@ -21,7 +21,7 @@ describe("门店首页与服务目录", () => {
     const response = await app.inject({ method: "GET", url: "/miniapp/storefront" });
 
     expect(response.statusCode).toBe(200);
-    expect(response.headers["cache-control"]).toBe("public, max-age=300");
+    expect(response.headers["cache-control"]).toBe("no-store");
     expect(response.json()).toEqual({
       store: {
         brandName: "茸光宠物洗护",
@@ -46,6 +46,7 @@ describe("门店首页与服务目录", () => {
           name: "犬基础洗护",
           description: "洗护、基础梳理、耳部与眼周清洁。",
           applicableSpecies: ["dog"],
+          requiredSkillIds: ["dog-basic-care"],
           availableAddonIds: ["nail-care", "deshedding-care", "oral-care"],
           specifications: [
             { petSize: "small", priceCents: 12800, durationMinutes: 60 },
@@ -58,6 +59,7 @@ describe("门店首页与服务目录", () => {
           name: "犬造型美容",
           description: "在完整洗护基础上完成犬只造型修剪。",
           applicableSpecies: ["dog"],
+          requiredSkillIds: ["dog-styling"],
           availableAddonIds: ["nail-care", "deshedding-care", "oral-care"],
           specifications: [
             { petSize: "small", priceCents: 22800, durationMinutes: 120 },
@@ -70,6 +72,7 @@ describe("门店首页与服务目录", () => {
           name: "猫咪洗护",
           description: "为猫咪提供低刺激洗护、梳理与基础清洁。",
           applicableSpecies: ["cat"],
+          requiredSkillIds: ["cat-care"],
           availableAddonIds: ["nail-care", "deshedding-care", "oral-care"],
           specifications: [
             { petSize: "small", priceCents: 16800, durationMinutes: 90 },
@@ -84,6 +87,7 @@ describe("门店首页与服务目录", () => {
           name: "修甲护理",
           description: "修整趾甲并检查足部状态。",
           applicableSpecies: ["dog", "cat"],
+          requiredSkillIds: ["nail-care"],
           specifications: [
             { petSize: "small", priceCents: 3000, durationMinutes: 15 },
             { petSize: "medium", priceCents: 3000, durationMinutes: 15 },
@@ -95,6 +99,7 @@ describe("门店首页与服务目录", () => {
           name: "除废毛护理",
           description: "按体型增加梳理时间，温和去除浮毛。",
           applicableSpecies: ["dog", "cat"],
+          requiredSkillIds: ["deshedding-care"],
           specifications: [
             { petSize: "small", priceCents: 6000, durationMinutes: 30 },
             { petSize: "medium", priceCents: 9000, durationMinutes: 45 },
@@ -106,6 +111,7 @@ describe("门店首页与服务目录", () => {
           name: "口腔清洁",
           description: "完成非医疗性质的日常口腔清洁。",
           applicableSpecies: ["dog", "cat"],
+          requiredSkillIds: ["oral-care"],
           specifications: [
             { petSize: "small", priceCents: 3500, durationMinutes: 15 },
             { petSize: "medium", priceCents: 3500, durationMinutes: 15 },

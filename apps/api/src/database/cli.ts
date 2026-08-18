@@ -66,6 +66,91 @@ async function withTransaction<T>(client: PoolClient, work: () => Promise<T>): P
   }
 }
 
+async function seedServiceCatalog(client: PoolClient): Promise<void> {
+  await client.query(
+    `
+      INSERT INTO service_catalog_state (singleton, revision)
+      VALUES (true, 1)
+      ON CONFLICT (singleton) DO UPDATE
+      SET revision = 1, updated_at = now()
+    `,
+  );
+  await client.query(
+    `
+      INSERT INTO service_catalog_items (
+        id, item_type, name, description, applicable_species,
+        required_skill_ids, display_order, active, updated_at
+      )
+      VALUES
+        ('dog-basic-care', 'primary_service', '犬基础洗护',
+         '洗护、基础梳理、耳部与眼周清洁。', ARRAY['dog'], ARRAY['dog-basic-care'], 10, true, now()),
+        ('dog-styling', 'primary_service', '犬造型美容',
+         '在完整洗护基础上完成犬只造型修剪。', ARRAY['dog'], ARRAY['dog-styling'], 20, true, now()),
+        ('cat-care', 'primary_service', '猫咪洗护',
+         '为猫咪提供低刺激洗护、梳理与基础清洁。', ARRAY['cat'], ARRAY['cat-care'], 30, true, now()),
+        ('nail-care', 'addon', '修甲护理',
+         '修整趾甲并检查足部状态。', ARRAY['dog', 'cat'], ARRAY['nail-care'], 10, true, now()),
+        ('deshedding-care', 'addon', '除废毛护理',
+         '按体型增加梳理时间，温和去除浮毛。', ARRAY['dog', 'cat'], ARRAY['deshedding-care'], 20, true, now()),
+        ('oral-care', 'addon', '口腔清洁',
+         '完成非医疗性质的日常口腔清洁。', ARRAY['dog', 'cat'], ARRAY['oral-care'], 30, true, now())
+      ON CONFLICT (id) DO UPDATE
+      SET item_type = excluded.item_type,
+          name = excluded.name,
+          description = excluded.description,
+          applicable_species = excluded.applicable_species,
+          required_skill_ids = excluded.required_skill_ids,
+          display_order = excluded.display_order,
+          active = true,
+          updated_at = now()
+    `,
+  );
+  await client.query(
+    `
+      INSERT INTO service_catalog_specifications (
+        id, item_id, pet_size, price_cents, duration_minutes, active, updated_at
+      )
+      VALUES
+        ('spec-dog-basic-care-small', 'dog-basic-care', 'small', 12800, 60, true, now()),
+        ('spec-dog-basic-care-medium', 'dog-basic-care', 'medium', 16800, 90, true, now()),
+        ('spec-dog-basic-care-large', 'dog-basic-care', 'large', 22800, 120, true, now()),
+        ('spec-dog-styling-small', 'dog-styling', 'small', 22800, 120, true, now()),
+        ('spec-dog-styling-medium', 'dog-styling', 'medium', 32800, 150, true, now()),
+        ('spec-dog-styling-large', 'dog-styling', 'large', 45800, 180, true, now()),
+        ('spec-cat-care-small', 'cat-care', 'small', 16800, 90, true, now()),
+        ('spec-cat-care-medium', 'cat-care', 'medium', 21800, 120, true, now()),
+        ('spec-cat-care-large', 'cat-care', 'large', 28800, 150, true, now()),
+        ('spec-nail-care-small', 'nail-care', 'small', 3000, 15, true, now()),
+        ('spec-nail-care-medium', 'nail-care', 'medium', 3000, 15, true, now()),
+        ('spec-nail-care-large', 'nail-care', 'large', 3000, 15, true, now()),
+        ('spec-deshedding-care-small', 'deshedding-care', 'small', 6000, 30, true, now()),
+        ('spec-deshedding-care-medium', 'deshedding-care', 'medium', 9000, 45, true, now()),
+        ('spec-deshedding-care-large', 'deshedding-care', 'large', 12000, 60, true, now()),
+        ('spec-oral-care-small', 'oral-care', 'small', 3500, 15, true, now()),
+        ('spec-oral-care-medium', 'oral-care', 'medium', 3500, 15, true, now()),
+        ('spec-oral-care-large', 'oral-care', 'large', 3500, 15, true, now())
+      ON CONFLICT (item_id, pet_size) DO UPDATE
+      SET price_cents = excluded.price_cents,
+          duration_minutes = excluded.duration_minutes,
+          active = true,
+          updated_at = now()
+    `,
+  );
+  await client.query("DELETE FROM service_catalog_primary_addons");
+  await client.query(
+    `
+      INSERT INTO service_catalog_primary_addons (primary_service_id, addon_id)
+      SELECT primary_service.id, addon.id
+      FROM service_catalog_items AS primary_service
+      CROSS JOIN service_catalog_items AS addon
+      WHERE primary_service.item_type = 'primary_service'
+        AND primary_service.id IN ('dog-basic-care', 'dog-styling', 'cat-care')
+        AND addon.item_type = 'addon'
+        AND addon.id IN ('nail-care', 'deshedding-care', 'oral-care')
+    `,
+  );
+}
+
 async function migrate(client: PoolClient): Promise<void> {
   await ensureMigrationTable(client);
 
@@ -118,6 +203,8 @@ async function seed(client: PoolClient): Promise<void> {
       [key, JSON.stringify(value)],
     );
   }
+
+  await seedServiceCatalog(client);
 
   const demoAccounts = [
     { id: "manager", username: "manager", displayName: "沈青", role: "manager" },
@@ -744,7 +831,7 @@ async function seed(client: PoolClient): Promise<void> {
 async function reset(client: PoolClient): Promise<void> {
   await withTransaction(client, async () => {
     await client.query(
-      "TRUNCATE TABLE app_metadata, notification_outbox, audit_events, booking_events, booking_idempotency_keys, booking_fulfilment_idempotency_keys, manager_booking_change_idempotency_keys, manager_proxy_booking_idempotency_keys, manager_proxy_booking_records, store_service_record_notes, store_service_records, staff_time_off_intervals, store_closure_intervals, staff_schedule_breaks, staff_schedule_shifts, staff_schedule_days, weekly_shift_template_breaks, weekly_shift_templates, store_business_hours, staff_skills, staff_members, privacy_consents, privacy_notices, bookings, pet_care_tags, pets, pet_photos, customer_sessions, demo_customer_profiles, customers, backoffice_sessions, backoffice_accounts",
+      "TRUNCATE TABLE app_metadata, notification_outbox, audit_events, booking_events, booking_idempotency_keys, booking_fulfilment_idempotency_keys, manager_booking_change_idempotency_keys, manager_proxy_booking_idempotency_keys, manager_proxy_booking_records, store_service_record_notes, store_service_records, staff_time_off_intervals, store_closure_intervals, staff_schedule_breaks, staff_schedule_shifts, staff_schedule_days, weekly_shift_template_breaks, weekly_shift_templates, store_business_hours, staff_skills, staff_members, privacy_consents, privacy_notices, bookings, pet_care_tags, pets, pet_photos, customer_sessions, demo_customer_profiles, customers, backoffice_sessions, backoffice_accounts, service_catalog_primary_addons, service_catalog_specifications, service_catalog_items, service_catalog_state",
     );
     await seed(client);
   });

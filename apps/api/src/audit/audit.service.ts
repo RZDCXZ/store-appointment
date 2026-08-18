@@ -6,18 +6,20 @@ import type { Pool, PoolClient } from "pg";
 import { DatabaseService } from "../database/database.service.js";
 
 export interface AppendAuditFact {
-  eventType: "customer_phone_revealed";
+  eventType:
+    | "customer_phone_revealed"
+    | "service_catalog_created"
+    | "service_catalog_updated"
+    | "service_catalog_deactivated";
   actor: {
-    type: "staff";
+    type: "staff" | "manager";
     id: string;
   };
   subject: {
-    type: "booking";
+    type: "booking" | "primary_service" | "addon";
     id: string;
   };
-  payload: {
-    customerId: string;
-  };
+  payload: Record<string, unknown>;
   occurredAt: string;
 }
 

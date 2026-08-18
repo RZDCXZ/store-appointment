@@ -15,7 +15,7 @@ export class ServiceCatalogController {
   @Get()
   @ApiOperation({ summary: "读取门店信息、主要服务、增项与确定服务规格" })
   storefront(@Res({ passthrough: true }) reply: FastifyReply): StorefrontCatalogResponse {
-    reply.header("Cache-Control", "public, max-age=300");
+    reply.header("Cache-Control", "no-store");
     return this.serviceCatalog.getStorefront();
   }
 }
