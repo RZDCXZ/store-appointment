@@ -151,7 +151,8 @@ describe("店长预约列表与代客预约页面", () => {
           managerActions: {
             canReschedule: true,
             canCancel: true,
-            message: "可依据已经与顾客达成的线下约定改期或取消。",
+            canCorrectContent: true,
+            message: "可依据已经与顾客达成的线下约定改期、取消或纠正预约内容。",
           },
           petProfile: {
             weightKg: 4.2,
@@ -209,6 +210,45 @@ describe("店长预约列表与代客预约页面", () => {
               },
               occurredAt: "2026-08-13T10:00:00.000Z",
             },
+            {
+              id: "event-content-correction",
+              type: "booking_content_corrected",
+              actorType: "manager",
+              actorId: "manager",
+              reason: "顾客确认复秤并增加修甲",
+              previous: {
+                pet: { ...booking.pet, weightKg: 4.8, petSize: "small" },
+                primaryService: {
+                  ...booking.primaryService,
+                  priceCents: 16800,
+                  durationMinutes: 90,
+                },
+                addons: [],
+                totalPriceCents: 16800,
+                serviceDurationMinutes: 90,
+                requiredSkillIds: ["cat-care"],
+              },
+              next: {
+                pet: { ...booking.pet, weightKg: 10.01, petSize: "medium" },
+                primaryService: {
+                  ...booking.primaryService,
+                  priceCents: 21800,
+                  durationMinutes: 120,
+                },
+                addons: [
+                  {
+                    id: "nail-care",
+                    name: "修甲护理",
+                    priceCents: 3000,
+                    durationMinutes: 15,
+                  },
+                ],
+                totalPriceCents: 24800,
+                serviceDurationMinutes: 135,
+                requiredSkillIds: ["cat-care", "nail-care"],
+              },
+              occurredAt: "2026-08-13T10:05:00.000Z",
+            },
           ],
           notifications: [
             {
@@ -237,6 +277,15 @@ describe("店长预约列表与代客预约页面", () => {
     expect(screen.getByText("店长 · created")).toBeInTheDocument();
     expect(screen.getByText(/原安排：陈嘉/)).toBeInTheDocument();
     expect(screen.getByText(/新安排：周宁/)).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "纠正预约内容" })).toHaveAttribute(
+      "href",
+      "/manager/appointments/booking-bohe-future/correction",
+    );
+    expect(screen.getByText("顾客确认复秤并增加修甲")).toBeInTheDocument();
+    expect(screen.getByText(/原内容：4.8 kg.*小型.*¥168.*90 分钟/)).toBeInTheDocument();
+    expect(
+      screen.getByText(/新内容：10.01 kg.*中型.*修甲护理.*¥248.*135 分钟/),
+    ).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: "通知记录" })).toBeInTheDocument();
     expect(screen.getByText("已发送 · 尝试 1 次")).toBeInTheDocument();
     expect(router.state.location.pathname).toBe("/manager/appointments/booking-bohe-future");

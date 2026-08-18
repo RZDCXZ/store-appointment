@@ -2685,6 +2685,185 @@ img.identity-avatar {
   margin-top: 18px;
 }
 
+/* MG-07 manager booking content correction */
+
+.manager-correction-comparison {
+  display: grid;
+  gap: 12px;
+  margin-bottom: 12px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.manager-correction-snapshot {
+  padding: 19px;
+  border: 1px solid var(--line-200);
+  border-radius: 12px;
+  background: var(--surface);
+}
+
+.manager-correction-snapshot:first-child {
+  border-color: var(--sage-200);
+  background: var(--sage-50);
+}
+
+.manager-correction-snapshot small {
+  color: var(--sage-700);
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+}
+
+.manager-correction-snapshot h3 {
+  margin: 8px 0;
+  font-size: 19px;
+}
+
+.manager-correction-snapshot p {
+  margin: 4px 0 0;
+  color: var(--ink-600);
+  font-size: 11px;
+  line-height: 1.55;
+}
+
+.manager-correction-fields {
+  display: grid;
+  gap: 12px;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+}
+
+.manager-correction-fields .manager-change-field {
+  margin-top: 14px;
+}
+
+.manager-correction-fields input {
+  width: 100%;
+  min-height: 44px;
+  padding: 0 12px;
+  border: 1px solid var(--line-200);
+  border-radius: 9px;
+  color: var(--ink-900);
+  background: var(--surface-strong);
+  font-size: 13px;
+}
+
+.manager-correction-service {
+  display: grid;
+  align-content: start;
+  gap: 7px;
+  margin-top: 14px;
+  padding: 12px;
+  border: 1px solid var(--line-200);
+  border-radius: 9px;
+  background: #f7f5f0;
+  font-size: 12px;
+}
+
+.manager-correction-service > span {
+  font-weight: 800;
+}
+
+.manager-correction-service small {
+  color: var(--ink-500);
+  line-height: 1.5;
+}
+
+.manager-correction-addons {
+  display: flex;
+  gap: 9px;
+  margin: 16px 0;
+  padding: 0;
+  border: 0;
+}
+
+.manager-correction-addons legend {
+  margin-bottom: 8px;
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.manager-correction-addons label {
+  display: flex;
+  min-height: 48px;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 11px;
+  border: 1px solid var(--line-200);
+  border-radius: 9px;
+  cursor: pointer;
+}
+
+.manager-correction-addons label:has(input:checked) {
+  border-color: var(--sage-700);
+  background: var(--sage-50);
+}
+
+.manager-correction-addons input {
+  width: 16px;
+  min-height: 16px;
+  margin: 0;
+  accent-color: var(--sage-700);
+}
+
+.manager-correction-addons span,
+.manager-correction-addons strong,
+.manager-correction-addons small {
+  display: block;
+}
+
+.manager-correction-addons strong {
+  font-size: 11px;
+}
+
+.manager-correction-addons small {
+  margin-top: 3px;
+  color: var(--ink-500);
+  font-size: 9px;
+}
+
+.manager-correction-validation {
+  display: grid;
+  gap: 8px;
+  border-color: var(--sage-200) !important;
+  background: var(--sage-50);
+}
+
+.manager-correction-validation p {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  margin: 0;
+  color: var(--sage-700);
+  font-size: 11px;
+  font-weight: 800;
+}
+
+.manager-change-alert p {
+  margin: 7px 0 0;
+}
+
+.manager-change-conflict nav {
+  display: flex;
+  gap: 13px;
+  margin-top: 10px;
+}
+
+.manager-change-conflict nav a {
+  color: currentColor;
+  font-size: 11px;
+  font-weight: 800;
+}
+
+@media (max-width: 680px) {
+  .manager-correction-comparison,
+  .manager-correction-fields {
+    grid-template-columns: 1fr;
+  }
+
+  .manager-correction-addons {
+    flex-direction: column;
+  }
+}
+
 .manager-proxy-form {
   display: grid;
   gap: 12px;

@@ -2,6 +2,7 @@ import {
   Body,
   Controller,
   Get,
+  HttpCode,
   HttpException,
   HttpStatus,
   Inject,
@@ -21,6 +22,9 @@ import {
   type BookingCompletionResponse,
   type BookingFulfilmentResponse,
   type BookingTerminationResponse,
+  type ManagerBookingContentCorrectionResponse,
+  type ManagerBookingCorrectionOptionsResponse,
+  type ManagerBookingCorrectionPreviewResponse,
   type ManagerBookingDetailResponse,
   type ManagerBookingListResponse,
   type ManagerProxyBookingResponse,
@@ -148,6 +152,41 @@ export class BackofficeController {
   ): Promise<ManagerRescheduleBookingOptionsResponse> {
     reply.header("Cache-Control", "no-store");
     return this.bookings.managerRescheduleOptions(bookingId);
+  }
+
+  @Get("manager/bookings/:bookingId/correction-options")
+  @UseGuards(ManagerGuard)
+  @ApiOperation({ summary: "按预约身份恢复 MG-07 当前服务快照与可纠正选项" })
+  managerBookingCorrectionOptions(
+    @Param("bookingId") bookingId: string,
+    @Res({ passthrough: true }) reply: FastifyReply,
+  ): Promise<ManagerBookingCorrectionOptionsResponse> {
+    reply.header("Cache-Control", "no-store");
+    return this.bookings.managerCorrectionOptions(bookingId);
+  }
+
+  @Post("manager/bookings/:bookingId/correction-preview")
+  @HttpCode(HttpStatus.OK)
+  @UseGuards(ManagerGuard, RequestOriginGuard)
+  @ApiOperation({ summary: "保存前重算 MG-07 价格、时长、技能和连续容量" })
+  managerBookingCorrectionPreview(
+    @Param("bookingId") bookingId: string,
+    @Body() body: unknown,
+    @Res({ passthrough: true }) reply: FastifyReply,
+  ): Promise<ManagerBookingCorrectionPreviewResponse> {
+    reply.header("Cache-Control", "no-store");
+    return this.bookings.managerCorrectionPreview(bookingId, body);
+  }
+
+  @Post("manager/bookings/:bookingId/correct-content")
+  @UseGuards(ManagerGuard, RequestOriginGuard)
+  @ApiOperation({ summary: "到店核销前原子纠正体重、服务规格和增项" })
+  managerCorrectBookingContent(
+    @Param("bookingId") bookingId: string,
+    @Body() body: unknown,
+    @Req() request: AuthenticatedRequest,
+  ): Promise<ManagerBookingContentCorrectionResponse> {
+    return this.bookings.managerCorrectContent(request.backofficeIdentity, bookingId, body);
   }
 
   @Post("manager/bookings/:bookingId/reschedule")

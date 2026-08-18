@@ -1,6 +1,10 @@
 import { Link, useParams } from "react-router-dom";
 import { ChevronLeftIcon, ClockIcon, PersonIcon, ReaderIcon } from "@radix-ui/react-icons";
-import type { ManagerBookingDetailResponse } from "@rongguang/contracts";
+import type {
+  BookingSelectionQuote,
+  CustomerBookingSchedule,
+  ManagerBookingDetailResponse,
+} from "@rongguang/contracts";
 
 import { managerBookingStatusLabels } from "../../manager-booking-presentation";
 import { useManagerResource } from "../../manager-live-resource";
@@ -40,6 +44,24 @@ const notificationStatusLabels = {
   retry: "待重试",
   failed: "发送失败",
 } as const;
+
+const sizeLabels = {
+  small: "小型",
+  medium: "中型",
+  large: "大型",
+} as const;
+
+function isContentSnapshot(
+  snapshot: CustomerBookingSchedule | BookingSelectionQuote,
+): snapshot is BookingSelectionQuote {
+  return "pet" in snapshot;
+}
+
+function correctionSnapshot(label: string, snapshot: BookingSelectionQuote): string {
+  const addons =
+    snapshot.addons.length > 0 ? snapshot.addons.map((addon) => addon.name).join("、") : "无增项";
+  return `${label}：${snapshot.pet.weightKg} kg · ${sizeLabels[snapshot.pet.petSize]} · 主要服务规格：${snapshot.primaryService.name} · ¥${(snapshot.primaryService.priceCents / 100).toLocaleString("zh-CN")} · ${snapshot.primaryService.durationMinutes} 分钟 · 增项：${addons} · 预约总计：¥${(snapshot.totalPriceCents / 100).toLocaleString("zh-CN")} · ${snapshot.serviceDurationMinutes} 分钟 · 所需技能：${snapshot.requiredSkillIds.join("、")}`;
+}
 
 export function ManagerAppointmentDetailPage(): React.JSX.Element {
   const { bookingId = "" } = useParams();
@@ -88,8 +110,18 @@ export function ManagerAppointmentDetailPage(): React.JSX.Element {
               <small>当前可执行操作</small>
               <strong>{detail.managerActions.message}</strong>
             </span>
-            {detail.managerActions.canCancel || detail.managerActions.canReschedule ? (
+            {detail.managerActions.canCancel ||
+            detail.managerActions.canReschedule ||
+            detail.managerActions.canCorrectContent ? (
               <div>
+                {detail.managerActions.canCorrectContent ? (
+                  <Link
+                    className="manager-secondary-link"
+                    to={`/manager/appointments/${booking.id}/correction`}
+                  >
+                    纠正预约内容
+                  </Link>
+                ) : null}
                 {detail.managerActions.canCancel ? (
                   <Link
                     className="manager-secondary-link"
@@ -207,13 +239,17 @@ export function ManagerAppointmentDetailPage(): React.JSX.Element {
                       </strong>
                       <span>{formatDateTime(event.occurredAt)}</span>
                       {event.reason ? <p>{event.reason}</p> : null}
-                      {event.previous ? (
+                      {event.previous && isContentSnapshot(event.previous) ? (
+                        <p>{correctionSnapshot("原内容", event.previous)}</p>
+                      ) : event.previous ? (
                         <p>
                           原安排：{event.previous.staff.displayName} ·{" "}
                           {formatDateTime(event.previous.startsAt)}
                         </p>
                       ) : null}
-                      {event.next ? (
+                      {event.next && isContentSnapshot(event.next) ? (
+                        <p>{correctionSnapshot("新内容", event.next)}</p>
+                      ) : event.next ? (
                         <p>
                           新安排：{event.next.staff.displayName} ·{" "}
                           {formatDateTime(event.next.startsAt)}

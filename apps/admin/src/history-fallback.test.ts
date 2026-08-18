@@ -39,6 +39,7 @@ describe("管理端浏览器路由 history fallback", () => {
     "/manager/appointments",
     "/manager/appointments/calendar?date=2026-08-13",
     "/manager/appointments/booking-direct-route",
+    "/manager/appointments/booking-direct-route/correction",
     "/manager/schedule",
     "/manager/schedule/published?date=2026-08-15",
     "/manager/services",

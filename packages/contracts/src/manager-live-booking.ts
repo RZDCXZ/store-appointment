@@ -1,6 +1,7 @@
 import type {
   PetSpecies,
   BookingAvailabilityResponse,
+  BookingSelectionQuote,
   BookingVerificationWindow,
   ConfirmedBooking,
   CustomerBookingSchedule,
@@ -136,8 +137,8 @@ export interface ManagerBookingDetailResponse {
     actorType: "customer" | "staff" | "manager" | "system";
     actorId: string | null;
     reason: string | null;
-    previous: CustomerBookingSchedule | null;
-    next: CustomerBookingSchedule | null;
+    previous: CustomerBookingSchedule | BookingSelectionQuote | null;
+    next: CustomerBookingSchedule | BookingSelectionQuote | null;
     occurredAt: string;
   }>;
   notifications: Array<{
@@ -152,7 +153,94 @@ export interface ManagerBookingDetailResponse {
 export interface ManagerBookingActions {
   canReschedule: boolean;
   canCancel: boolean;
+  canCorrectContent: boolean;
   message: string;
+}
+
+export interface ManagerBookingCorrectionOptionsResponse {
+  booking: ConfirmedBooking;
+  bookingRevision: number;
+  contentDigest: string;
+  managerActions: ManagerBookingActions;
+  currentContent: BookingSelectionQuote;
+  availableAddons: Array<{
+    id: string;
+    name: string;
+    description: string;
+  }>;
+}
+
+export interface ManagerBookingContentCorrectionInput {
+  idempotencyKey: string;
+  reason: string;
+  expectedStaffId: string;
+  expectedStartsAt: string;
+  expectedBookingRevision: number;
+  expectedContentDigest: string;
+  petWeightKg: number;
+  primaryServiceId: string;
+  addonIds: string[];
+}
+
+export type ManagerBookingCorrectionDraft = Pick<
+  ManagerBookingContentCorrectionInput,
+  "petWeightKg" | "primaryServiceId" | "addonIds"
+>;
+
+export interface ManagerBookingCorrectionPreviewResponse {
+  booking: ConfirmedBooking;
+  currentContent: BookingSelectionQuote;
+  candidateContent: BookingSelectionQuote;
+  interval: {
+    startsAt: string;
+    endsAt: string;
+    turnoverEndsAt: string;
+  };
+  validation: {
+    skill: {
+      status: "satisfied";
+      staff: { id: string; displayName: string };
+    };
+    capacity: { status: "available" };
+  };
+  canSave: true;
+}
+
+export interface ManagerBookingCorrectionFailureDetails {
+  booking: ConfirmedBooking;
+  blocker?: { bookingId: string } | null;
+  candidate: BookingSelectionQuote;
+  validation:
+    | {
+        skill: { status: "insufficient"; missingSkillIds: StaffSkillId[] };
+        capacity: { status: "not_checked" };
+      }
+    | {
+        skill: { status: "satisfied" };
+        capacity: { status: "insufficient"; reason: string };
+      };
+  nextSteps: Array<"change_staff" | "reschedule" | "cancel">;
+}
+
+export interface ManagerBookingContentCorrectionResponse {
+  booking: ConfirmedBooking;
+  bookingRevision: number;
+  contentDigest: string;
+  managerActions: ManagerBookingActions;
+  verificationCodeStatus: "unchanged";
+  change: {
+    id: string;
+    kind: "manager_content_corrected";
+    actor: {
+      type: "manager";
+      id: string;
+      displayName: string;
+    };
+    reason: string;
+    previous: BookingSelectionQuote;
+    next: BookingSelectionQuote;
+    occurredAt: string;
+  };
 }
 
 export interface ManagerRescheduleBookingOptionsResponse {

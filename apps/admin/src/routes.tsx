@@ -6,6 +6,7 @@ import { ManagerAppointmentsPage } from "./pages/manager/appointments-page";
 import { ManagerAppointmentDetailPage } from "./pages/manager/appointment-detail-page";
 import { ManagerAppointmentListPage } from "./pages/manager/appointment-list-page";
 import { ManagerCancelBookingPage } from "./pages/manager/cancel-booking-page";
+import { ManagerContentCorrectionPage } from "./pages/manager/content-correction-page";
 import { ManagerProxyBookingPage } from "./pages/manager/proxy-booking-page";
 import { ManagerRescheduleBookingPage } from "./pages/manager/reschedule-booking-page";
 import { ManagerTerminateBookingPage } from "./pages/manager/terminate-booking-page";
@@ -66,6 +67,10 @@ export const routes: RouteObject[] = [
           {
             path: "appointments/:bookingId/reschedule",
             element: <ManagerRescheduleBookingPage />,
+          },
+          {
+            path: "appointments/:bookingId/correction",
+            element: <ManagerContentCorrectionPage />,
           },
           { path: "appointments/:bookingId/cancel", element: <ManagerCancelBookingPage /> },
           {

@@ -1,4 +1,4 @@
-export type ManagerBookingChangeCommand = "reschedule" | "cancel" | "terminate";
+export type ManagerBookingChangeCommand = "reschedule" | "cancel" | "terminate" | "correction";
 
 export function managerChangeIdempotencyKey(
   bookingId: string,

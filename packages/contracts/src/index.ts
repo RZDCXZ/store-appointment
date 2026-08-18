@@ -583,7 +583,11 @@ export interface CustomerBookingHistoryResponse {
 }
 
 export type CustomerMessageKind =
-  "booking_confirmed" | "booking_rescheduled" | "booking_cancelled" | "booking_reminder";
+  | "booking_confirmed"
+  | "booking_rescheduled"
+  | "booking_cancelled"
+  | "booking_content_corrected"
+  | "booking_reminder";
 
 export interface CustomerMessage {
   id: string;

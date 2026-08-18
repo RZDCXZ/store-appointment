@@ -25,6 +25,11 @@ import type {
   ManagerCancelBookingInput,
   ManagerBookingChange,
   ManagerBookingChangeResponse,
+  ManagerBookingContentCorrectionInput,
+  ManagerBookingContentCorrectionResponse,
+  ManagerBookingCorrectionDraft,
+  ManagerBookingCorrectionOptionsResponse,
+  ManagerBookingCorrectionPreviewResponse,
   ManagerOfflineConsentSource,
   ManagerProxyBookingResponse,
   ManagerRescheduleBookingOptionsResponse,
@@ -220,6 +225,14 @@ interface AppliedCancellation {
   eventId: string;
   occurredAt: string;
   previous: CustomerBookingSchedule;
+}
+
+interface AppliedContentCorrection {
+  booking: BookingRow;
+  eventId: string;
+  occurredAt: string;
+  previous: BookingSelectionQuote;
+  next: BookingSelectionQuote;
 }
 
 interface DatabaseError {
@@ -538,6 +551,74 @@ function parseManagerCancelInput(body: unknown): ManagerCancelBookingInput {
   };
 }
 
+function parseManagerCorrectionDraft(body: unknown): ManagerBookingCorrectionDraft {
+  const input = body && typeof body === "object" ? (body as Record<string, unknown>) : {};
+  if ("petId" in input) {
+    businessError(
+      "BOOKING_CONTENT_REPLACEMENT_NOT_ALLOWED",
+      "纠正不能更换宠物；请取消当前预约后新建。",
+      HttpStatus.BAD_REQUEST,
+      { nextStep: "cancel_and_rebook" },
+    );
+  }
+  const fieldErrors: Record<string, string> = {};
+  if (
+    typeof input.petWeightKg !== "number" ||
+    !Number.isFinite(input.petWeightKg) ||
+    input.petWeightKg < 0.1 ||
+    input.petWeightKg > 99.99
+  ) {
+    fieldErrors.petWeightKg = "请填写 0.1–99.99kg 的当前体重。";
+  }
+  if (typeof input.primaryServiceId !== "string" || !idPattern.test(input.primaryServiceId)) {
+    fieldErrors.primaryServiceId = "主要服务无效。";
+  }
+  if (
+    !Array.isArray(input.addonIds) ||
+    input.addonIds.length > 3 ||
+    input.addonIds.some((id) => typeof id !== "string" || !idPattern.test(id)) ||
+    new Set(input.addonIds).size !== input.addonIds.length
+  ) {
+    fieldErrors.addonIds = "增项选择无效，请重新选择。";
+  }
+  if (Object.keys(fieldErrors).length > 0) validationError(fieldErrors);
+  return {
+    petWeightKg: Number((input.petWeightKg as number).toFixed(2)),
+    primaryServiceId: input.primaryServiceId as string,
+    addonIds: [...(input.addonIds as string[])].sort(),
+  };
+}
+
+function parseManagerContentCorrectionInput(body: unknown): ManagerBookingContentCorrectionInput {
+  const input = body && typeof body === "object" ? (body as Record<string, unknown>) : {};
+  const draft = parseManagerCorrectionDraft(body);
+  const fieldErrors: Record<string, string> = {};
+  if (typeof input.idempotencyKey !== "string" || !idempotencyPattern.test(input.idempotencyKey)) {
+    fieldErrors.idempotencyKey = "请提供 8–128 位稳定幂等键。";
+  }
+  if (
+    typeof input.reason !== "string" ||
+    input.reason.trim().length < 2 ||
+    input.reason.trim().length > 120
+  ) {
+    fieldErrors.reason = "请填写 2–120 字的纠正原因。";
+  }
+  if (
+    typeof input.expectedContentDigest !== "string" ||
+    !/^[0-9a-f]{64}$/.test(input.expectedContentDigest)
+  ) {
+    fieldErrors.expectedContentDigest = "请提供页面读取时的当前内容摘要。";
+  }
+  if (Object.keys(fieldErrors).length > 0) validationError(fieldErrors);
+  return {
+    idempotencyKey: input.idempotencyKey as string,
+    reason: (input.reason as string).trim(),
+    ...parseManagerExpectedFact(input),
+    expectedContentDigest: input.expectedContentDigest as string,
+    ...draft,
+  };
+}
+
 function parseManagerExpectedFact(input: Record<string, unknown>): {
   expectedStaffId: string;
   expectedStartsAt: string;
@@ -739,6 +820,11 @@ function asCustomerMessage(row: CustomerMessageRow): CustomerMessage {
     booking_cancelled: {
       title: "预约已取消",
       body: `${petName}的本次预约已取消。`,
+      actionLabel: "查看预约",
+    },
+    booking_content_corrected: {
+      title: "预约内容已更新",
+      body: `${petName}的${serviceName}内容已由门店纠正，请查看新的价格与预计时长。`,
       actionLabel: "查看预约",
     },
     booking_reminder: {
@@ -1529,6 +1615,234 @@ export class BookingService {
     };
   }
 
+  async managerCorrectionOptions(
+    bookingId: string,
+  ): Promise<ManagerBookingCorrectionOptionsResponse> {
+    this.requireBookingId(bookingId);
+    const client = await this.database.pool.connect();
+    let row: BookingRow;
+    try {
+      row = await this.findManagerBookingRow(client, bookingId);
+    } finally {
+      client.release();
+    }
+    const currentContent = currentSelection(row);
+    const catalog = this.catalog.getStorefront();
+    const primaryService = catalog.primaryServices.find(
+      (service) => service.id === row.primary_service_id_snapshot,
+    );
+    const availableAddonIds = new Set(primaryService?.availableAddonIds ?? []);
+
+    return {
+      booking: asBooking(row),
+      bookingRevision: row.verification_code_version,
+      contentDigest: requestDigest(currentContent),
+      managerActions: managerBookingActions(row.status),
+      currentContent,
+      availableAddons: catalog.addons
+        .filter(
+          (addon) =>
+            availableAddonIds.has(addon.id) &&
+            addon.applicableSpecies.includes(row.pet_species_snapshot),
+        )
+        .map(({ id, name, description }) => ({ id, name, description })),
+    };
+  }
+
+  async managerCorrectionPreview(
+    bookingId: string,
+    body: unknown,
+  ): Promise<ManagerBookingCorrectionPreviewResponse> {
+    this.requireBookingId(bookingId);
+    const draft = parseManagerCorrectionDraft(body);
+    const client = await this.database.pool.connect();
+    try {
+      const row = await this.findManagerBookingRow(client, bookingId);
+      this.requireManagerChangeAllowed(row);
+      const candidateContent = this.correctedSelection(row, draft);
+      const staff = await this.requireQualifiedCorrectionStaff(client, row, candidateContent);
+      const interval = await this.requireCorrectionCapacity(client, row, draft, candidateContent);
+      return {
+        booking: asBooking(row),
+        currentContent: currentSelection(row),
+        candidateContent,
+        interval,
+        validation: {
+          skill: {
+            status: "satisfied",
+            staff: { id: staff.id, displayName: staff.display_name },
+          },
+          capacity: { status: "available" },
+        },
+        canSave: true,
+      };
+    } finally {
+      client.release();
+    }
+  }
+
+  async managerCorrectContent(
+    manager: BackofficeIdentity,
+    bookingId: string,
+    body: unknown,
+  ): Promise<ManagerBookingContentCorrectionResponse> {
+    this.requireManager(manager);
+    this.requireBookingId(bookingId);
+    const input = parseManagerContentCorrectionInput(body);
+    const digest = requestDigest({ bookingId, ...input });
+    const client = await this.database.pool.connect();
+    const lockKey = `${manager.id}:manager_content_correction:${input.idempotencyKey}`;
+    let lockHeld = false;
+    let replayedFailure = false;
+
+    try {
+      await client.query("SELECT pg_advisory_lock(hashtextextended($1, 0))", [lockKey]);
+      lockHeld = true;
+      await client.query("BEGIN TRANSACTION ISOLATION LEVEL READ COMMITTED");
+      const existing = await client.query<ManagerChangeIdempotencyRow>(
+        `
+          SELECT request_digest, booking_id, response_status, response_body
+          FROM manager_booking_change_idempotency_keys
+          WHERE manager_id = $1
+            AND command_type = 'manager_content_correction'
+            AND idempotency_key = $2
+        `,
+        [manager.id, input.idempotencyKey],
+      );
+      const previousResult = existing.rows[0];
+      if (previousResult) {
+        if (previousResult.request_digest !== digest) {
+          businessError(
+            "IDEMPOTENCY_KEY_REUSED",
+            "这个幂等键已经用于另一条预约内容纠正命令，请重新提交。",
+            HttpStatus.CONFLICT,
+          );
+        }
+        await client.query("COMMIT");
+        if (previousResult.booking_id && previousResult.response_status < 300) {
+          return previousResult.response_body as ManagerBookingContentCorrectionResponse;
+        }
+        if (!previousResult.response_body || typeof previousResult.response_body !== "object") {
+          throw new Error("预约内容纠正幂等结果缺少失败响应。");
+        }
+        replayedFailure = true;
+        throw new HttpException(previousResult.response_body, previousResult.response_status);
+      }
+
+      const row = await this.findManagerBookingRow(client, bookingId, true);
+      this.requireManagerChangeAllowed(row);
+      this.requireManagerExpectedFact(row, input);
+      if (requestDigest(currentSelection(row)) !== input.expectedContentDigest) {
+        businessError(
+          "BOOKING_FACT_CHANGED",
+          "预约内容已被其他操作者更新，原页面不会覆盖新事实；请重新读取后再操作。",
+          HttpStatus.CONFLICT,
+          {
+            booking: asBooking(row),
+            bookingRevision: row.verification_code_version,
+            contentDigest: requestDigest(currentSelection(row)),
+            managerActions: managerBookingActions(row.status),
+          },
+        );
+      }
+      const next = this.correctedSelection(row, input);
+      if (requestDigest(next) === input.expectedContentDigest) {
+        businessError(
+          "BOOKING_CONTENT_UNCHANGED",
+          "体重、服务规格和增项均未变化，无需保存纠正。",
+          HttpStatus.BAD_REQUEST,
+        );
+      }
+      await this.requireQualifiedCorrectionStaff(client, row, next);
+      const interval = await this.requireCorrectionCapacity(client, row, input, next);
+      const applied = await this.applyAtomicContentCorrection(client, row, input, next, interval, {
+        id: manager.id,
+        displayName: manager.displayName,
+      });
+      const response: ManagerBookingContentCorrectionResponse = {
+        booking: asBooking(applied.booking),
+        bookingRevision: applied.booking.verification_code_version,
+        contentDigest: requestDigest(applied.next),
+        managerActions: managerBookingActions(applied.booking.status),
+        verificationCodeStatus: "unchanged",
+        change: {
+          id: applied.eventId,
+          kind: "manager_content_corrected",
+          actor: { type: "manager", id: manager.id, displayName: manager.displayName },
+          reason: input.reason,
+          previous: applied.previous,
+          next: applied.next,
+          occurredAt: applied.occurredAt,
+        },
+      };
+      await client.query(
+        `
+          INSERT INTO manager_booking_change_idempotency_keys (
+            manager_id, command_type, idempotency_key, request_digest,
+            booking_id, response_status, response_body, created_at
+          )
+          VALUES ($1, 'manager_content_correction', $2, $3, $4, $5, $6::jsonb, $7)
+        `,
+        [
+          manager.id,
+          input.idempotencyKey,
+          digest,
+          bookingId,
+          HttpStatus.CREATED,
+          JSON.stringify(response),
+          applied.occurredAt,
+        ],
+      );
+      await client.query("COMMIT");
+      return response;
+    } catch (error) {
+      await client.query("ROLLBACK").catch(() => undefined);
+      const databaseError = error as DatabaseError;
+      if (
+        !replayedFailure &&
+        (this.isBookingTimeConflict(error) ||
+          databaseError.code === "23P01" ||
+          databaseError.code === "40001" ||
+          databaseError.code === "40P01")
+      ) {
+        await this.throwManagerCorrectionCapacityConflict(
+          manager,
+          bookingId,
+          input,
+          digest,
+          client,
+        );
+      }
+      if (!replayedFailure && error instanceof HttpException) {
+        await this.persistManagerChangeFailure(
+          client,
+          manager.id,
+          "manager_content_correction",
+          input.idempotencyKey,
+          digest,
+          error,
+        );
+      }
+      throw error;
+    } finally {
+      let releaseError: Error | undefined;
+      if (lockHeld) {
+        try {
+          const unlocked = await client.query<{ unlocked: boolean }>(
+            "SELECT pg_advisory_unlock(hashtextextended($1, 0)) AS unlocked",
+            [lockKey],
+          );
+          if (!unlocked.rows[0]?.unlocked) {
+            releaseError = new Error("预约内容纠正幂等锁未能释放，连接不可复用。");
+          }
+        } catch (error) {
+          releaseError = error instanceof Error ? error : new Error("预约内容纠正幂等锁释放失败。");
+        }
+      }
+      client.release(releaseError);
+    }
+  }
+
   async managerReschedule(
     manager: BackofficeIdentity,
     bookingId: string,
@@ -2268,6 +2582,111 @@ export class BookingService {
     };
   }
 
+  private async applyAtomicContentCorrection(
+    client: PoolClient,
+    row: BookingRow,
+    input: ManagerBookingContentCorrectionInput,
+    next: BookingSelectionQuote,
+    interval: { startsAt: string; endsAt: string; turnoverEndsAt: string },
+    manager: { id: string; displayName: string },
+  ): Promise<AppliedContentCorrection> {
+    const occurredAt = getDemoNow();
+    const previous = currentSelection(row);
+    const payload = { reason: input.reason, previous, next };
+    const eventId = randomUUID();
+
+    await client.query("UPDATE pets SET weight_kg = $2, updated_at = $3 WHERE id = $1", [
+      row.pet_id,
+      input.petWeightKg,
+      occurredAt,
+    ]);
+    await client.query(
+      `
+        UPDATE bookings
+        SET pet_weight_kg_snapshot = $2,
+            pet_size_snapshot = $3,
+            primary_service_name_snapshot = $4,
+            primary_service_price_cents = $5,
+            primary_service_duration_minutes = $6,
+            addon_snapshots = $7::jsonb,
+            required_skill_ids_snapshot = $8::jsonb,
+            total_price_cents = $9,
+            service_duration_minutes = $10,
+            ends_at = $11,
+            occupancy_ends_at = $12
+        WHERE id = $1
+      `,
+      [
+        row.id,
+        input.petWeightKg,
+        next.pet.petSize,
+        next.primaryService.name,
+        next.primaryService.priceCents,
+        next.primaryService.durationMinutes,
+        JSON.stringify(next.addons),
+        JSON.stringify(next.requiredSkillIds),
+        next.totalPriceCents,
+        next.serviceDurationMinutes,
+        interval.endsAt,
+        interval.turnoverEndsAt,
+      ],
+    );
+    await client.query(
+      `
+        INSERT INTO booking_events (
+          id, booking_id, event_type, actor_type, actor_id, payload, occurred_at
+        )
+        VALUES ($1, $2, 'booking_content_corrected', 'manager', $3, $4::jsonb, $5)
+      `,
+      [eventId, row.id, manager.id, JSON.stringify(payload), occurredAt],
+    );
+    await client.query(
+      `
+        INSERT INTO audit_events (
+          id, event_type, actor_type, actor_id, subject_type, subject_id, payload, occurred_at
+        )
+        VALUES (
+          $1, 'manager_booking_content_corrected', 'manager', $2,
+          'booking', $3, $4::jsonb, $5
+        )
+      `,
+      [randomUUID(), manager.id, row.id, JSON.stringify(payload), occurredAt],
+    );
+    await client.query(
+      `
+        INSERT INTO notification_outbox (
+          id, booking_id, customer_id, notification_type, payload,
+          status, available_at, created_at
+        )
+        VALUES (
+          $1, $2, $3, 'booking_content_corrected', $4::jsonb,
+          'pending', $5, $5
+        )
+      `,
+      [
+        randomUUID(),
+        row.id,
+        row.customer_id,
+        JSON.stringify({
+          ...payload,
+          petName: next.pet.name,
+          serviceName: next.primaryService.name,
+          staffName: row.staff_display_name_snapshot,
+          startsAt: row.starts_at.toISOString(),
+          managerDisplayName: manager.displayName,
+        }),
+        occurredAt,
+      ],
+    );
+    return {
+      booking: await this.findManagerBookingRow(client, row.id),
+      eventId,
+      occurredAt,
+      previous,
+      next,
+    };
+  }
+
   private async throwManagerRescheduleTimeConflict(
     manager: BackofficeIdentity,
     bookingId: string,
@@ -2323,10 +2742,69 @@ export class BookingService {
     throw new HttpException(proposed, HttpStatus.CONFLICT);
   }
 
+  private async throwManagerCorrectionCapacityConflict(
+    manager: BackofficeIdentity,
+    bookingId: string,
+    input: ManagerBookingContentCorrectionInput,
+    digest: string,
+    client: PoolClient,
+  ): Promise<never> {
+    const row = await this.findManagerBookingRow(client, bookingId);
+    const candidate = this.correctedSelection(row, input);
+    const candidateEndsAt = new Date(
+      row.starts_at.getTime() + candidate.serviceDurationMinutes * 60_000,
+    );
+    const candidateOccupancyEndsAt = new Date(
+      candidateEndsAt.getTime() + row.turnover_minutes * 60_000,
+    );
+    const blocker = await client.query<{ id: string }>(
+      `
+        SELECT id
+        FROM bookings
+        WHERE id <> $1
+          AND status NOT IN ('cancelled', 'no_show')
+          AND (staff_id = $2 OR pet_id = $3)
+          AND tstzrange(occupancy_starts_at, occupancy_ends_at, '[)')
+              && tstzrange($4::timestamptz, $5::timestamptz, '[)')
+        ORDER BY starts_at, id
+        LIMIT 1
+      `,
+      [
+        row.id,
+        row.staff_id,
+        row.pet_id,
+        row.starts_at.toISOString(),
+        candidateOccupancyEndsAt.toISOString(),
+      ],
+    );
+    const proposed = {
+      code: "BOOKING_CORRECTION_CAPACITY_UNAVAILABLE",
+      message: "纠正保存时连续容量刚刚发生变化，原快照和实际占用保持不变；请换员工、改期或取消。",
+      booking: asBooking(row),
+      blocker: blocker.rows[0] ? { bookingId: blocker.rows[0].id } : null,
+      candidate,
+      validation: {
+        skill: { status: "satisfied" },
+        capacity: { status: "insufficient", reason: "concurrent_change" },
+      },
+      nextSteps: ["change_staff", "reschedule", "cancel"],
+    };
+    const conflict = new HttpException(proposed, HttpStatus.CONFLICT);
+    await this.persistManagerChangeFailure(
+      client,
+      manager.id,
+      "manager_content_correction",
+      input.idempotencyKey,
+      digest,
+      conflict,
+    );
+    throw conflict;
+  }
+
   private async persistManagerChangeFailure(
     client: PoolClient,
     managerId: string,
-    commandType: "manager_reschedule" | "manager_cancel",
+    commandType: "manager_reschedule" | "manager_cancel" | "manager_content_correction",
     idempotencyKey: string,
     digest: string,
     error: HttpException,
@@ -2787,6 +3265,41 @@ export class BookingService {
     }
   }
 
+  private correctedSelection(
+    row: BookingRow,
+    input: ManagerBookingCorrectionDraft,
+  ): BookingSelectionQuote {
+    if (input.primaryServiceId !== row.primary_service_id_snapshot) {
+      businessError(
+        "BOOKING_CONTENT_REPLACEMENT_NOT_ALLOWED",
+        "纠正不能更换为完全不同的主要服务；请取消当前预约后新建。",
+        HttpStatus.BAD_REQUEST,
+        { nextStep: "cancel_and_rebook" },
+      );
+    }
+    try {
+      return quoteBookingSelection(
+        {
+          id: row.pet_id,
+          name: row.pet_name_snapshot,
+          species: row.pet_species_snapshot,
+          weightKg: input.petWeightKg,
+          petSize: petSizeFor(input.petWeightKg),
+        },
+        this.catalog.getStorefront(),
+        input.primaryServiceId,
+        input.addonIds,
+      );
+    } catch (error) {
+      businessError(
+        "SERVICE_NOT_AVAILABLE",
+        error instanceof Error ? error.message : "服务已经停用或不再适用于这只宠物。",
+        HttpStatus.CONFLICT,
+        { nextStep: "service" },
+      );
+    }
+  }
+
   private async requireQualifiedStaff(
     client: PoolClient,
     staffId: string,
@@ -2818,12 +3331,132 @@ export class BookingService {
     return staff;
   }
 
+  private async requireQualifiedCorrectionStaff(
+    client: PoolClient,
+    row: BookingRow,
+    selection: BookingSelectionQuote,
+  ): Promise<StaffRow> {
+    const result = await client.query<StaffRow>(
+      `
+        SELECT staff.id,
+               account.display_name,
+               coalesce(array_agg(skill.skill_id ORDER BY skill.skill_id)
+                 FILTER (WHERE skill.skill_id IS NOT NULL), '{}') AS skills
+        FROM staff_members AS staff
+        JOIN backoffice_accounts AS account ON account.id = staff.id
+        LEFT JOIN staff_skills AS skill ON skill.staff_id = staff.id
+        WHERE staff.id = $1 AND staff.active = true AND account.active = true
+        GROUP BY staff.id, account.display_name
+      `,
+      [row.staff_id],
+    );
+    const staff = result.rows[0];
+    const currentSkills = new Set(staff?.skills ?? []);
+    const missingSkillIds = selection.requiredSkillIds.filter((skill) => !currentSkills.has(skill));
+    if (!staff || missingSkillIds.length > 0) {
+      businessError(
+        "BOOKING_CORRECTION_SKILL_MISMATCH",
+        `${staff?.display_name ?? row.staff_display_name_snapshot}当前不能覆盖纠正后全部员工技能，请换员工、改期或取消。`,
+        HttpStatus.CONFLICT,
+        {
+          booking: asBooking(row),
+          candidate: selection,
+          validation: {
+            skill: { status: "insufficient", missingSkillIds },
+            capacity: { status: "not_checked" },
+          },
+          nextSteps: ["change_staff", "reschedule", "cancel"],
+        },
+      );
+    }
+    return staff;
+  }
+
+  private async requireCorrectionCapacity(
+    client: PoolClient,
+    row: BookingRow,
+    input: ManagerBookingCorrectionDraft & { idempotencyKey?: string },
+    selection: BookingSelectionQuote,
+  ): Promise<{ startsAt: string; endsAt: string; turnoverEndsAt: string }> {
+    try {
+      return await this.requireAvailableInterval(
+        client,
+        {
+          idempotencyKey: input.idempotencyKey ?? "manager-correction-preview",
+          petId: row.pet_id,
+          primaryServiceId: row.primary_service_id_snapshot,
+          addonIds: input.addonIds,
+          staffId: row.staff_id,
+          staffPreference: { kind: "specified", staffId: row.staff_id },
+          startsAt: row.starts_at.toISOString(),
+        },
+        selection,
+        row.id,
+        "correction",
+      );
+    } catch (error) {
+      if (!(error instanceof HttpException) || error.getStatus() !== HttpStatus.CONFLICT) {
+        throw error;
+      }
+      const response = error.getResponse();
+      const code =
+        response && typeof response === "object" && "code" in response
+          ? String((response as { code: unknown }).code)
+          : "";
+      if (
+        ![
+          "STAFF_TIME_CONFLICT",
+          "PET_TIME_CONFLICT",
+          "SLOT_NO_LONGER_AVAILABLE",
+          "SLOT_OUTSIDE_OPEN_WINDOW",
+        ].includes(code)
+      ) {
+        throw error;
+      }
+      const candidateEndsAt = new Date(
+        row.starts_at.getTime() + selection.serviceDurationMinutes * 60_000,
+      );
+      const candidateOccupancyEndsAt = new Date(
+        candidateEndsAt.getTime() + row.turnover_minutes * 60_000,
+      );
+      const blocker = await client.query<{ id: string }>(
+        `
+          SELECT id
+          FROM bookings
+          WHERE id <> $1
+            AND staff_id = $2
+            AND status NOT IN ('cancelled', 'no_show')
+            AND tstzrange(occupancy_starts_at, occupancy_ends_at, '[)')
+                && tstzrange($3::timestamptz, $4::timestamptz, '[)')
+          ORDER BY starts_at, id
+          LIMIT 1
+        `,
+        [row.id, row.staff_id, row.starts_at.toISOString(), candidateOccupancyEndsAt.toISOString()],
+      );
+      businessError(
+        "BOOKING_CORRECTION_CAPACITY_UNAVAILABLE",
+        "纠正后的连续容量不足，原快照和实际占用保持不变；请换员工、改期或取消。",
+        HttpStatus.CONFLICT,
+        {
+          booking: asBooking(row),
+          blocker: blocker.rows[0] ? { bookingId: blocker.rows[0].id } : null,
+          candidate: selection,
+          validation: {
+            skill: { status: "satisfied" },
+            capacity: { status: "insufficient", reason: code },
+          },
+          nextSteps: ["change_staff", "reschedule", "cancel"],
+        },
+      );
+    }
+  }
+
   private async requireAvailableInterval(
     client: PoolClient,
     input: CreateBookingInput,
     selection: BookingSelectionQuote,
     excludeBookingId: string | null = null,
-    actor: "customer" | "manager" = "customer",
+    actor: "customer" | "manager" | "correction" = "customer",
   ): Promise<{ startsAt: string; endsAt: string; turnoverEndsAt: string }> {
     const startsAt = new Date(input.startsAt);
     const endsAt = new Date(startsAt.getTime() + selection.serviceDurationMinutes * 60_000);
@@ -2832,17 +3465,18 @@ export class BookingService {
     const window = bookingWindowFor(getDemoNow());
     const localMinute = localMinuteOfDay(startsAt);
     const earliestCandidate =
-      actor === "manager"
+      actor === "manager" || actor === "correction"
         ? earliestManagerCandidate(getDemoNow())
         : earliestCustomerCandidate(getDemoNow());
+    const enforceOpenWindow = actor !== "correction";
 
     if (
       startsAt.getUTCSeconds() !== 0 ||
       startsAt.getUTCMilliseconds() !== 0 ||
       localMinute % 30 !== 0 ||
-      startsAt.getTime() < Date.parse(earliestCandidate) ||
-      localDate < window.startsOn ||
-      localDate > window.endsOn ||
+      (enforceOpenWindow && startsAt.getTime() < Date.parse(earliestCandidate)) ||
+      (enforceOpenWindow && localDate < window.startsOn) ||
+      (enforceOpenWindow && localDate > window.endsOn) ||
       getShanghaiLocalDate(turnoverEndsAt) !== localDate
     ) {
       businessError(
