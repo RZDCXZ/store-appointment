@@ -76,7 +76,7 @@ export interface ManagerStaffDay {
   scheduleStatus: "published" | "no_schedule";
   source: "weekly_template" | "date_exception" | null;
   exception: {
-    kind: "adjusted_shift" | "special_break" | "day_off";
+    kind: "adjusted_shift" | "overtime" | "special_break" | "day_off";
     note: string;
   } | null;
   shifts: PublishedScheduleShift[];

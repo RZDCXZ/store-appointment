@@ -12,7 +12,8 @@
 | ST-05     | 迟到与爽约处理   | Web 后台   | `/staff/appointments/:bookingId/late`          | `apps/admin/src/pages/staff/late-page.tsx`                 | 已完成 | 直达、危险操作确认、结果恢复测试 + Vite history fallback  |
 | MG-01     | 店长今日工作台   | Web 后台   | `/manager/workbench`                           | `apps/admin/src/pages/manager/workbench-page.tsx`          | 骨架   | Vite history fallback + 角色路由测试                      |
 | —         | 店长预约入口     | Web 后台   | `/manager/appointments`                        | `apps/admin/src/pages/manager/appointments-page.tsx`       | 骨架   | Vite history fallback + 独立路由测试                      |
-| —         | 店长排班入口     | Web 后台   | `/manager/schedule`                            | `apps/admin/src/pages/manager/schedule-index-redirect.tsx` | 已完成 | 保留查询参数并重定向到 MG-09 已发布排班                   |
+| —         | 店长排班入口     | Web 后台   | `/manager/schedule`                            | `apps/admin/src/pages/manager/schedule-index-redirect.tsx` | 已完成 | 保留查询参数并重定向到 MG-08 模板与草稿工作区             |
+| MG-08     | 排班模板与草稿   | Web 后台   | `/manager/schedule/planning`                   | `apps/admin/src/pages/manager/schedule-planning-page.tsx`  | 已完成 | 周模板、14 天草稿、逐日例外、发布确认与预约影响提示       |
 | MG-09     | 已发布排班       | Web 后台   | `/manager/schedule/published?date=:date`       | `apps/admin/src/pages/manager/schedule-page.tsx`           | 已完成 | 指定日期直达、刷新恢复、角色边界与 history fallback 测试  |
 | MG-12     | 服务目录管理     | Web 后台   | `/manager/services`                            | `apps/admin/src/pages/manager/services-page.tsx`           | 已完成 | 目录读取、角色边界、直接路由刷新与恢复状态测试            |
 | MG-13     | 员工账号与技能   | Web 后台   | `/manager/services/staff`                      | `apps/admin/src/pages/manager/staff-page.tsx`              | 已完成 | 技能矩阵键盘操作、错误提示、角色边界与浏览器刷新测试      |

@@ -13,13 +13,25 @@ export interface AppendAuditFact {
     | "service_catalog_deactivated"
     | "staff_account_created"
     | "staff_skills_updated"
-    | "staff_account_deactivated";
+    | "staff_account_deactivated"
+    | "schedule_template_updated"
+    | "schedule_drafts_generated"
+    | "schedule_draft_updated"
+    | "schedule_published"
+    | "schedule_exception_updated";
   actor: {
     type: "staff" | "manager";
     id: string;
   };
   subject: {
-    type: "booking" | "primary_service" | "addon" | "staff";
+    type:
+      | "booking"
+      | "primary_service"
+      | "addon"
+      | "staff"
+      | "schedule_template"
+      | "schedule_draft"
+      | "published_schedule";
     id: string;
   };
   payload: Record<string, unknown>;

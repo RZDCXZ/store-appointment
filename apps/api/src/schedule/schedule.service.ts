@@ -31,7 +31,7 @@ interface StaffRow {
 interface ScheduleRow {
   staff_id: string;
   source: "weekly_template" | "date_exception";
-  exception_kind: "adjusted_shift" | "special_break" | "day_off" | null;
+  exception_kind: "adjusted_shift" | "overtime" | "special_break" | "day_off" | null;
   exception_note: string | null;
   shift_id: string | null;
   shift_starts_at: string | null;

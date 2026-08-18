@@ -394,7 +394,7 @@ export interface PublishedScheduleStaffDay {
   scheduleStatus: "published" | "no_schedule";
   source: "weekly_template" | "date_exception" | null;
   exception: {
-    kind: "adjusted_shift" | "special_break" | "day_off";
+    kind: "adjusted_shift" | "overtime" | "special_break" | "day_off";
     note: string;
   } | null;
   shifts: PublishedScheduleShift[];
@@ -412,6 +412,53 @@ export interface ManagerPublishedScheduleResponse {
   businessHours: ScheduleBusinessHours;
   draftDayCount: number;
   staffDays: PublishedScheduleStaffDay[];
+}
+
+export interface EditableScheduleShift extends ScheduleTimeInterval {
+  breaks: ScheduleTimeInterval[];
+}
+
+export interface WeeklyScheduleTemplateDay {
+  weekday: number;
+  businessHours: ScheduleBusinessHours;
+  shifts: EditableScheduleShift[];
+}
+
+export interface SchedulePlanningStaff {
+  id: string;
+  displayName: string;
+  employeeNumber: number;
+  templateDays: WeeklyScheduleTemplateDay[];
+}
+
+export interface ScheduleDraftStaffDay {
+  staffId: string;
+  status: "draft";
+  source: "weekly_template" | "date_exception";
+  exception: PublishedScheduleStaffDay["exception"];
+  shifts: EditableScheduleShift[];
+}
+
+export interface ScheduleDraftDay {
+  date: string;
+  weekday: number;
+  businessHours: ScheduleBusinessHours;
+  staffDays: ScheduleDraftStaffDay[];
+}
+
+export interface ManagerSchedulePlanningResponse {
+  timeZone: "Asia/Shanghai";
+  demoNow: string;
+  window: {
+    startsOn: string;
+    endsOn: string;
+  };
+  staff: SchedulePlanningStaff[];
+  draftDays: ScheduleDraftDay[];
+}
+
+export interface ManagerSchedulePublishResponse {
+  publishedCount: number;
 }
 
 export type BookingAvailabilityReason =

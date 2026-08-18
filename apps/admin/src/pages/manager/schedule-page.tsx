@@ -11,6 +11,11 @@ import {
 import { apiFetch, readApiError } from "../../api";
 import { useAuth } from "../../auth-context";
 import { PageHeading } from "../../page-components";
+import {
+  ScheduleExceptionEditor,
+  type ScheduleExceptionInput,
+} from "../../schedule-exception-editor";
+import { ScheduleNavigation } from "../../schedule-navigation";
 
 const weekdayLabels = ["周日", "周一", "周二", "周三", "周四", "周五", "周六"] as const;
 
@@ -29,6 +34,16 @@ interface ScheduleRequestState {
   forbidden: boolean;
   loading: boolean;
   refreshing: boolean;
+}
+
+interface AffectedBooking {
+  id: string;
+  petName: string;
+  serviceName: string;
+  staffName: string;
+  startsAt: string;
+  endsAt: string;
+  resolutionPath: string;
 }
 
 function scheduleDateFromDemoNow(value: string | undefined): string {
@@ -239,7 +254,15 @@ function ScheduleDateNavigation({ data }: { data: ManagerPublishedScheduleRespon
   );
 }
 
-function StaffScheduleCard({ day }: { day: PublishedScheduleStaffDay }): React.JSX.Element {
+function StaffScheduleCard({
+  day,
+  selectedDate,
+  onEdit,
+}: {
+  day: PublishedScheduleStaffDay;
+  selectedDate: string;
+  onEdit: (day: PublishedScheduleStaffDay) => void;
+}): React.JSX.Element {
   return (
     <article className="schedule-staff-card">
       <header>
@@ -306,7 +329,43 @@ function StaffScheduleCard({ day }: { day: PublishedScheduleStaffDay }): React.J
           ))}
         </div>
       )}
+      <button
+        type="button"
+        aria-label={`设置${day.staff.displayName}${dateParts(selectedDate).month}月${dateParts(selectedDate).day}日日期例外`}
+        onClick={() => onEdit(day)}
+      >
+        设置日期例外
+      </button>
     </article>
+  );
+}
+
+function PublishedScheduleImpactNotice({
+  bookings,
+}: {
+  bookings: AffectedBooking[];
+}): React.JSX.Element {
+  return (
+    <section className="schedule-impact-notice" role="alert">
+      <div>
+        <p>容量变更流程</p>
+        <h2>调整已阻断：{bookings.length} 笔预约受影响</h2>
+        <span>原已发布排班与容量保持不变。请逐笔换员工、改期或取消后再调整。</span>
+      </div>
+      <ul>
+        {bookings.map((booking) => (
+          <li key={booking.id}>
+            <span>
+              <strong>
+                {booking.petName} · {booking.serviceName}
+              </strong>
+              <small>{booking.staffName}</small>
+            </span>
+            <Link to={booking.resolutionPath}>处理{booking.petName}的预约</Link>
+          </li>
+        ))}
+      </ul>
+    </section>
   );
 }
 
@@ -315,6 +374,50 @@ export function ManagerSchedulePage(): React.JSX.Element {
   const selectedDate =
     searchParams.get("date") ?? scheduleDateFromDemoNow(import.meta.env.VITE_DEMO_NOW);
   const state = usePublishedSchedule(selectedDate);
+  const [editingDay, setEditingDay] = useState<PublishedScheduleStaffDay | null>(null);
+  const [saving, setSaving] = useState(false);
+  const [commandMessage, setCommandMessage] = useState<string | null>(null);
+  const [editorError, setEditorError] = useState<string | null>(null);
+  const [affectedBookings, setAffectedBookings] = useState<AffectedBooking[]>([]);
+
+  async function savePublishedException(body: ScheduleExceptionInput): Promise<void> {
+    if (!editingDay) return;
+    const member = editingDay.staff;
+    setSaving(true);
+    setEditorError(null);
+    setCommandMessage(null);
+    setAffectedBookings([]);
+    try {
+      const response = await apiFetch(
+        `/backoffice/manager/schedule/published/${member.id}/${selectedDate}/exception`,
+        {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(body),
+        },
+      );
+      if (!response.ok) {
+        const error = await readApiError(response);
+        if (error.status === 409 && error.code === "SCHEDULE_CHANGE_AFFECTS_BOOKINGS") {
+          const bookings = error.details.affectedBookings;
+          if (Array.isArray(bookings)) setAffectedBookings(bookings as AffectedBooking[]);
+          setEditingDay(null);
+        } else {
+          setEditorError(error.message);
+        }
+        return;
+      }
+      setEditingDay(null);
+      state.refresh();
+      setCommandMessage(
+        `${member.displayName}${dateParts(selectedDate).month}月${dateParts(selectedDate).day}日的日期例外已保存，容量已刷新。`,
+      );
+    } catch (error) {
+      setEditorError(error instanceof Error ? error.message : "日期例外保存失败，请稍后重试。");
+    } finally {
+      setSaving(false);
+    }
+  }
 
   return (
     <main className="page-shell schedule-page">
@@ -326,6 +429,7 @@ export function ManagerSchedulePage(): React.JSX.Element {
         }}
         badge="店长权限"
       />
+      <ScheduleNavigation />
       {state.forbidden ? <InPageForbidden /> : null}
       {state.loading ? <ScheduleLoading /> : null}
       {!state.loading && !state.forbidden && !state.data && state.error ? (
@@ -334,6 +438,10 @@ export function ManagerSchedulePage(): React.JSX.Element {
 
       {state.data && !state.forbidden ? (
         <>
+          {commandMessage ? <p role="status">{commandMessage}</p> : null}
+          {affectedBookings.length > 0 ? (
+            <PublishedScheduleImpactNotice bookings={affectedBookings} />
+          ) : null}
           <div className="schedule-toolbar">
             <div>
               <span>已发布窗口</span>
@@ -391,10 +499,33 @@ export function ManagerSchedulePage(): React.JSX.Element {
 
           <section className="schedule-staff-grid" aria-label="四名员工已发布排班">
             {state.data.staffDays.map((day) => (
-              <StaffScheduleCard day={day} key={day.staff.id} />
+              <StaffScheduleCard
+                day={day}
+                selectedDate={selectedDate}
+                onEdit={(selected) => {
+                  setEditorError(null);
+                  setEditingDay(selected);
+                }}
+                key={day.staff.id}
+              />
             ))}
           </section>
         </>
+      ) : null}
+      {editingDay && state.data ? (
+        <ScheduleExceptionEditor
+          key={`${editingDay.staff.id}-${selectedDate}`}
+          title={`设置${editingDay.staff.displayName}${dateParts(selectedDate).month}月${dateParts(selectedDate).day}日日期例外`}
+          eyebrow="已发布排班"
+          saveLabel="保存日期例外"
+          shifts={editingDay.shifts}
+          exception={editingDay.exception}
+          businessHours={state.data.businessHours}
+          pending={saving}
+          error={editorError}
+          onCancel={() => setEditingDay(null)}
+          onSave={(body) => void savePublishedException(body)}
+        />
       ) : null}
     </main>
   );
