@@ -128,6 +128,18 @@ export class BackofficeController {
     return this.staffFulfilment.bookingDetail(request.backofficeIdentity, bookingId);
   }
 
+  @Get("staff/bookings/:bookingId/pet-photo")
+  @ApiOperation({ summary: "仅向当前分配员工返回预约宠物的顾客上传照片" })
+  async staffBookingPetPhoto(
+    @Param("bookingId") bookingId: string,
+    @Req() request: AuthenticatedRequest,
+    @Res() reply: FastifyReply,
+  ): Promise<void> {
+    const photo = await this.staffFulfilment.bookingPetPhoto(request.backofficeIdentity, bookingId);
+    reply.header("Cache-Control", "private, no-store");
+    reply.type(photo.mimeType).send(photo.bytes);
+  }
+
   @Post("staff/bookings/:bookingId/customer-phone/reveal")
   @UseGuards(RequestOriginGuard)
   @ApiOperation({ summary: "当前分配员工确认后揭示完整手机号并追加审计事实" })

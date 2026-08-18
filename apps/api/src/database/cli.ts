@@ -695,6 +695,7 @@ async function seed(client: PoolClient): Promise<void> {
     `
       INSERT INTO privacy_consents (customer_id, notice_version, source, consented_at)
       VALUES
+        ('customer-gu-yan', '2026.08', 'miniapp_booking', '2026-08-12T06:14:00.000Z'),
         ('customer-cheng-mo', '2026.08', 'miniapp_booking', '2026-08-02T03:20:00.000Z'),
         ('customer-lu-yao', '2026.05', 'miniapp_booking', '2026-05-06T01:10:00.000Z')
       ON CONFLICT (customer_id, notice_version) DO UPDATE

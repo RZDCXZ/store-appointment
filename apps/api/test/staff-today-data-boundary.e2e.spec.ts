@@ -1,7 +1,11 @@
+import { unlink } from "node:fs/promises";
+import { join } from "node:path";
+
 import type { NestFastifyApplication } from "@nestjs/platform-fastify";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 import { createApplication } from "../src/bootstrap.js";
+import { getPetUploadDirectory } from "../src/config/environment.js";
 import { DatabaseService } from "../src/database/database.service.js";
 
 const adminOrigin = "http://localhost:5173";
@@ -32,7 +36,9 @@ async function login(app: NestFastifyApplication, username: string): Promise<str
   return sessionCookie(response);
 }
 
-async function createAssignedBooking(app: NestFastifyApplication): Promise<string> {
+async function createAssignedBooking(
+  app: NestFastifyApplication,
+): Promise<{ authorization: string; bookingId: string }> {
   const session = await app.inject({
     method: "POST",
     url: "/miniapp/demo-sessions",
@@ -55,7 +61,10 @@ async function createAssignedBooking(app: NestFastifyApplication): Promise<strin
   });
 
   expect(response.statusCode).toBe(201);
-  return response.json<{ booking: { id: string } }>().booking.id;
+  return {
+    authorization,
+    bookingId: response.json<{ booking: { id: string } }>().booking.id,
+  };
 }
 
 describe("员工今日工作与履约资料边界", () => {
@@ -64,18 +73,58 @@ describe("员工今日工作与履约资料边界", () => {
   let bookingId: string;
   let assignedCookie: string;
   let otherStaffCookie: string;
+  let uploadedPhotoId = "";
 
   beforeAll(async () => {
     app = await createApplication();
     await app.init();
     database = app.get(DatabaseService);
-    bookingId = await createAssignedBooking(app);
+    const assigned = await createAssignedBooking(app);
+    bookingId = assigned.bookingId;
     assignedCookie = await login(app, "chenjia");
     otherStaffCookie = await login(app, "linxia");
+
+    const pngBytes = Buffer.from([
+      0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0x00, 0x00, 0x00, 0x0d,
+    ]);
+    const uploadResponse = await app.inject({
+      method: "POST",
+      url: "/miniapp/pet-photos",
+      headers: { authorization: assigned.authorization },
+      payload: { mimeType: "image/png", base64Data: pngBytes.toString("base64") },
+    });
+    expect(uploadResponse.statusCode).toBe(201);
+    uploadedPhotoId = uploadResponse.json<{ photo: { id: string } }>().photo.id;
+
+    const petResponse = await app.inject({
+      method: "GET",
+      url: "/miniapp/pets/pet-bohe",
+      headers: { authorization: assigned.authorization },
+    });
+    expect(petResponse.statusCode).toBe(200);
+    const pet = petResponse.json<{ pet: Record<string, unknown> }>().pet;
+    const updateResponse = await app.inject({
+      method: "PUT",
+      url: "/miniapp/pets/pet-bohe",
+      headers: { authorization: assigned.authorization },
+      payload: { ...pet, photoId: uploadedPhotoId },
+    });
+    expect(updateResponse.statusCode).toBe(200);
   });
 
   afterAll(async () => {
+    await database.pool.query("UPDATE pets SET photo_id = NULL WHERE id = 'pet-bohe'");
     await database.pool.query("DELETE FROM bookings WHERE id = $1", [bookingId]);
+    if (uploadedPhotoId) {
+      const photoResult = await database.pool.query<{ storage_key: string }>(
+        "DELETE FROM pet_photos WHERE id = $1 RETURNING storage_key",
+        [uploadedPhotoId],
+      );
+      const storageKey = photoResult.rows[0]?.storage_key;
+      if (storageKey) {
+        await unlink(join(getPetUploadDirectory(), storageKey)).catch(() => undefined);
+      }
+    }
     await app.close();
   });
 
@@ -92,7 +141,14 @@ describe("员工今日工作与履约资料边界", () => {
       localDate: "2026-08-13",
       identity: { id: "chenjia", displayName: "陈嘉" },
       shifts: [{ startsAt: "10:30", endsAt: "19:00" }],
-      nextBooking: { pet: { id: "pet-bohe", name: "薄荷" }, staff: { id: "chenjia" } },
+      nextBooking: {
+        pet: {
+          id: "pet-bohe",
+          name: "薄荷",
+          photoPath: `/backoffice/staff/bookings/${bookingId}/pet-photo`,
+        },
+        staff: { id: "chenjia" },
+      },
       bookings: expect.arrayContaining([expect.objectContaining({ id: bookingId })]),
     });
     expect(JSON.stringify(todayResponse.json())).not.toContain("13951870341");
@@ -108,7 +164,7 @@ describe("员工今日工作与履约资料边界", () => {
     expect(detailResponse.json()).toMatchObject({
       booking: {
         id: bookingId,
-        customer: { id: "customer-cheng-mo", displayName: "程墨", phoneMasked: "139****0341" },
+        customer: { displayName: "程墨", phoneMasked: "139****0341" },
         pet: {
           id: "pet-bohe",
           name: "薄荷",
@@ -131,8 +187,37 @@ describe("员工今日工作与履约资料边界", () => {
         }),
       ],
     });
+    expect(detailResponse.json().booking.customer).not.toHaveProperty("id");
     expect(JSON.stringify(detailResponse.json())).not.toContain("13951870341");
     expect(JSON.stringify(detailResponse.json())).not.toContain("totalPriceCents");
+
+    const photoResponse = await app.inject({
+      method: "GET",
+      url: `/backoffice/staff/bookings/${bookingId}/pet-photo`,
+      headers: { cookie: assignedCookie },
+    });
+    expect(photoResponse.statusCode).toBe(200);
+    expect(photoResponse.headers["content-type"]).toContain("image/png");
+    expect(photoResponse.headers["cache-control"]).toBe("private, no-store");
+    expect(photoResponse.rawPayload).toEqual(
+      Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0x00, 0x00, 0x00, 0x0d]),
+    );
+
+    const otherStaffPhotoResponse = await app.inject({
+      method: "GET",
+      url: `/backoffice/staff/bookings/${bookingId}/pet-photo`,
+      headers: { cookie: otherStaffCookie },
+    });
+    expect(otherStaffPhotoResponse.statusCode).toBe(403);
+
+    const consentResult = await database.pool.query<{ consented_at: Date }>(
+      `
+        SELECT consented_at
+        FROM privacy_consents
+        WHERE customer_id = 'customer-gu-yan' AND notice_version = '2026.08'
+      `,
+    );
+    expect(consentResult.rows[0]?.consented_at).toEqual(new Date("2026-08-12T06:14:00.000Z"));
   });
 
   it("其他员工访问预约详情时得到明确无权限，而不是空数据或不存在", async () => {
@@ -181,7 +266,6 @@ describe("员工今日工作与履约资料边界", () => {
     expect(response.statusCode).toBe(201);
     expect(response.json()).toEqual({
       bookingId,
-      customerId: "customer-cheng-mo",
       phone: "13951870341",
       revealedAt: "2026-08-13T02:50:00.000Z",
     });

@@ -1,40 +1,21 @@
 import { useMemo, useState } from "react";
-import type { StaffBookingListResponse, StaffBookingSummary } from "@rongguang/contracts";
+import type { StaffBookingListResponse } from "@rongguang/contracts";
 
-import { formatShanghaiDate } from "../../staff-booking-presentation";
+import {
+  formatShanghaiDate,
+  matchesStaffAppointmentFilter,
+  type StaffAppointmentFilter,
+} from "../../staff-booking-presentation";
 import { StaffBookingRow, StaffPageError, StaffPageLoading } from "../../staff-booking-components";
 import { useStaffResource } from "../../staff-resource";
 
-type AppointmentFilter = "today" | "upcoming" | "ended";
-
-function shanghaiDate(value: string): string {
-  return new Intl.DateTimeFormat("en-CA", {
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-    timeZone: "Asia/Shanghai",
-  }).format(new Date(value));
-}
-
-function matchesFilter(
-  booking: StaffBookingSummary,
-  filter: AppointmentFilter,
-  demoNow: string,
-): boolean {
-  if (filter === "today") return shanghaiDate(booking.startsAt) === shanghaiDate(demoNow);
-  if (filter === "upcoming") {
-    return booking.action !== "ended" && Date.parse(booking.startsAt) > Date.parse(demoNow);
-  }
-  return booking.action === "ended";
-}
-
 export function StaffAppointmentsPage(): React.JSX.Element {
   const resource = useStaffResource<StaffBookingListResponse>("/backoffice/staff/bookings");
-  const [filter, setFilter] = useState<AppointmentFilter>("today");
+  const [filter, setFilter] = useState<StaffAppointmentFilter>("today");
   const bookings = useMemo(
     () =>
       resource.data?.bookings.filter((booking) =>
-        matchesFilter(booking, filter, resource.data?.demoNow ?? ""),
+        matchesStaffAppointmentFilter(booking, filter, resource.data?.demoNow ?? ""),
       ) ?? [],
     [filter, resource.data],
   );
@@ -60,6 +41,7 @@ export function StaffAppointmentsPage(): React.JSX.Element {
         {(
           [
             ["today", "今天"],
+            ["attention", "待处理"],
             ["upcoming", "接下来"],
             ["ended", "已结束"],
           ] as const

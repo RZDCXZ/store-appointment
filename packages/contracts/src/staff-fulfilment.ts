@@ -59,7 +59,6 @@ export interface StaffBookingListResponse {
 
 export interface StaffBookingDetailResponse {
   booking: StaffBookingSummary & {
-    customer: StaffBookingSummary["customer"] & { id: string };
     pet: StaffBookingSummary["pet"] & {
       weightKg: number;
       petSize: "small" | "medium" | "large";
@@ -87,7 +86,6 @@ export interface StaffBookingDetailResponse {
 
 export interface StaffPhoneRevealResponse {
   bookingId: string;
-  customerId: string;
   phone: string;
   revealedAt: string;
 }

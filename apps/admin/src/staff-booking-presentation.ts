@@ -1,4 +1,12 @@
-import type { StaffBookingAction, StaffBookingStatus } from "@rongguang/contracts";
+import type {
+  StaffBookingAction,
+  StaffBookingStatus,
+  StaffBookingSummary,
+} from "@rongguang/contracts";
+
+import { createApiUrl } from "./api";
+
+export type StaffAppointmentFilter = "today" | "attention" | "upcoming" | "ended";
 
 export const staffStatusLabels: Record<StaffBookingStatus, string> = {
   confirmed: "已确认",
@@ -41,4 +49,34 @@ export function formatShanghaiDateTime(value: string): string {
 
 export function serviceLabel(service: { name: string; addonNames: string[] }): string {
   return [service.name, ...service.addonNames].join(" + ");
+}
+
+function shanghaiDate(value: string): string {
+  return new Intl.DateTimeFormat("en-CA", {
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    timeZone: "Asia/Shanghai",
+  }).format(new Date(value));
+}
+
+export function matchesStaffAppointmentFilter(
+  booking: StaffBookingSummary,
+  filter: StaffAppointmentFilter,
+  demoNow: string,
+): boolean {
+  if (filter === "today") return shanghaiDate(booking.startsAt) === shanghaiDate(demoNow);
+  if (filter === "attention") {
+    return (
+      booking.action === "late" || booking.action === "check_in" || booking.action === "complete"
+    );
+  }
+  if (filter === "upcoming") {
+    return booking.action !== "ended" && Date.parse(booking.startsAt) > Date.parse(demoNow);
+  }
+  return booking.action === "ended";
+}
+
+export function staffPhotoSource(path: string): string {
+  return path.startsWith("/backoffice/") ? createApiUrl(path) : path;
 }

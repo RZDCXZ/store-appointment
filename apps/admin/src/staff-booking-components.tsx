@@ -5,6 +5,7 @@ import type { StaffBookingSummary } from "@rongguang/contracts";
 import {
   formatShanghaiClock,
   serviceLabel,
+  staffPhotoSource,
   staffActionLabels,
   staffStatusLabels,
 } from "./staff-booking-presentation";
@@ -34,7 +35,9 @@ export function StaffBookingRow({ booking }: { booking: StaffBookingSummary }): 
     >
       <time>{formatShanghaiClock(booking.startsAt)}</time>
       <span className="staff-booking-row__pet">
-        {booking.pet.photoPath ? <img src={booking.pet.photoPath} alt="" /> : null}
+        {booking.pet.photoPath ? (
+          <img src={staffPhotoSource(booking.pet.photoPath)} alt="" />
+        ) : null}
         <span>
           <strong>{booking.pet.name}</strong>
           <small>{serviceLabel(booking.service)}</small>

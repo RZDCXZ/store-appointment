@@ -13,6 +13,7 @@ import {
   formatShanghaiDateTime,
   serviceLabel,
   staffActionLabels,
+  staffPhotoSource,
 } from "../../staff-booking-presentation";
 import {
   StaffActionLabel,
@@ -120,7 +121,7 @@ export function StaffAppointmentDetailPage(): React.JSX.Element {
                 <h2>宠物资料</h2>
               </span>
               {booking.pet.photoPath ? (
-                <img src={booking.pet.photoPath} alt={booking.pet.name} />
+                <img src={staffPhotoSource(booking.pet.photoPath)} alt={booking.pet.name} />
               ) : null}
             </header>
             <dl>

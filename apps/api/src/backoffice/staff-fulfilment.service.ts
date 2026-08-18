@@ -1,3 +1,6 @@
+import { readFile } from "node:fs/promises";
+import { join } from "node:path";
+
 import { HttpException, HttpStatus, Inject, Injectable } from "@nestjs/common";
 import type {
   StaffBookingAction,
@@ -11,13 +14,12 @@ import type {
 
 import { AuditService } from "../audit/audit.service.js";
 import type { BackofficeIdentity } from "../auth/auth.types.js";
-import { getDemoNow } from "../config/environment.js";
+import { getDemoNow, getPetUploadDirectory } from "../config/environment.js";
 import { DatabaseService } from "../database/database.service.js";
 import { getShanghaiLocalDate } from "../schedule/schedule-date.js";
 
 interface BookingRow {
   id: string;
-  customer_id: string;
   customer_display_name: string;
   customer_phone: string;
   pet_id: string;
@@ -28,7 +30,8 @@ interface BookingRow {
   pet_sex: "male" | "female" | null;
   pet_birth_date: string | null;
   pet_coat_type: "short" | "long" | "double" | "curly" | "hairless" | "other" | null;
-  pet_photo_path: string | null;
+  pet_photo_id: string | null;
+  pet_seed_photo_path: string | null;
   pet_care_notes: string | null;
   care_tags: string[];
   primary_service_id_snapshot: string;
@@ -65,9 +68,14 @@ interface ServiceHistoryRow {
   completed_at: Date;
 }
 
+interface StaffPetPhotoRow {
+  staff_id: string;
+  mime_type: "image/jpeg" | "image/png" | null;
+  storage_key: string | null;
+}
+
 const bookingSelect = `
   booking.id,
-  booking.customer_id,
   customer.display_name AS customer_display_name,
   customer.phone AS customer_phone,
   booking.pet_id,
@@ -78,7 +86,8 @@ const bookingSelect = `
   pet.sex AS pet_sex,
   pet.birth_date::text AS pet_birth_date,
   pet.coat_type AS pet_coat_type,
-  pet.seed_photo_path AS pet_photo_path,
+  pet.photo_id AS pet_photo_id,
+  pet.seed_photo_path AS pet_seed_photo_path,
   pet.care_notes AS pet_care_notes,
   COALESCE(
     (SELECT jsonb_agg(tag.tag ORDER BY tag.tag) FROM pet_care_tags AS tag WHERE tag.pet_id = pet.id),
@@ -146,7 +155,9 @@ function summary(row: BookingRow, now: number): StaffBookingSummary {
       id: row.pet_id,
       name: row.pet_name,
       species: row.pet_species,
-      photoPath: row.pet_photo_path,
+      photoPath: row.pet_photo_id
+        ? `/backoffice/staff/bookings/${encodeURIComponent(row.id)}/pet-photo`
+        : row.pet_seed_photo_path,
       careTags: row.care_tags,
     },
     service: {
@@ -342,7 +353,6 @@ export class StaffFulfilmentService {
     return {
       booking: {
         ...booking,
-        customer: { ...booking.customer, id: row.customer_id },
         pet: {
           ...booking.pet,
           weightKg: Number(row.pet_weight_kg),
@@ -438,7 +448,6 @@ export class StaffFulfilmentService {
 
       return {
         bookingId: row.id,
-        customerId: row.customer_id,
         phone: row.customer_phone,
         revealedAt,
       };
@@ -448,5 +457,42 @@ export class StaffFulfilmentService {
     } finally {
       connection.release();
     }
+  }
+
+  async bookingPetPhoto(
+    identity: BackofficeIdentity,
+    bookingId: string,
+  ): Promise<{ bytes: Buffer; mimeType: "image/jpeg" | "image/png" }> {
+    requireStaff(identity);
+    const result = await this.database.pool.query<StaffPetPhotoRow>(
+      `
+        SELECT booking.staff_id, photo.mime_type, photo.storage_key
+        FROM bookings AS booking
+        JOIN pets AS pet ON pet.id = booking.pet_id
+        LEFT JOIN pet_photos AS photo ON photo.id = pet.photo_id
+        WHERE booking.id = $1
+      `,
+      [bookingId],
+    );
+    const row = result.rows[0];
+
+    if (!row) {
+      throw new HttpException(
+        { code: "BOOKING_NOT_FOUND", message: "找不到这笔预约。" },
+        HttpStatus.NOT_FOUND,
+      );
+    }
+    if (row.staff_id !== identity.id) forbidden();
+    if (!row.mime_type || !row.storage_key) {
+      throw new HttpException(
+        { code: "PET_PHOTO_NOT_FOUND", message: "这笔预约没有顾客上传的宠物照片。" },
+        HttpStatus.NOT_FOUND,
+      );
+    }
+
+    return {
+      bytes: await readFile(join(getPetUploadDirectory(), row.storage_key)),
+      mimeType: row.mime_type,
+    };
   }
 }

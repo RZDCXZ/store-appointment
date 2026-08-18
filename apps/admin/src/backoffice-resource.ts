@@ -52,6 +52,7 @@ export function useBackofficeResource<T>(
           }
           setState((current) => ({
             ...current,
+            data: error.status === 403 ? null : current.data,
             error: error.message,
             forbidden: error.status === 403,
             loading: false,

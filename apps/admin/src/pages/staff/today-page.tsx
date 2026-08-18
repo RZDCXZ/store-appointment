@@ -13,6 +13,7 @@ import {
   formatShanghaiDate,
   serviceLabel,
   staffActionLabels,
+  staffPhotoSource,
 } from "../../staff-booking-presentation";
 import {
   StaffActionLabel,
@@ -48,7 +49,9 @@ function NextBooking({ booking }: { booking: NonNullable<StaffTodayResponse["nex
         <StaffActionLabel booking={booking} />
       </header>
       <div className="staff-next-card__body">
-        {booking.pet.photoPath ? <img src={booking.pet.photoPath} alt={booking.pet.name} /> : null}
+        {booking.pet.photoPath ? (
+          <img src={staffPhotoSource(booking.pet.photoPath)} alt={booking.pet.name} />
+        ) : null}
         <div>
           <StaffStatusTag booking={booking} />
           <h3>{booking.pet.name}</h3>

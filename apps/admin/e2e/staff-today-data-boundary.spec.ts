@@ -64,6 +64,10 @@ test("员工在 390px 直达今日工作、恢复本人详情并确认揭示手�
     true,
   );
 
+  await page.goto("/staff/appointments/booking-lizi-cancelled/phone");
+  await expect(page.getByRole("heading", { name: "完整手机号不可揭示" })).toBeVisible();
+  await expect(page.getByRole("checkbox")).toHaveCount(0);
+
   await page.setViewportSize({ width: 1280, height: 900 });
   await page.goto("/staff/today");
   await expect(page.getByRole("heading", { name: "我的今日工作" })).toBeVisible();
@@ -77,4 +81,7 @@ test("员工在 390px 直达今日工作、恢复本人详情并确认揭示手�
   await page.goto(`/staff/appointments/${bookingId}`);
   await expect(page.getByRole("heading", { name: "没有预约访问权限" })).toBeVisible();
   await expect(page.getByText("当前员工只能读取分配给自己的预约。", { exact: true })).toBeVisible();
+  await page.goto(`/staff/appointments/${bookingId}/phone`);
+  await expect(page.getByRole("heading", { name: "没有手机号访问权限" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "重新读取" })).toHaveCount(0);
 });
