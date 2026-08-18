@@ -128,13 +128,11 @@ export interface StoreServiceRecord {
   primaryService: {
     id: string;
     name: string;
-    priceCents: number;
     durationMinutes: number;
   };
   addons: Array<{
     id: string;
     name: string;
-    priceCents: number;
     durationMinutes: number;
   }>;
   staff: {
@@ -179,7 +177,7 @@ export interface BookingCompletionResponse {
   outcome: "completed";
   occurredAt: string;
   actor: {
-    type: "staff" | "manager";
+    type: "staff";
     id: string;
     displayName: string;
   };

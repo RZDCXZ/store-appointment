@@ -437,8 +437,16 @@ export class StaffFulfilmentService {
             id: serviceRecordRow.id,
             bookingId: serviceRecordRow.booking_id,
             pet: serviceRecordRow.pet_snapshot,
-            primaryService: serviceRecordRow.primary_service_snapshot,
-            addons: serviceRecordRow.addon_snapshots,
+            primaryService: {
+              id: serviceRecordRow.primary_service_snapshot.id,
+              name: serviceRecordRow.primary_service_snapshot.name,
+              durationMinutes: serviceRecordRow.primary_service_snapshot.durationMinutes,
+            },
+            addons: serviceRecordRow.addon_snapshots.map((addon) => ({
+              id: addon.id,
+              name: addon.name,
+              durationMinutes: addon.durationMinutes,
+            })),
             staff: serviceRecordRow.staff_snapshot,
             actualStartsAt: serviceRecordRow.actual_starts_at.toISOString(),
             actualEndsAt: serviceRecordRow.actual_ends_at.toISOString(),

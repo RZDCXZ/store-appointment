@@ -9,7 +9,11 @@ import type {
 
 import { apiFetch, readApiError } from "../../api";
 import { useAuth } from "../../auth-context";
-import { StaffPageError, StaffPageLoading } from "../../staff-booking-components";
+import {
+  StaffInlineRefreshError,
+  StaffPageError,
+  StaffPageLoading,
+} from "../../staff-booking-components";
 import { formatShanghaiDateTime } from "../../staff-booking-presentation";
 import {
   commandIdempotencyKey,
@@ -64,6 +68,7 @@ export function StaffServiceRecordPage(): React.JSX.Element {
         throw apiError;
       }
       setSubmittedNote((await response.json()) as StoreServiceRecordNoteResponse);
+      discardCommandIdempotencyKey(bookingId, "service_record_note");
       setText("");
       resource.refresh();
     } catch (caught) {
@@ -108,6 +113,10 @@ export function StaffServiceRecordPage(): React.JSX.Element {
             <p>ST-09 · 只追加记录</p>
             <h1>门店服务记录与追加说明</h1>
           </header>
+
+          {resource.error ? (
+            <StaffInlineRefreshError message={resource.error} retry={resource.refresh} />
+          ) : null}
 
           {submittedNote ? (
             <section className="staff-fulfilment-result" role="status">

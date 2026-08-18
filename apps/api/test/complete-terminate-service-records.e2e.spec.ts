@@ -91,8 +91,14 @@ describe("完成服务、服务终止与追加说明", () => {
         UPDATE bookings
         SET status = 'checked_in',
             completed_at = NULL,
+            starts_at = '2026-08-14T03:00:00.000Z',
+            ends_at = '2026-08-14T04:30:00.000Z',
             occupancy_starts_at = '2026-08-14T03:00:00.000Z',
-            occupancy_ends_at = '2026-08-14T04:45:00.000Z'
+            occupancy_ends_at = '2026-08-14T04:45:00.000Z',
+            original_starts_at = '2026-08-14T03:00:00.000Z',
+            original_ends_at = '2026-08-14T04:30:00.000Z',
+            original_occupancy_starts_at = '2026-08-14T03:00:00.000Z',
+            original_occupancy_ends_at = '2026-08-14T04:45:00.000Z'
         WHERE id = $1
       `,
       [bookingId],
@@ -111,6 +117,72 @@ describe("完成服务、服务终止与追加说明", () => {
         "2026-08-14T03:05:00.000Z",
       ],
     );
+  }
+
+  async function moveCurrentScheduleToAugust16(): Promise<void> {
+    await database.pool.query(
+      `
+        UPDATE bookings
+        SET starts_at = '2026-08-16T03:00:00.000Z',
+            ends_at = '2026-08-16T04:30:00.000Z',
+            occupancy_starts_at = '2026-08-16T03:00:00.000Z',
+            occupancy_ends_at = '2026-08-16T04:45:00.000Z'
+        WHERE id = $1
+      `,
+      [bookingId],
+    );
+    await database.pool.query(
+      `
+        UPDATE booking_events
+        SET occurred_at = '2026-08-16T03:05:00.000Z'
+        WHERE booking_id = $1 AND event_type = 'booking_checked_in'
+      `,
+      [bookingId],
+    );
+  }
+
+  async function expectStaffCapacityReleasedAt(releasedAt: string): Promise<void> {
+    const conflictingStart = new Date(Date.parse(releasedAt) - 1).toISOString();
+    const updateMaiya = (startsAt: string) =>
+      database.pool.query(
+        `
+          UPDATE bookings
+          SET staff_id = 'chenjia',
+              staff_display_name_snapshot = '陈嘉',
+              starts_at = $1::timestamptz,
+              ends_at = $1::timestamptz + interval '60 minutes',
+              occupancy_starts_at = $1::timestamptz,
+              occupancy_ends_at = $1::timestamptz + interval '75 minutes',
+              original_starts_at = $1::timestamptz,
+              original_ends_at = $1::timestamptz + interval '60 minutes',
+              original_occupancy_starts_at = $1::timestamptz,
+              original_occupancy_ends_at = $1::timestamptz + interval '75 minutes'
+          WHERE id = 'booking-maiya-today'
+        `,
+        [startsAt],
+      );
+
+    try {
+      await expect(updateMaiya(conflictingStart)).rejects.toMatchObject({ code: "23P01" });
+      await expect(updateMaiya(releasedAt)).resolves.toBeDefined();
+    } finally {
+      await database.pool.query(
+        `
+          UPDATE bookings
+          SET staff_id = 'linxia',
+              staff_display_name_snapshot = '林夏',
+              starts_at = '2026-08-13T03:00:00.000Z',
+              ends_at = '2026-08-13T04:00:00.000Z',
+              occupancy_starts_at = '2026-08-13T03:00:00.000Z',
+              occupancy_ends_at = '2026-08-13T04:15:00.000Z',
+              original_starts_at = '2026-08-13T03:00:00.000Z',
+              original_ends_at = '2026-08-13T04:00:00.000Z',
+              original_occupancy_starts_at = '2026-08-13T03:00:00.000Z',
+              original_occupancy_ends_at = '2026-08-13T04:15:00.000Z'
+          WHERE id = 'booking-maiya-today'
+        `,
+      );
+    }
   }
 
   beforeAll(async () => {
@@ -142,6 +214,25 @@ describe("完成服务、服务终止与追加说明", () => {
     await database.pool.query("UPDATE bookings SET status = 'confirmed' WHERE id = $1", [
       bookingId,
     ]);
+    const connection = await database.pool.connect();
+    try {
+      await connection.query("BEGIN");
+      await connection.query("SET LOCAL session_replication_role = replica");
+      await connection.query(
+        `
+          UPDATE store_service_records
+          SET pet_snapshot = '{"id":"pet-bohe","name":"薄荷","species":"cat","weightKg":4.8,"petSize":"small"}'::jsonb,
+              internal_text = '洗护过程配合良好，耳部清洁完成。'
+          WHERE id = 'service-record-bohe-completed'
+        `,
+      );
+      await connection.query("COMMIT");
+    } catch (error) {
+      await connection.query("ROLLBACK");
+      throw error;
+    } finally {
+      connection.release();
+    }
     vi.unstubAllEnvs();
     await app.close();
   });
@@ -179,6 +270,37 @@ describe("完成服务、服务终止与追加说明", () => {
         careTags: ["情绪稳定"],
         internalText: "洗护过程配合良好。",
         notes: [],
+      },
+    });
+    expect(JSON.stringify(response.json())).not.toContain("priceCents");
+    await expectStaffCapacityReleasedAt("2026-08-14T03:55:00.000Z");
+  });
+
+  it("改期到首次原计划之后的预约仍按当前计划完成并释放当前剩余容量", async () => {
+    await moveCurrentScheduleToAugust16();
+    vi.stubEnv("DEMO_NOW", "2026-08-16T03:40:00.000Z");
+
+    const response = await app.inject({
+      method: "POST",
+      url: `/backoffice/bookings/${bookingId}/complete`,
+      headers: { cookie: staffCookie, origin: adminOrigin },
+      payload: {
+        idempotencyKey: "complete-after-later-reschedule",
+        careTags: [],
+        internalText: null,
+      },
+    });
+
+    expect(response.statusCode).toBe(201);
+    expect(response.json()).toMatchObject({
+      status: "completed",
+      actualOccupancy: {
+        startsAt: "2026-08-16T03:00:00.000Z",
+        endsAt: "2026-08-16T03:55:00.000Z",
+      },
+      originalSchedule: {
+        startsAt: "2026-08-14T03:00:00.000Z",
+        occupancyEndsAt: "2026-08-14T04:45:00.000Z",
       },
     });
   });
@@ -246,6 +368,34 @@ describe("完成服务、服务终止与追加说明", () => {
       [bookingId],
     );
     expect(records.rows).toHaveLength(0);
+  });
+
+  it("改期到首次原计划之后的预约仍按当前计划终止并保留十五分钟周转", async () => {
+    await moveCurrentScheduleToAugust16();
+    vi.stubEnv("DEMO_NOW", "2026-08-16T03:25:00.000Z");
+
+    const response = await app.inject({
+      method: "POST",
+      url: `/backoffice/bookings/${bookingId}/terminate`,
+      headers: { cookie: staffCookie, origin: adminOrigin },
+      payload: {
+        idempotencyKey: "terminate-after-later-reschedule",
+        reason: "改期后到店应激，无法安全继续服务",
+      },
+    });
+
+    expect(response.statusCode).toBe(201);
+    expect(response.json()).toMatchObject({
+      status: "terminated",
+      actualOccupancy: {
+        startsAt: "2026-08-16T03:00:00.000Z",
+        endsAt: "2026-08-16T03:40:00.000Z",
+      },
+      originalSchedule: {
+        startsAt: "2026-08-14T03:00:00.000Z",
+        occupancyEndsAt: "2026-08-14T04:45:00.000Z",
+      },
+    });
   });
 
   it("计划开始前已核销后终止时可在周转结束后释放整段原计划容量", async () => {
@@ -358,6 +508,28 @@ describe("完成服务、服务终止与追加说明", () => {
     });
     expect(unverifiedCompletion.statusCode).toBe(409);
     expect(unverifiedCompletion.json()).toMatchObject({ code: "BOOKING_COMPLETION_NOT_ALLOWED" });
+
+    const unverifiedTermination = await app.inject({
+      method: "POST",
+      url: `/backoffice/bookings/${bookingId}/terminate`,
+      headers: { cookie: staffCookie, origin: adminOrigin },
+      payload: {
+        idempotencyKey: "terminate-without-check-in",
+        reason: "尚未核销时不能终止",
+      },
+    });
+    expect(unverifiedTermination.statusCode).toBe(409);
+    expect(unverifiedTermination.json()).toMatchObject({ code: "BOOKING_TERMINATION_NOT_ALLOWED" });
+    const unchanged = await database.pool.query<{
+      status: string;
+      occupancy_starts_at: Date;
+      occupancy_ends_at: Date;
+    }>("SELECT status, occupancy_starts_at, occupancy_ends_at FROM bookings WHERE id = $1", [
+      bookingId,
+    ]);
+    expect(unchanged.rows[0]).toMatchObject({ status: "confirmed" });
+    expect(unchanged.rows[0]?.occupancy_starts_at.toISOString()).toBe("2026-08-14T03:00:00.000Z");
+    expect(unchanged.rows[0]?.occupancy_ends_at.toISOString()).toBe("2026-08-14T04:45:00.000Z");
 
     await resetCheckedInBooking();
     vi.stubEnv("DEMO_NOW", "2026-08-13T02:50:00.000Z");
@@ -474,6 +646,52 @@ describe("完成服务、服务终止与追加说明", () => {
       serviceRecord: {
         internalText: "员工原始记录。",
         notes: [{ kind: "manager_correction", text: "更正：护理标签应补充为换毛期。" }],
+      },
+    });
+  });
+
+  it("隐私匿名化使用受控数据库函数清理不可变记录中的宠物身份与自由文字", async () => {
+    const completion = await app.inject({
+      method: "POST",
+      url: `/backoffice/bookings/${bookingId}/complete`,
+      headers: { cookie: staffCookie, origin: adminOrigin },
+      payload: {
+        idempotencyKey: "complete-before-service-record-anonymization",
+        careTags: ["情绪稳定"],
+        internalText: "含有宠物名称薄荷的内部记录。",
+      },
+    });
+    expect(completion.statusCode).toBe(201);
+    const recordId = completion.json<{ serviceRecord: { id: string } }>().serviceRecord.id;
+    vi.stubEnv("DEMO_NOW", "2026-08-14T03:45:00.000Z");
+    const note = await app.inject({
+      method: "POST",
+      url: `/backoffice/bookings/${bookingId}/service-record/notes`,
+      headers: { cookie: staffCookie, origin: adminOrigin },
+      payload: {
+        idempotencyKey: "append-before-service-record-anonymization",
+        text: "补充中也可能包含顾客或宠物身份。",
+      },
+    });
+    expect(note.statusCode).toBe(201);
+
+    const anonymized = await database.pool.query<{ anonymized_count: number }>(
+      "SELECT anonymize_store_service_records_for_customer($1) AS anonymized_count",
+      ["customer-cheng-mo"],
+    );
+    expect(anonymized.rows[0]?.anonymized_count).toBe(2);
+
+    const detail = await app.inject({
+      method: "GET",
+      url: `/backoffice/staff/bookings/${bookingId}`,
+      headers: { cookie: staffCookie },
+    });
+    expect(detail.statusCode).toBe(200);
+    expect(detail.json()).toMatchObject({
+      serviceRecord: {
+        pet: { id: `anonymized-${recordId}`, name: "已匿名宠物" },
+        internalText: null,
+        notes: [{ text: "[原说明已匿名化]" }],
       },
     });
   });

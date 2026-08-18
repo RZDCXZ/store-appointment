@@ -81,3 +81,20 @@ export function StaffPageError({
     </section>
   );
 }
+
+export function StaffInlineRefreshError({
+  message,
+  retry,
+}: {
+  message: string;
+  retry: () => void;
+}): React.JSX.Element {
+  return (
+    <div className="staff-inline-error" role="alert">
+      <span>状态重新读取失败：{message}</span>
+      <button type="button" onClick={retry}>
+        重试
+      </button>
+    </div>
+  );
+}

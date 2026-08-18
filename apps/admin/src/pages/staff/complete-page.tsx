@@ -10,7 +10,11 @@ import {
 
 import { apiFetch, readApiError } from "../../api";
 import { useAuth } from "../../auth-context";
-import { StaffPageError, StaffPageLoading } from "../../staff-booking-components";
+import {
+  StaffInlineRefreshError,
+  StaffPageError,
+  StaffPageLoading,
+} from "../../staff-booking-components";
 import { formatShanghaiDateTime, serviceLabel } from "../../staff-booking-presentation";
 import {
   commandIdempotencyKey,
@@ -113,6 +117,10 @@ export function StaffCompletePage(): React.JSX.Element {
             <p>ST-06 · 正常履约结果</p>
             <h1>完成服务</h1>
           </header>
+
+          {resource.error ? (
+            <StaffInlineRefreshError message={resource.error} retry={resource.refresh} />
+          ) : null}
 
           <section className="staff-fulfilment-summary">
             <span>

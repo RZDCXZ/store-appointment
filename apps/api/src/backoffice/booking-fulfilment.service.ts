@@ -312,9 +312,7 @@ export class BookingFulfilmentService {
         const actualStartsAt = checkIn.rows[0]?.occurred_at;
         if (!actualStartsAt) throw new Error("已到店预约缺少首次核销事实。");
 
-        const releasedAt = new Date(
-          Math.min(now + 15 * 60_000, row.original_occupancy_ends_at.getTime()),
-        );
+        const releasedAt = new Date(Math.min(now + 15 * 60_000, row.occupancy_ends_at.getTime()));
         const serviceRecord: StoreServiceRecord = {
           id: randomUUID(),
           bookingId: row.id,
@@ -328,10 +326,13 @@ export class BookingFulfilmentService {
           primaryService: {
             id: row.primary_service_id_snapshot,
             name: row.primary_service_name_snapshot,
-            priceCents: row.primary_service_price_cents,
             durationMinutes: row.primary_service_duration_minutes,
           },
-          addons: row.addon_snapshots,
+          addons: row.addon_snapshots.map((addon) => ({
+            id: addon.id,
+            name: addon.name,
+            durationMinutes: addon.durationMinutes,
+          })),
           staff: { id: row.staff_id, displayName: row.staff_display_name_snapshot },
           actualStartsAt: actualStartsAt.toISOString(),
           actualEndsAt: occurredAt,
@@ -430,7 +431,7 @@ export class BookingFulfilmentService {
 
         const occurredAt = getDemoNow();
         const releasedAt = new Date(
-          Math.min(Date.parse(occurredAt) + 15 * 60_000, row.original_occupancy_ends_at.getTime()),
+          Math.min(Date.parse(occurredAt) + 15 * 60_000, row.occupancy_ends_at.getTime()),
         );
         const hasRemainingOccupancy = releasedAt.getTime() > row.occupancy_starts_at.getTime();
         await client.query(

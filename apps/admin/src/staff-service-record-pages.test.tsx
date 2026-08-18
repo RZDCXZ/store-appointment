@@ -48,7 +48,6 @@ const serviceRecord = {
   primaryService: {
     id: "cat-care",
     name: "猫咪洗护",
-    priceCents: 16800,
     durationMinutes: 90,
   },
   addons: [],
@@ -229,6 +228,14 @@ describe("ST-06 / ST-07 / ST-09 门店服务记录路由", () => {
 
   it("可直达只读门店服务记录页并追加带作者时间的员工说明", async () => {
     let detailReads = 0;
+    const submittedKeys: string[] = [];
+    const savedNotes: Array<{
+      id: string;
+      kind: "staff_note";
+      text: string;
+      author: { type: "staff"; id: string; displayName: string };
+      createdAt: string;
+    }> = [];
     vi.spyOn(globalThis, "fetch").mockImplementation(async (input, init) => {
       const url = String(input);
       if (url.endsWith("/auth/session")) return jsonResponse({ account: staffAccount });
@@ -238,38 +245,31 @@ describe("ST-06 / ST-07 / ST-09 门店服务记录路由", () => {
           ...bookingDetail({ status: "completed", action: "ended" }),
           serviceRecord: {
             ...serviceRecord,
-            notes:
-              detailReads === 1
-                ? []
-                : [
-                    {
-                      id: "note-bohe",
-                      kind: "staff_note",
-                      text: "补充：左前爪修剪时略有躲闪。",
-                      author: { type: "staff", id: "chenjia", displayName: "陈嘉" },
-                      createdAt: "2026-08-14T03:45:00.000Z",
-                    },
-                  ],
+            notes: savedNotes,
           },
         });
       }
       if (url.endsWith(`/backoffice/bookings/${booking.id}/service-record/notes`)) {
         expect(init?.method).toBe("POST");
-        expect(JSON.parse(String(init?.body))).toMatchObject({
-          text: "补充：左前爪修剪时略有躲闪。",
-        });
+        const request = JSON.parse(String(init?.body)) as {
+          idempotencyKey: string;
+          text: string;
+        };
+        submittedKeys.push(request.idempotencyKey);
+        const note = {
+          id: `note-bohe-${savedNotes.length + 1}`,
+          kind: "staff_note" as const,
+          text: request.text,
+          author: { type: "staff" as const, id: "chenjia", displayName: "陈嘉" },
+          createdAt: `2026-08-14T03:${45 + savedNotes.length}:00.000Z`,
+        };
+        savedNotes.push(note);
         return jsonResponse(
           {
             bookingId: booking.id,
             serviceRecordId: serviceRecord.id,
-            occurredAt: "2026-08-14T03:45:00.000Z",
-            note: {
-              id: "note-bohe",
-              kind: "staff_note",
-              text: "补充：左前爪修剪时略有躲闪。",
-              author: { type: "staff", id: "chenjia", displayName: "陈嘉" },
-              createdAt: "2026-08-14T03:45:00.000Z",
-            },
+            occurredAt: note.createdAt,
+            note,
           },
           201,
         );
@@ -294,7 +294,64 @@ describe("ST-06 / ST-07 / ST-09 门店服务记录路由", () => {
     expect(await screen.findByText("补充：左前爪修剪时略有躲闪。")).toBeVisible();
     expect(screen.getByText(/陈嘉.*8月14日周五 11:45/)).toBeVisible();
     await waitFor(() => expect(detailReads).toBe(2));
+
+    fireEvent.change(screen.getByLabelText("追加说明"), {
+      target: { value: "再次补充：离店前情绪已经恢复稳定。" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "保存追加说明" }));
+    expect(await screen.findByText("再次补充：离店前情绪已经恢复稳定。")).toBeVisible();
+    await waitFor(() => expect(detailReads).toBe(3));
+    expect(submittedKeys).toHaveLength(2);
+    expect(submittedKeys[1]).not.toBe(submittedKeys[0]);
     expect(router.state.location.pathname).toBe(`/staff/appointments/${booking.id}/service-record`);
+  });
+
+  it("完成命令成功但状态回源失败时保留结果并提供明确重试入口", async () => {
+    let detailReads = 0;
+    vi.spyOn(globalThis, "fetch").mockImplementation(async (input) => {
+      const url = String(input);
+      if (url.endsWith("/auth/session")) return jsonResponse({ account: staffAccount });
+      if (url.endsWith(`/backoffice/staff/bookings/${booking.id}`)) {
+        detailReads += 1;
+        return detailReads === 1
+          ? jsonResponse(bookingDetail())
+          : jsonResponse({ code: "TEMPORARY_FAILURE", message: "状态回源暂时失败" }, 503);
+      }
+      if (url.endsWith(`/backoffice/bookings/${booking.id}/complete`)) {
+        return jsonResponse(
+          {
+            bookingId: booking.id,
+            status: "completed",
+            outcome: "completed",
+            occurredAt: "2026-08-14T03:40:00.000Z",
+            actor: { type: "staff", id: "chenjia", displayName: "陈嘉" },
+            actualOccupancy: {
+              startsAt: "2026-08-14T03:00:00.000Z",
+              endsAt: "2026-08-14T03:55:00.000Z",
+            },
+            originalSchedule: {
+              startsAt: booking.startsAt,
+              endsAt: booking.endsAt,
+              occupancyStartsAt: booking.startsAt,
+              occupancyEndsAt: "2026-08-14T04:45:00.000Z",
+            },
+            serviceRecord,
+          },
+          201,
+        );
+      }
+      throw new Error(`未处理的测试请求：${url}`);
+    });
+    const router = createMemoryRouter(routes, {
+      initialEntries: [`/staff/appointments/${booking.id}/complete`],
+    });
+
+    render(<RouterProvider router={router} />);
+    fireEvent.click(await screen.findByRole("button", { name: "完成服务并保存记录" }));
+
+    expect(await screen.findByRole("status")).toHaveTextContent("门店服务记录已保存");
+    expect(await screen.findByRole("alert")).toHaveTextContent("状态回源暂时失败");
+    expect(screen.getByRole("button", { name: "重试" })).toBeVisible();
   });
 
   it("已到店预约详情提供完成服务主行动与独立服务终止入口", async () => {
