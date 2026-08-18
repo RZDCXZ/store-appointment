@@ -1,4 +1,4 @@
-import { createHash, createHmac, randomUUID, timingSafeEqual } from "node:crypto";
+import { createHmac, randomUUID, timingSafeEqual } from "node:crypto";
 
 import { HttpException, HttpStatus, Inject, Injectable } from "@nestjs/common";
 import type {
@@ -92,6 +92,19 @@ function matchesVerificationCode(row: FulfilmentBookingRow, code: string): boole
   const expected = Buffer.from(verificationCodeDigest(row.id, code), "hex");
   const actual = Buffer.from(row.verification_code_digest, "hex");
   return actual.length === expected.length && timingSafeEqual(actual, expected);
+}
+
+function fulfilmentRequestDigest(
+  commandType: FulfilmentCommandType,
+  bookingId: string,
+  input: { idempotencyKey: string },
+): string {
+  return createHmac("sha256", getBookingCodeSecret())
+    .update("booking-fulfilment-request:v1\0")
+    .update(commandType)
+    .update("\0")
+    .update(JSON.stringify({ bookingId, ...input }))
+    .digest("hex");
 }
 
 function fulfilmentResponse(
@@ -309,9 +322,7 @@ export class BookingFulfilmentService {
     execute: (client: PoolClient) => Promise<BookingFulfilmentResponse>,
   ): Promise<BookingFulfilmentResponse> {
     const client = await this.database.pool.connect();
-    const requestDigest = createHash("sha256")
-      .update(JSON.stringify({ bookingId, ...input }))
-      .digest("hex");
+    const requestDigest = fulfilmentRequestDigest(commandType, bookingId, input);
     const lockKey = `${identity.id}:${commandType}:${input.idempotencyKey}`;
     let lockHeld = false;
     let transactionOpen = false;

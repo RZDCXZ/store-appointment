@@ -1,3 +1,5 @@
+import { createHash } from "node:crypto";
+
 import type { NestFastifyApplication } from "@nestjs/platform-fastify";
 import type { BookingDetailResponse } from "@rongguang/contracts";
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
@@ -218,23 +220,28 @@ describe("到店核销、迟到与爽约", () => {
     expect(retry.json()).toEqual(first.json());
 
     const stored = await database.pool.query<{
+      request_digest: string;
       response_status: number;
       response_body: { code: string };
     }>(
       `
-        SELECT response_status, response_body
+        SELECT request_digest, response_status, response_body
         FROM booking_fulfilment_idempotency_keys
         WHERE actor_id = 'chenjia'
           AND command_type = 'check_in'
           AND idempotency_key = 'check-in-stable-failure'
       `,
     );
-    expect(stored.rows).toEqual([
-      {
-        response_status: 409,
-        response_body: expect.objectContaining({ code: "CHECK_IN_TOO_EARLY" }),
-      },
-    ]);
+    expect(stored.rows).toHaveLength(1);
+    expect(stored.rows[0]).toMatchObject({
+      response_status: 409,
+      response_body: expect.objectContaining({ code: "CHECK_IN_TOO_EARLY" }),
+    });
+    expect(stored.rows[0]?.request_digest).not.toBe(
+      createHash("sha256")
+        .update(JSON.stringify({ bookingId, ...request.payload }))
+        .digest("hex"),
+    );
   });
 
   it("在窗口终点恰好允许核销，重复请求返回首次结果且不追加历史", async () => {
