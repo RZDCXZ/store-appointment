@@ -4,6 +4,7 @@ import { HttpException, HttpStatus, Inject, Injectable } from "@nestjs/common";
 import { quoteBookingSelection } from "@rongguang/contracts";
 import type {
   BookingDetailResponse,
+  BookingAvailabilityResponse,
   BookingConflictSuggestion,
   BookingVerificationWindow,
   BookingSelectionLine,
@@ -34,6 +35,7 @@ import type { PoolClient } from "pg";
 import {
   bookingWindowFor,
   earliestCustomerCandidate,
+  earliestManagerCandidate,
 } from "../booking-availability/availability.js";
 import { BookingAvailabilityService } from "../booking-availability/booking-availability.service.js";
 import { getBookingCodeSecret, getDemoNow } from "../config/environment.js";
@@ -118,12 +120,21 @@ interface IdempotencyRow {
 
 interface ManagerProxyIdempotencyRow {
   request_digest: string;
-  booking_id: string;
-  customer_id: string;
-  privacy_notice_version: string;
-  offline_consent_source: ManagerOfflineConsentSource;
-  manager_display_name: string;
-  created_at: Date;
+  booking_id: string | null;
+  customer_id: string | null;
+  response_status: number;
+  response_body: unknown;
+  privacy_notice_version: string | null;
+  offline_consent_source: ManagerOfflineConsentSource | null;
+  manager_display_name: string | null;
+  created_at: Date | null;
+}
+
+interface StoredManagerProxySuccess {
+  kind: "manager_proxy_booking_success";
+  booking: ManagerProxyBookingResponse["booking"];
+  verificationWindow: ManagerProxyBookingResponse["verificationWindow"];
+  proxyRecord: ManagerProxyBookingResponse["proxyRecord"];
 }
 
 type ManagerProxyProfile =
@@ -362,13 +373,6 @@ function parseManagerProxyInput(body: unknown): ParsedManagerProxyInput {
   };
 }
 
-function earliestManagerCandidate(now: string): string {
-  const halfHourMilliseconds = 30 * 60_000;
-  return new Date(
-    Math.ceil(Date.parse(now) / halfHourMilliseconds) * halfHourMilliseconds,
-  ).toISOString();
-}
-
 function petSizeFor(weightKg: number): PetSize {
   if (weightKg <= 10) return "small";
   if (weightKg <= 25) return "medium";
@@ -382,6 +386,50 @@ function hasAllSkills(staff: StaffRow, requiredSkills: StaffSkillId[]): boolean 
 
 function requestDigest(input: unknown): string {
   return createHash("sha256").update(JSON.stringify(input)).digest("hex");
+}
+
+function isStoredManagerProxySuccess(value: unknown): value is StoredManagerProxySuccess {
+  if (!value || typeof value !== "object") return false;
+  const candidate = value as Partial<StoredManagerProxySuccess>;
+  return (
+    candidate.kind === "manager_proxy_booking_success" &&
+    Boolean(candidate.booking) &&
+    Boolean(candidate.verificationWindow) &&
+    Boolean(candidate.proxyRecord)
+  );
+}
+
+function isStoredLegacyManagerProxySuccess(value: unknown): boolean {
+  return (
+    Boolean(value) &&
+    typeof value === "object" &&
+    (value as { kind?: unknown }).kind === "manager_proxy_booking_legacy_success"
+  );
+}
+
+function nearbySuggestions(
+  availability: BookingAvailabilityResponse,
+  requestedStartsAt: string,
+): BookingConflictSuggestion[] {
+  const requestedStart = Date.parse(requestedStartsAt);
+  const suggestions = availability.days
+    .flatMap((day) =>
+      day.slots.map((slot) => ({
+        date: day.date,
+        startsAt: slot.startsAt,
+        endsAt: slot.endsAt,
+        staff: { id: slot.staff.id, displayName: slot.staff.displayName },
+      })),
+    )
+    .filter((suggestion) => suggestion.startsAt !== requestedStartsAt)
+    .sort((left, right) => {
+      const distance =
+        Math.abs(Date.parse(left.startsAt) - requestedStart) -
+        Math.abs(Date.parse(right.startsAt) - requestedStart);
+      return distance || left.startsAt.localeCompare(right.startsAt);
+    })
+    .slice(0, 5);
+  return suggestions.length >= 3 ? suggestions : [];
 }
 
 function parseCancelInput(body: unknown): CancelBookingInput {
@@ -787,14 +835,17 @@ export class BookingService {
           SELECT idempotency.request_digest,
                  idempotency.booking_id,
                  booking.customer_id,
+                 idempotency.response_status,
+                 idempotency.response_body,
                  record.privacy_notice_version,
                  record.offline_consent_source,
                  account.display_name AS manager_display_name,
                  record.created_at
           FROM manager_proxy_booking_idempotency_keys AS idempotency
-          JOIN bookings AS booking ON booking.id = idempotency.booking_id
-          JOIN manager_proxy_booking_records AS record ON record.booking_id = booking.id
-          JOIN backoffice_accounts AS account ON account.id = record.manager_id
+          LEFT JOIN bookings AS booking ON booking.id = idempotency.booking_id
+          LEFT JOIN manager_proxy_booking_records AS record
+            ON record.booking_id = idempotency.booking_id
+          LEFT JOIN backoffice_accounts AS account ON account.id = record.manager_id
           WHERE idempotency.manager_id = $1 AND idempotency.idempotency_key = $2
         `,
         [manager.id, input.idempotencyKey],
@@ -809,22 +860,53 @@ export class BookingService {
             HttpStatus.CONFLICT,
           );
         }
-        const row = await this.findBookingRow(client, previous.customer_id, previous.booking_id);
-        const code = activeVerificationCode(row);
-        if (!code) {
-          throw new Error("代客预约核销码摘要与服务端派生值不一致。");
+        if (!previous.booking_id) {
+          await client.query("COMMIT");
+          throw new HttpException(
+            previous.response_body as Record<string, unknown>,
+            previous.response_status,
+          );
         }
+        if (
+          previous.customer_id &&
+          isStoredLegacyManagerProxySuccess(previous.response_body) &&
+          previous.privacy_notice_version &&
+          previous.offline_consent_source &&
+          previous.manager_display_name &&
+          previous.created_at
+        ) {
+          const row = await this.findBookingRow(client, previous.customer_id, previous.booking_id);
+          const code = activeVerificationCode(row);
+          if (!code) {
+            throw new Error("旧版代客预约幂等结果的核销码已不可恢复。");
+          }
+          await client.query("COMMIT");
+          return {
+            booking: asBooking(row),
+            verificationCode: code,
+            verificationWindow: verificationWindow(row),
+            proxyRecord: {
+              privacyNoticeVersion: previous.privacy_notice_version,
+              offlineConsentSource: previous.offline_consent_source,
+              manager: { id: manager.id, displayName: previous.manager_display_name },
+              createdAt: previous.created_at.toISOString(),
+            },
+          };
+        }
+        if (!previous.customer_id || !isStoredManagerProxySuccess(previous.response_body)) {
+          throw new Error("代客预约幂等结果缺少完整的首次成功快照。");
+        }
+        const code = verificationCode(
+          previous.customer_id,
+          previous.booking_id,
+          input.idempotencyKey,
+        );
         await client.query("COMMIT");
         return {
-          booking: asBooking(row),
+          booking: previous.response_body.booking,
           verificationCode: code,
-          verificationWindow: verificationWindow(row),
-          proxyRecord: {
-            privacyNoticeVersion: previous.privacy_notice_version,
-            offlineConsentSource: previous.offline_consent_source,
-            manager: { id: manager.id, displayName: previous.manager_display_name },
-            createdAt: previous.created_at.toISOString(),
-          },
+          verificationWindow: previous.response_body.verificationWindow,
+          proxyRecord: previous.response_body.proxyRecord,
         };
       }
 
@@ -928,20 +1010,10 @@ export class BookingService {
         `,
         [bookingId, noticeVersion, input.offlineConsentSource, manager.id, createdAt],
       );
-      await client.query(
-        `
-          INSERT INTO manager_proxy_booking_idempotency_keys (
-            manager_id, idempotency_key, request_digest, booking_id, created_at
-          )
-          VALUES ($1, $2, $3, $4, $5)
-        `,
-        [manager.id, input.idempotencyKey, digest, bookingId, createdAt],
-      );
       const row = await this.findBookingRow(client, customerId, bookingId);
-      await client.query("COMMIT");
-      return {
+      const storedResponse: StoredManagerProxySuccess = {
+        kind: "manager_proxy_booking_success",
         booking: asBooking(row),
-        verificationCode: code,
         verificationWindow: verificationWindow(row),
         proxyRecord: {
           privacyNoticeVersion: noticeVersion,
@@ -949,6 +1021,31 @@ export class BookingService {
           manager: { id: manager.id, displayName: manager.displayName },
           createdAt,
         },
+      };
+      await client.query(
+        `
+          INSERT INTO manager_proxy_booking_idempotency_keys (
+            manager_id, idempotency_key, request_digest, booking_id,
+            response_status, response_body, created_at
+          )
+          VALUES ($1, $2, $3, $4, $5, $6::jsonb, $7)
+        `,
+        [
+          manager.id,
+          input.idempotencyKey,
+          digest,
+          bookingId,
+          HttpStatus.CREATED,
+          JSON.stringify(storedResponse),
+          createdAt,
+        ],
+      );
+      await client.query("COMMIT");
+      return {
+        booking: storedResponse.booking,
+        verificationCode: code,
+        verificationWindow: storedResponse.verificationWindow,
+        proxyRecord: storedResponse.proxyRecord,
       };
     } catch (error) {
       await client.query("ROLLBACK").catch(() => undefined);
@@ -959,12 +1056,7 @@ export class BookingService {
         databaseError.code === "40001" ||
         databaseError.code === "40P01"
       ) {
-        businessError(
-          "BOOKING_TIME_CONFLICT",
-          "这个时段刚被占用，代客预约没有建立，请重新选择。",
-          HttpStatus.CONFLICT,
-          { nextStep: "time" },
-        );
+        await this.throwManagerProxyTimeConflict(manager, input, digest, client);
       }
       throw error;
     } finally {
@@ -1503,6 +1595,85 @@ export class BookingService {
     }
   }
 
+  private async throwManagerProxyTimeConflict(
+    manager: BackofficeIdentity,
+    input: ParsedManagerProxyInput,
+    digest: string,
+    client: PoolClient,
+  ): Promise<never> {
+    const commonDiscovery = {
+      primaryServiceId: input.primaryServiceId,
+      addonIds: input.addonIds.join(","),
+      staffId: input.staffId,
+      earliestStartsAtOverride: earliestManagerCandidate(getDemoNow()),
+    };
+    const availability =
+      input.profile.kind === "existing"
+        ? await this.availability.discover(
+            {
+              ...commonDiscovery,
+              customerId: input.profile.customerId,
+              petId: input.profile.petId,
+            },
+            client,
+          )
+        : await (() => {
+            const pet: PetRow = {
+              id: "manager-proxy-pet",
+              name: input.profile.pet.name,
+              species: input.profile.pet.species,
+              weight_kg: String(input.profile.pet.weightKg),
+              archived_at: null,
+            };
+            return this.availability.discover(
+              {
+                ...commonDiscovery,
+                customerId: "manager-proxy-customer",
+                petId: pet.id,
+                petOverride: {
+                  id: pet.id,
+                  name: pet.name,
+                  species: pet.species,
+                  weightKg: Number(pet.weight_kg),
+                },
+                selectionOverride: this.quote(pet, input.primaryServiceId, input.addonIds),
+              },
+              client,
+            );
+          })();
+    const proposed: BookingConflictBody = {
+      code: "BOOKING_TIME_CONFLICT",
+      message: "这个时段刚被占用，代客预约没有建立，请选择相近可用安排。",
+      nextStep: "conflict",
+      suggestions: nearbySuggestions(availability, input.startsAt),
+    };
+    try {
+      await client.query("BEGIN");
+      await client.query(
+        `
+          INSERT INTO manager_proxy_booking_idempotency_keys (
+            manager_id, idempotency_key, request_digest, booking_id,
+            response_status, response_body, created_at
+          )
+          VALUES ($1, $2, $3, NULL, $4, $5::jsonb, $6)
+        `,
+        [
+          manager.id,
+          input.idempotencyKey,
+          digest,
+          HttpStatus.CONFLICT,
+          JSON.stringify(proposed),
+          getDemoNow(),
+        ],
+      );
+      await client.query("COMMIT");
+    } catch (error) {
+      await client.query("ROLLBACK").catch(() => undefined);
+      throw error;
+    }
+    throw new HttpException(proposed, HttpStatus.CONFLICT);
+  }
+
   private async insertConfirmedBooking(
     client: PoolClient,
     facts: {
@@ -1638,31 +1809,13 @@ export class BookingService {
       },
       client,
     );
-    const requestedStart = Date.parse(input.startsAt);
-    const nearbySuggestions: BookingConflictSuggestion[] = availability.days
-      .flatMap((day) =>
-        day.slots.map((slot) => ({
-          date: day.date,
-          startsAt: slot.startsAt,
-          endsAt: slot.endsAt,
-          staff: { id: slot.staff.id, displayName: slot.staff.displayName },
-        })),
-      )
-      .filter((suggestion) => suggestion.startsAt !== input.startsAt)
-      .sort((left, right) => {
-        const distance =
-          Math.abs(Date.parse(left.startsAt) - requestedStart) -
-          Math.abs(Date.parse(right.startsAt) - requestedStart);
-        return distance || left.startsAt.localeCompare(right.startsAt);
-      })
-      .slice(0, 5);
     const proposed: RescheduleConflictBody = {
       code: "BOOKING_TIME_CONFLICT",
       message: "刚刚有人选走了这个安排，原安排保持不变，请选择相近可用安排。",
       nextStep: "conflict",
       booking: asBooking(row),
       requested: { staffId: input.staffId, startsAt: input.startsAt },
-      suggestions: nearbySuggestions.length >= 3 ? nearbySuggestions : [],
+      suggestions: nearbySuggestions(availability, input.startsAt),
     };
 
     try {
@@ -1718,34 +1871,11 @@ export class BookingService {
       },
       client,
     );
-    const requestedStart = Date.parse(input.startsAt);
-    const nearbySuggestions: BookingConflictSuggestion[] = availability.days
-      .flatMap((day) =>
-        day.slots.map((slot) => ({
-          date: day.date,
-          startsAt: slot.startsAt,
-          endsAt: slot.endsAt,
-          staff: {
-            id: slot.staff.id,
-            displayName: slot.staff.displayName,
-          },
-        })),
-      )
-      .filter((suggestion) => suggestion.startsAt !== input.startsAt)
-      .sort((left, right) => {
-        const distance =
-          Math.abs(Date.parse(left.startsAt) - requestedStart) -
-          Math.abs(Date.parse(right.startsAt) - requestedStart);
-        return distance || left.startsAt.localeCompare(right.startsAt);
-      })
-      .slice(0, 5);
-    const suggestions = nearbySuggestions.length >= 3 ? nearbySuggestions : [];
-
     const proposed: BookingConflictBody = {
       code: "BOOKING_TIME_CONFLICT",
       message: "刚刚有人选走了这个时段，请选择相近可用安排。",
       nextStep: "conflict",
-      suggestions,
+      suggestions: nearbySuggestions(availability, input.startsAt),
     };
     try {
       await client.query("BEGIN");

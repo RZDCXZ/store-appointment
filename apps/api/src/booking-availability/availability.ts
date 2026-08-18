@@ -92,6 +92,19 @@ export function earliestCustomerCandidate(now: string | Date): string {
   ).toISOString();
 }
 
+export function earliestManagerCandidate(now: string | Date): string {
+  const instant = now instanceof Date ? now : new Date(now);
+
+  if (Number.isNaN(instant.getTime())) {
+    throw new Error("无法从无效时刻计算店长最早代客预约时段。");
+  }
+
+  const intervalMilliseconds = halfHourMinutes * 60_000;
+  return new Date(
+    Math.ceil(instant.getTime() / intervalMilliseconds) * intervalMilliseconds,
+  ).toISOString();
+}
+
 export function earliestCandidateMinutesForDate(
   localDate: string,
   earliestStartsAt: string,

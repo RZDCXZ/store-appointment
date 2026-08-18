@@ -2190,10 +2190,9 @@ img.identity-avatar {
   align-items: center;
   gap: 14px;
   padding: 0 19px;
-  grid-template-columns: minmax(145px, 1.1fr) minmax(150px, 1.2fr) minmax(145px, 1.1fr) minmax(
-      80px,
-      0.7fr
-    ) minmax(70px, 0.6fr) 72px;
+  grid-template-columns:
+    minmax(145px, 1.1fr) minmax(150px, 1.2fr) minmax(145px, 1.1fr) minmax(80px, 0.7fr)
+    minmax(70px, 0.6fr) 72px;
 }
 
 .manager-booking-list-head {
@@ -2478,6 +2477,38 @@ img.identity-avatar {
   color: var(--danger-700);
   background: rgb(249 226 220 / 60%);
   font-size: 12px;
+}
+
+.manager-proxy-suggestions {
+  display: grid;
+  gap: 9px;
+  padding: 15px;
+  border: 1px solid var(--sage-200);
+  border-radius: 10px;
+  background: var(--sage-50);
+}
+
+.manager-proxy-suggestions > strong {
+  font-size: 12px;
+}
+
+.manager-proxy-suggestions > div {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px;
+}
+
+.manager-proxy-suggestions button {
+  min-height: 36px;
+  padding: 0 11px;
+  border: 1px solid var(--sage-200);
+  border-radius: 8px;
+  color: var(--sage-700);
+  background: var(--surface-strong);
+  cursor: pointer;
+  font: inherit;
+  font-size: 11px;
+  font-weight: 800;
 }
 
 .manager-proxy-form > footer {

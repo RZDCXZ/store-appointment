@@ -2,6 +2,7 @@ import type {
   PetSpecies,
   BookingVerificationWindow,
   ConfirmedBooking,
+  CustomerBookingSchedule,
   PublishedScheduleShift,
   ScheduleBusinessHours,
   ScheduleWindowDay,
@@ -132,6 +133,8 @@ export interface ManagerBookingDetailResponse {
     actorType: "customer" | "staff" | "manager" | "system";
     actorId: string | null;
     reason: string | null;
+    previous: CustomerBookingSchedule | null;
+    next: CustomerBookingSchedule | null;
     occurredAt: string;
   }>;
   notifications: Array<{

@@ -47,6 +47,9 @@ describe("店长预约列表与代客预约", () => {
   });
 
   afterAll(async () => {
+    await database.pool.query(
+      "DELETE FROM booking_events WHERE id = 'manager-detail-reschedule-history-ticket16'",
+    );
     await database.pool.query("DELETE FROM bookings WHERE id = ANY($1::text[])", [
       createdBookingIds,
     ]);
@@ -99,6 +102,40 @@ describe("店长预约列表与代客预约", () => {
   });
 
   it("详情返回当前事实、门店服务记录、完整变更历史和关联通知", async () => {
+    await database.pool.query(
+      `
+        INSERT INTO booking_events (
+          id, booking_id, event_type, actor_type, actor_id, payload, occurred_at
+        )
+        VALUES (
+          'manager-detail-reschedule-history-ticket16',
+          'booking-bohe-completed',
+          'booking_rescheduled',
+          'manager',
+          'manager',
+          $1::jsonb,
+          '2026-08-12T02:00:00.000Z'
+        )
+        ON CONFLICT (id) DO NOTHING
+      `,
+      [
+        JSON.stringify({
+          reason: "应顾客电话调整",
+          previous: {
+            staff: { id: "chenjia", displayName: "陈嘉" },
+            startsAt: "2026-08-12T03:00:00.000Z",
+            endsAt: "2026-08-12T04:30:00.000Z",
+            turnoverEndsAt: "2026-08-12T04:45:00.000Z",
+          },
+          next: {
+            staff: { id: "zhouning", displayName: "周宁" },
+            startsAt: "2026-08-12T05:00:00.000Z",
+            endsAt: "2026-08-12T06:30:00.000Z",
+            turnoverEndsAt: "2026-08-12T06:45:00.000Z",
+          },
+        }),
+      ],
+    );
     const response = await app.inject({
       method: "GET",
       url: "/backoffice/manager/bookings/booking-bohe-completed",
@@ -126,9 +163,22 @@ describe("店长预约列表与代客预约", () => {
         bookingId: "booking-bohe-completed",
         internalText: "洗护过程配合良好，耳部清洁完成。",
       },
-      changeHistory: [
+      changeHistory: expect.arrayContaining([
         expect.objectContaining({ type: "booking_confirmed", actorType: "customer" }),
-      ],
+        expect.objectContaining({
+          type: "booking_rescheduled",
+          actorType: "manager",
+          reason: "应顾客电话调整",
+          previous: expect.objectContaining({
+            staff: { id: "chenjia", displayName: "陈嘉" },
+            startsAt: "2026-08-12T03:00:00.000Z",
+          }),
+          next: expect.objectContaining({
+            staff: { id: "zhouning", displayName: "周宁" },
+            startsAt: "2026-08-12T05:00:00.000Z",
+          }),
+        }),
+      ]),
       notifications: [
         expect.objectContaining({
           id: "notification-bohe-completed-confirmed",
@@ -223,6 +273,22 @@ describe("店长预约列表与代客预约", () => {
     expect(replay.statusCode).toBe(201);
     expect(replay.json()).toMatchObject({
       booking: { id: firstBody.booking.id },
+      verificationCode: firstBody.verificationCode,
+      proxyRecord: firstBody.proxyRecord,
+    });
+
+    await database.pool.query(
+      "UPDATE bookings SET staff_display_name_snapshot = '已变更' WHERE id = $1",
+      [firstBody.booking.id],
+    );
+    const delayedReplay = await create();
+    expect(delayedReplay.statusCode).toBe(201);
+    expect(delayedReplay.json()).toMatchObject({
+      booking: {
+        id: firstBody.booking.id,
+        status: "confirmed",
+        staff: { id: "zhaohang", displayName: "赵航" },
+      },
       verificationCode: firstBody.verificationCode,
       proxyRecord: firstBody.proxyRecord,
     });
@@ -375,9 +441,16 @@ describe("店长预约列表与代客预约", () => {
     const conflict = responses.find((response) => response.statusCode === 409);
 
     expect(success).toBeDefined();
-    expect(conflict?.json()).toMatchObject({
+    const conflictBody = conflict?.json();
+    expect(conflictBody).toMatchObject({
       code: "BOOKING_TIME_CONFLICT",
-      nextStep: "time",
+      nextStep: "conflict",
+      suggestions: expect.arrayContaining([
+        expect.objectContaining({
+          startsAt: expect.any(String),
+          staff: expect.objectContaining({ id: "zhaohang" }),
+        }),
+      ]),
     });
     createdBookingIds.push(success!.json().booking.id);
 
@@ -396,5 +469,16 @@ describe("店长预约列表与代客预约", () => {
       `,
     );
     expect(overlaps.rows[0]?.count).toBe("1");
+
+    await database.pool.query("DELETE FROM bookings WHERE id = $1", [success!.json().booking.id]);
+    const conflictIndex = responses.findIndex((response) => response.statusCode === 409);
+    const replay = await app.inject({
+      method: "POST",
+      url: "/backoffice/manager/proxy-bookings",
+      headers: { cookie: managerCookie, origin: adminOrigin },
+      payload: requests[conflictIndex],
+    });
+    expect(replay.statusCode).toBe(409);
+    expect(replay.json()).toEqual(conflictBody);
   });
 });

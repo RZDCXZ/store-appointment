@@ -17,7 +17,10 @@ import type {
 } from "@rongguang/contracts";
 
 import { getDemoNow } from "../config/environment.js";
-import { bookingWindowFor } from "../booking-availability/availability.js";
+import {
+  bookingWindowFor,
+  earliestManagerCandidate,
+} from "../booking-availability/availability.js";
 import { DatabaseService } from "../database/database.service.js";
 import { getShanghaiLocalDate, isLocalDate } from "../schedule/schedule-date.js";
 import { ScheduleService } from "../schedule/schedule.service.js";
@@ -76,7 +79,11 @@ interface ManagerBookingEventRow {
   event_type: string;
   actor_type: "customer" | "staff" | "manager" | "system";
   actor_id: string | null;
-  payload: { reason?: string | null };
+  payload: {
+    reason?: string | null;
+    previous?: ManagerBookingDetailResponse["changeHistory"][number]["previous"];
+    next?: ManagerBookingDetailResponse["changeHistory"][number]["next"];
+  };
   occurred_at: Date;
 }
 
@@ -307,13 +314,6 @@ function petSize(weightKg: number): "small" | "medium" | "large" {
   return "large";
 }
 
-function managerCandidate(now: string): string {
-  const halfHourMilliseconds = 30 * 60_000;
-  return new Date(
-    Math.ceil(Date.parse(now) / halfHourMilliseconds) * halfHourMilliseconds,
-  ).toISOString();
-}
-
 function emptyStatusSummary(): ManagerBookingStatusSummary {
   return {
     confirmed: 0,
@@ -511,7 +511,7 @@ export class ManagerLiveBookingService {
     return {
       demoNow,
       privacyNotice: notice,
-      window: { ...window, earliestStartsAt: managerCandidate(demoNow) },
+      window: { ...window, earliestStartsAt: earliestManagerCandidate(demoNow) },
       customers: [...customers.values()],
       staff: staffResult.rows.map((staff) => ({
         id: staff.id,
@@ -819,6 +819,8 @@ export class ManagerLiveBookingService {
         actorType: event.actor_type,
         actorId: event.actor_id,
         reason: event.payload.reason ?? null,
+        previous: event.payload.previous ?? null,
+        next: event.payload.next ?? null,
         occurredAt: event.occurred_at.toISOString(),
       })),
       notifications: notificationResult.rows.map((notification) => ({

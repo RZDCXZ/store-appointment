@@ -189,6 +189,18 @@ describe("店长预约列表与代客预约页面", () => {
               actorType: "manager",
               actorId: "manager",
               reason: null,
+              previous: {
+                staff: { id: "chenjia", displayName: "陈嘉" },
+                startsAt: "2026-08-13T03:00:00.000Z",
+                endsAt: "2026-08-13T04:30:00.000Z",
+                turnoverEndsAt: "2026-08-13T04:45:00.000Z",
+              },
+              next: {
+                staff: { id: "zhouning", displayName: "周宁" },
+                startsAt: "2026-08-13T05:00:00.000Z",
+                endsAt: "2026-08-13T06:30:00.000Z",
+                turnoverEndsAt: "2026-08-13T06:45:00.000Z",
+              },
               occurredAt: "2026-08-13T10:00:00.000Z",
             },
           ],
@@ -217,6 +229,8 @@ describe("店长预约列表与代客预约页面", () => {
     expect(screen.getByText("已与顾客电话确认")).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: "预约变更历史" })).toBeInTheDocument();
     expect(screen.getByText("店长 · created")).toBeInTheDocument();
+    expect(screen.getByText(/原安排：陈嘉/)).toBeInTheDocument();
+    expect(screen.getByText(/新安排：周宁/)).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: "通知记录" })).toBeInTheDocument();
     expect(screen.getByText("已发送 · 尝试 1 次")).toBeInTheDocument();
     expect(router.state.location.pathname).toBe("/manager/appointments/booking-bohe-future");
@@ -376,7 +390,15 @@ describe("店长预约列表与代客预约页面", () => {
           {
             code: "BOOKING_TIME_CONFLICT",
             message: "该员工在所选时段已有占用。",
-            nextStep: "time",
+            nextStep: "conflict",
+            suggestions: [
+              {
+                date: "2026-08-13",
+                startsAt: "2026-08-13T05:00:00.000Z",
+                endsAt: "2026-08-13T06:00:00.000Z",
+                staff: { id: "zhaohang", displayName: "赵航" },
+              },
+            ],
           },
           409,
         );
@@ -409,5 +431,7 @@ describe("店长预约列表与代客预约页面", () => {
     expect(screen.getByLabelText("已有宠物")).toHaveValue("pet-tuanzi");
     expect(screen.getByLabelText("执行员工")).toHaveValue("zhaohang");
     expect(screen.getByLabelText("开始时间")).toHaveValue("2026-08-13T11:00");
+    fireEvent.click(screen.getByRole("button", { name: "赵航 · 2026-08-13 13:00" }));
+    expect(screen.getByLabelText("开始时间")).toHaveValue("2026-08-13T13:00");
   });
 });

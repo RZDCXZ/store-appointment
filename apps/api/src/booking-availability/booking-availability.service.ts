@@ -34,6 +34,13 @@ interface DiscoveryInput {
   staffId?: string;
   excludeBookingId?: string;
   selectionOverride?: BookingSelectionQuote;
+  earliestStartsAtOverride?: string;
+  petOverride?: {
+    id: string;
+    name: string;
+    species: "dog" | "cat";
+    weightKg: number;
+  };
 }
 
 interface PetRow {
@@ -200,23 +207,32 @@ export class BookingAvailabilityService {
     const staffId = input.staffId ? requiredId(input.staffId, "员工") : null;
     const demoNow = getDemoNow();
     const window = bookingWindowFor(demoNow);
-    const earliestStartsAt = earliestCustomerCandidate(demoNow);
+    const earliestStartsAt = input.earliestStartsAtOverride ?? earliestCustomerCandidate(demoNow);
     const client = existingClient ?? (await this.database.pool.connect());
     const ownsClient = !existingClient;
 
     try {
       await client.query("BEGIN TRANSACTION ISOLATION LEVEL REPEATABLE READ READ ONLY");
-      const petResult = await client.query<PetRow>(
-        `
-          SELECT id, name, species, weight_kg::text, archived_at
-          FROM pets
-          WHERE id = $1 AND customer_id = $2
-        `,
-        [petId, input.customerId],
-      );
-      const pet = petResult.rows[0];
+      const pet = input.petOverride
+        ? {
+            id: input.petOverride.id,
+            name: input.petOverride.name,
+            species: input.petOverride.species,
+            weight_kg: String(input.petOverride.weightKg),
+            archived_at: null,
+          }
+        : (
+            await client.query<PetRow>(
+              `
+                SELECT id, name, species, weight_kg::text, archived_at
+                FROM pets
+                WHERE id = $1 AND customer_id = $2
+              `,
+              [petId, input.customerId],
+            )
+          ).rows[0];
 
-      if (!pet) {
+      if (!pet || pet.id !== petId) {
         throw new HttpException(
           { code: "PET_NOT_FOUND", message: "找不到这份宠物档案，或当前顾客无权访问。" },
           HttpStatus.NOT_FOUND,

@@ -2,6 +2,7 @@ import { useMemo, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import { CheckCircledIcon, ChevronLeftIcon, LockClosedIcon } from "@radix-ui/react-icons";
 import type {
+  BookingConflictSuggestion,
   ManagerOfflineConsentSource,
   ManagerProxyBookingOptionsResponse,
   ManagerProxyBookingResponse,
@@ -80,6 +81,7 @@ export function ManagerProxyBookingPage(): React.JSX.Element {
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState("");
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
+  const [suggestions, setSuggestions] = useState<BookingConflictSuggestion[]>([]);
   const [result, setResult] = useState<ManagerProxyBookingResponse | null>(null);
   const options = resource.data;
   const selectedCustomer = options?.customers.find((item) => item.id === draft.customerId);
@@ -101,6 +103,7 @@ export function ManagerProxyBookingPage(): React.JSX.Element {
     setDraft((current) => ({ ...current, ...next }));
     setError("");
     setFieldErrors({});
+    setSuggestions([]);
   }
 
   async function submit(event: React.FormEvent<HTMLFormElement>): Promise<void> {
@@ -108,6 +111,7 @@ export function ManagerProxyBookingPage(): React.JSX.Element {
     setSubmitting(true);
     setError("");
     setFieldErrors({});
+    setSuggestions([]);
     const profile =
       draft.profileKind === "existing"
         ? { kind: "existing" as const, customerId: draft.customerId, petId: draft.petId }
@@ -143,6 +147,11 @@ export function ManagerProxyBookingPage(): React.JSX.Element {
         }
         setFieldErrors(fieldErrorsFrom(apiError));
         if (apiError.status === 409 && apiError.code === "BOOKING_TIME_CONFLICT") {
+          setSuggestions(
+            Array.isArray(apiError.details.suggestions)
+              ? (apiError.details.suggestions as BookingConflictSuggestion[])
+              : [],
+          );
           setError(`${apiError.message}当前选择已保留，请更换时间或员工。`);
           return;
         }
@@ -509,6 +518,28 @@ export function ManagerProxyBookingPage(): React.JSX.Element {
             <p className="manager-proxy-submit-error" role="alert">
               {error}
             </p>
+          ) : null}
+          {suggestions.length > 0 ? (
+            <section className="manager-proxy-suggestions" aria-label="相近可用安排">
+              <strong>相近可用安排</strong>
+              <div>
+                {suggestions.map((suggestion) => (
+                  <button
+                    type="button"
+                    key={`${suggestion.staff.id}-${suggestion.startsAt}`}
+                    onClick={() =>
+                      changeDraft({
+                        staffId: suggestion.staff.id,
+                        startsAt: isoToShanghaiInput(suggestion.startsAt),
+                      })
+                    }
+                  >
+                    {suggestion.staff.displayName} ·{" "}
+                    {isoToShanghaiInput(suggestion.startsAt).replace("T", " ")}
+                  </button>
+                ))}
+              </div>
+            </section>
           ) : null}
           <footer>
             <span>提交后将立即发出预约通知并产生核销码。</span>

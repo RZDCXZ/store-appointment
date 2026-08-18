@@ -170,6 +170,18 @@ export function ManagerAppointmentDetailPage(): React.JSX.Element {
                       </strong>
                       <span>{formatDateTime(event.occurredAt)}</span>
                       {event.reason ? <p>{event.reason}</p> : null}
+                      {event.previous ? (
+                        <p>
+                          原安排：{event.previous.staff.displayName} ·{" "}
+                          {formatDateTime(event.previous.startsAt)}
+                        </p>
+                      ) : null}
+                      {event.next ? (
+                        <p>
+                          新安排：{event.next.staff.displayName} ·{" "}
+                          {formatDateTime(event.next.startsAt)}
+                        </p>
+                      ) : null}
                     </li>
                   ))}
                 </ol>
