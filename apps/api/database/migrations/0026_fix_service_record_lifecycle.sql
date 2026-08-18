@@ -47,41 +47,41 @@ AS $$
 BEGIN
   IF TG_OP = 'UPDATE'
      AND current_setting('rongguang.service_record_anonymization', true) = 'on' THEN
-    IF TG_TABLE_NAME = 'store_service_records' THEN
-      IF NEW.id = OLD.id
-         AND NEW.booking_id = OLD.booking_id
-         AND NEW.pet_snapshot = jsonb_set(
-           jsonb_set(
-             OLD.pet_snapshot,
-             '{id}',
-             to_jsonb(('anonymized-' || OLD.id)::text),
-             true
-           ),
-           '{name}',
-           to_jsonb('已匿名宠物'::text),
+    IF TG_TABLE_NAME = 'store_service_records'
+       AND NEW.id = OLD.id
+       AND NEW.booking_id = OLD.booking_id
+       AND NEW.pet_snapshot = jsonb_set(
+         jsonb_set(
+           OLD.pet_snapshot,
+           '{id}',
+           to_jsonb(('anonymized-' || OLD.id)::text),
            true
-         )
-         AND NEW.primary_service_snapshot = OLD.primary_service_snapshot
-         AND NEW.addon_snapshots = OLD.addon_snapshots
-         AND NEW.staff_snapshot = OLD.staff_snapshot
-         AND NEW.actual_starts_at = OLD.actual_starts_at
-         AND NEW.actual_ends_at = OLD.actual_ends_at
-         AND NEW.care_tags = OLD.care_tags
-         AND NEW.internal_text IS NULL
-         AND NEW.created_at = OLD.created_at THEN
-        RETURN NEW;
-      END IF;
-    ELSIF TG_TABLE_NAME = 'store_service_record_notes' THEN
-      IF NEW.id = OLD.id
-         AND NEW.service_record_id = OLD.service_record_id
-         AND NEW.kind = OLD.kind
-         AND NEW.note_text = '[原说明已匿名化]'
-         AND NEW.author_type = OLD.author_type
-         AND NEW.author_id = OLD.author_id
-         AND NEW.author_display_name = OLD.author_display_name
-         AND NEW.created_at = OLD.created_at THEN
-        RETURN NEW;
-      END IF;
+         ),
+         '{name}',
+         to_jsonb('已匿名宠物'::text),
+         true
+       )
+       AND NEW.primary_service_snapshot = OLD.primary_service_snapshot
+       AND NEW.addon_snapshots = OLD.addon_snapshots
+       AND NEW.staff_snapshot = OLD.staff_snapshot
+       AND NEW.actual_starts_at = OLD.actual_starts_at
+       AND NEW.actual_ends_at = OLD.actual_ends_at
+       AND NEW.care_tags = OLD.care_tags
+       AND NEW.internal_text IS NULL
+       AND NEW.created_at = OLD.created_at THEN
+      RETURN NEW;
+    END IF;
+
+    IF TG_TABLE_NAME = 'store_service_record_notes'
+       AND NEW.id = OLD.id
+       AND NEW.service_record_id = OLD.service_record_id
+       AND NEW.kind = OLD.kind
+       AND NEW.note_text = '[原说明已匿名化]'
+       AND NEW.author_type = OLD.author_type
+       AND NEW.author_id = OLD.author_id
+       AND NEW.author_display_name = OLD.author_display_name
+       AND NEW.created_at = OLD.created_at THEN
+      RETURN NEW;
     END IF;
   END IF;
 

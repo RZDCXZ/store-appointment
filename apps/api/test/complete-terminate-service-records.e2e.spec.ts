@@ -368,6 +368,7 @@ describe("完成服务、服务终止与追加说明", () => {
       [bookingId],
     );
     expect(records.rows).toHaveLength(0);
+    await expectStaffCapacityReleasedAt("2026-08-14T03:40:00.000Z");
   });
 
   it("改期到首次原计划之后的预约仍按当前计划终止并保留十五分钟周转", async () => {
@@ -396,6 +397,7 @@ describe("完成服务、服务终止与追加说明", () => {
         occupancyEndsAt: "2026-08-14T04:45:00.000Z",
       },
     });
+    await expectStaffCapacityReleasedAt("2026-08-16T03:40:00.000Z");
   });
 
   it("计划开始前已核销后终止时可在周转结束后释放整段原计划容量", async () => {
@@ -675,6 +677,22 @@ describe("完成服务、服务终止与追加说明", () => {
     });
     expect(note.statusCode).toBe(201);
 
+    const completionEventsBeforeAnonymization = await database.pool.query<{ payload: object }>(
+      `
+        SELECT payload
+        FROM booking_events
+        WHERE booking_id = $1 AND event_type = 'booking_completed'
+      `,
+      [bookingId],
+    );
+    expect(completionEventsBeforeAnonymization.rows).toHaveLength(1);
+    expect(completionEventsBeforeAnonymization.rows[0]?.payload).not.toHaveProperty(
+      "serviceRecord",
+    );
+    expect(JSON.stringify(completionEventsBeforeAnonymization.rows[0]?.payload)).not.toContain(
+      "含有宠物名称薄荷的内部记录。",
+    );
+
     const anonymized = await database.pool.query<{ anonymized_count: number }>(
       "SELECT anonymize_store_service_records_for_customer($1) AS anonymized_count",
       ["customer-cheng-mo"],
@@ -694,6 +712,23 @@ describe("完成服务、服务终止与追加说明", () => {
         notes: [{ text: "[原说明已匿名化]" }],
       },
     });
+
+    const persistedEvents = await database.pool.query<{ payload: object }>(
+      "SELECT payload FROM booking_events WHERE booking_id = $1",
+      [bookingId],
+    );
+    const persistedIdempotency = await database.pool.query<{ response_body: object }>(
+      "SELECT response_body FROM booking_fulfilment_idempotency_keys WHERE booking_id = $1",
+      [bookingId],
+    );
+    const persistedCopies = JSON.stringify({
+      events: persistedEvents.rows,
+      idempotency: persistedIdempotency.rows,
+    });
+    expect(persistedIdempotency.rows).toHaveLength(0);
+    expect(persistedCopies).not.toContain("薄荷");
+    expect(persistedCopies).not.toContain("含有宠物名称薄荷的内部记录。");
+    expect(persistedCopies).not.toContain("补充中也可能包含顾客或宠物身份。");
   });
 
   it("顾客预约详情只返回实际完成时间而不泄露门店服务记录或说明", async () => {

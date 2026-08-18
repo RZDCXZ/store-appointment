@@ -395,7 +395,15 @@ export class BookingFulfilmentService {
           },
           serviceRecord,
         };
-        await this.appendBookingEvent(client, row.id, "booking_completed", identity, response);
+        await this.appendBookingEvent(client, row.id, "booking_completed", identity, {
+          bookingId: response.bookingId,
+          status: response.status,
+          outcome: response.outcome,
+          occurredAt: response.occurredAt,
+          actor: response.actor,
+          actualOccupancy: response.actualOccupancy,
+          originalSchedule: response.originalSchedule,
+        });
         return response;
       },
     );
@@ -468,7 +476,15 @@ export class BookingFulfilmentService {
             occupancyEndsAt: row.original_occupancy_ends_at.toISOString(),
           },
         };
-        await this.appendBookingEvent(client, row.id, "booking_terminated", identity, response);
+        await this.appendBookingEvent(client, row.id, "booking_terminated", identity, {
+          bookingId: response.bookingId,
+          status: response.status,
+          outcome: response.outcome,
+          occurredAt: response.occurredAt,
+          actor: response.actor,
+          actualOccupancy: response.actualOccupancy,
+          originalSchedule: response.originalSchedule,
+        });
         return response;
       },
     );
@@ -846,7 +862,7 @@ export class BookingFulfilmentService {
     await this.appendBookingEvent(client, bookingId, eventType, identity, response);
   }
 
-  private async appendBookingEvent(
+  private async appendBookingEvent<EventPayload extends { occurredAt: string }>(
     client: PoolClient,
     bookingId: string,
     eventType:
@@ -856,7 +872,7 @@ export class BookingFulfilmentService {
       | "booking_completed"
       | "booking_terminated",
     identity: BackofficeIdentity,
-    response: { occurredAt: string },
+    response: EventPayload,
   ): Promise<void> {
     await client.query(
       `
