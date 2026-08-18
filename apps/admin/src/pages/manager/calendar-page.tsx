@@ -319,7 +319,8 @@ export function ManagerCalendarPage(): React.JSX.Element {
             <span className="legend-break">休息</span>
             <span className="legend-booking">预约</span>
             <span className="legend-turnover">15 分钟周转</span>
-            <span className="legend-block">停班 / 临时闭店</span>
+            <span className="legend-block">已生效停班 / 临时闭店</span>
+            <span className="legend-block-pending">待处理容量变化</span>
           </section>
           <CalendarBoard data={resource.data} />
         </>

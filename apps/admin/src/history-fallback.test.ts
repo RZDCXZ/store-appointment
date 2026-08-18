@@ -42,6 +42,7 @@ describe("管理端浏览器路由 history fallback", () => {
     "/manager/appointments/booking-direct-route/correction",
     "/manager/schedule",
     "/manager/schedule/planning",
+    "/manager/schedule/capacity-changes/new",
     "/manager/schedule/published?date=2026-08-15",
     "/manager/services",
     "/manager/customers",

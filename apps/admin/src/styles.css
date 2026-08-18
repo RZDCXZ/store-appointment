@@ -2877,6 +2877,19 @@ img.identity-avatar {
   background: var(--coral-100);
 }
 
+.manager-calendar-legend .legend-block-pending {
+  border-color: #d5a76f;
+  color: var(--warning);
+  background-color: rgb(255 244 223 / 94%);
+  background-image: repeating-linear-gradient(
+    135deg,
+    transparent 0,
+    transparent 6px,
+    rgb(154 93 31 / 10%) 6px,
+    rgb(154 93 31 / 10%) 10px
+  );
+}
+
 .manager-calendar-board {
   display: grid;
   min-width: 1050px;
@@ -4855,9 +4868,40 @@ img.identity-avatar {
 }
 
 .capacity-change-loading {
+  display: grid;
+  gap: 18px;
   min-height: 180px;
   padding: 24px;
-  color: var(--ink-600);
+}
+
+.capacity-change-loading__heading {
+  width: min(320px, 52%);
+  height: 34px;
+  border-radius: 8px;
+}
+
+.capacity-change-loading__choices,
+.capacity-change-loading__fields {
+  display: grid;
+  gap: 12px;
+}
+
+.capacity-change-loading__choices {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.capacity-change-loading__fields {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+.capacity-change-loading__choices span,
+.capacity-change-loading__fields span {
+  height: 58px;
+  border-radius: 10px;
+}
+
+.capacity-change-loading__fields span {
+  height: 42px;
 }
 
 .capacity-change-form-panel,

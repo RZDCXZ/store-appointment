@@ -11,6 +11,7 @@ import type {
 import { apiFetch, readApiError } from "../../api";
 import { useAuth } from "../../auth-context";
 import { useBackofficeResource } from "../../backoffice-resource";
+import { managerBookingStatusLabels } from "../../manager-booking-presentation";
 import { PageHeading } from "../../page-components";
 import { ScheduleNavigation } from "../../schedule-navigation";
 
@@ -90,7 +91,7 @@ function ImpactSummary({ preview }: { preview: CapacityChangePreviewResponse }):
                   {formatBookingTime(booking.startsAt)}–{formatBookingTime(booking.endsAt)}
                 </small>
               </span>
-              <b>保持已确认</b>
+              <b>保持{managerBookingStatusLabels[booking.status]}</b>
             </article>
           ))}
         </div>
@@ -300,7 +301,14 @@ function CapacityChangeForm({
               type="time"
               value={form.startsAt}
               onChange={(event) => update("startsAt", event.target.value)}
-              aria-describedby={fieldErrors.startsAt ? "capacity-error-start" : undefined}
+              aria-describedby={
+                [
+                  fieldErrors.startsAt ? "capacity-error-start" : null,
+                  fieldErrors.interval ? "capacity-error-interval" : null,
+                ]
+                  .filter(Boolean)
+                  .join(" ") || undefined
+              }
             />
             <FieldError id="capacity-error-start" message={fieldErrors.startsAt} />
           </label>
@@ -310,7 +318,14 @@ function CapacityChangeForm({
               type="time"
               value={form.endsAt}
               onChange={(event) => update("endsAt", event.target.value)}
-              aria-describedby={fieldErrors.endsAt ? "capacity-error-end" : undefined}
+              aria-describedby={
+                [
+                  fieldErrors.endsAt ? "capacity-error-end" : null,
+                  fieldErrors.interval ? "capacity-error-interval" : null,
+                ]
+                  .filter(Boolean)
+                  .join(" ") || undefined
+              }
             />
             <FieldError id="capacity-error-end" message={fieldErrors.endsAt} />
           </label>
@@ -404,8 +419,21 @@ export function ManagerCapacityChangePage(): React.JSX.Element {
       <ScheduleNavigation />
 
       {resource.loading && !resource.data ? (
-        <section className="capacity-change-loading" role="status">
-          正在读取员工与十四日已发布排班…
+        <section
+          className="capacity-change-loading"
+          role="status"
+          aria-label="正在读取员工与十四日已发布排班"
+        >
+          <div className="capacity-change-loading__heading manager-shimmer" />
+          <div className="capacity-change-loading__choices">
+            <span className="manager-shimmer" />
+            <span className="manager-shimmer" />
+          </div>
+          <div className="capacity-change-loading__fields">
+            {Array.from({ length: 4 }, (_, index) => (
+              <span className="manager-shimmer" key={index} />
+            ))}
+          </div>
         </section>
       ) : null}
       {resource.error && !resource.data ? (

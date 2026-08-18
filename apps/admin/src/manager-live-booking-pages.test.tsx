@@ -287,6 +287,7 @@ describe("店长即时预约页面", () => {
     expect(screen.getAllByText("休息").length).toBeGreaterThan(0);
     expect(screen.getByText("周转 15 分钟")).toBeInTheDocument();
     expect(screen.getByText("已确认")).toBeInTheDocument();
+    expect(screen.getByText("待处理容量变化")).toBeInTheDocument();
     expect(screen.getByText(/影响 1 笔预约/)).toBeInTheDocument();
     expect(screen.getByRole("link", { name: /薄荷.*猫咪洗护/ })).toHaveAttribute(
       "href",

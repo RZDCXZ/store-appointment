@@ -55,7 +55,7 @@ const previewFixture = {
     {
       id: "booking-bohe-future",
       revision: 1,
-      status: "confirmed",
+      status: "checked_in",
       customerName: "程墨",
       petName: "薄荷",
       serviceName: "猫咪洗护",
@@ -85,6 +85,7 @@ describe("MG-10 停班或临时闭店创建", () => {
 
       if (url.endsWith("/auth/session")) return jsonResponse({ account: managerAccount });
       if (url.endsWith("/backoffice/manager/capacity-changes/options")) {
+        await new Promise((resolve) => setTimeout(resolve, 20));
         return jsonResponse(optionsFixture);
       }
       if (url.endsWith("/backoffice/manager/capacity-changes/preview")) {
@@ -115,6 +116,7 @@ describe("MG-10 停班或临时闭店创建", () => {
     });
     render(<RouterProvider router={router} />);
 
+    expect(await screen.findByLabelText("正在读取员工与十四日已发布排班")).toBeInTheDocument();
     expect(await screen.findByRole("heading", { name: "创建停班或临时闭店" })).toBeInTheDocument();
     expect(screen.getByText(/MG-10/)).toBeInTheDocument();
     expect(screen.getByRole("link", { name: "容量变化" })).toHaveAttribute("aria-current", "page");
@@ -133,6 +135,7 @@ describe("MG-10 停班或临时闭店创建", () => {
     expect(screen.getByText("7.5 员工小时")).toBeInTheDocument();
     expect(screen.getByText("1 笔预约")).toBeInTheDocument();
     expect(screen.getByText(/薄荷 · 程墨/)).toBeInTheDocument();
+    expect(screen.getByText("保持已到店")).toBeInTheDocument();
     expect(screen.getByText(previewFixture.consequence)).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "确认并进入待处理" }));
 
@@ -189,6 +192,14 @@ describe("MG-10 停班或临时闭店创建", () => {
     fireEvent.click(screen.getByRole("button", { name: "预览影响" }));
 
     expect(await screen.findByText("员工停班区间必须完整落在已发布班次内。")).toBeInTheDocument();
+    expect(screen.getByLabelText("开始时间")).toHaveAttribute(
+      "aria-describedby",
+      "capacity-error-interval",
+    );
+    expect(screen.getByLabelText("结束时间")).toHaveAttribute(
+      "aria-describedby",
+      "capacity-error-interval",
+    );
     expect(screen.queryByText("容量变化已进入待处理")).not.toBeInTheDocument();
     await waitFor(() => expect(optionsReads).toBe(2));
   });

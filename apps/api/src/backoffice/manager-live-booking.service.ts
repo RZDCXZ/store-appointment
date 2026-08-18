@@ -903,45 +903,50 @@ export class ManagerLiveBookingService {
 
   private async pendingCapacityRisks(localDate: string): Promise<PendingCapacityRiskRow[]> {
     const result = await this.database.pool.query<PendingCapacityRiskRow>(
-      `SELECT time_off.id,
-              'time_off'::text AS kind,
-              to_char(time_off.local_date, 'YYYY-MM-DD') AS local_date,
-              to_char(time_off.starts_at, 'HH24:MI') AS starts_at,
-              to_char(time_off.ends_at, 'HH24:MI') AS ends_at,
-              account.display_name AS staff_display_name,
+      `WITH pending_change AS (
+         SELECT time_off.id,
+                'time_off'::text AS kind,
+                time_off.local_date,
+                time_off.starts_at,
+                time_off.ends_at,
+                time_off.staff_id,
+                account.display_name AS staff_display_name
+         FROM staff_time_off_intervals AS time_off
+         JOIN backoffice_accounts AS account ON account.id = time_off.staff_id
+         WHERE time_off.status = 'pending'
+           AND time_off.local_date BETWEEN $1::date AND ($1::date + 13)
+         UNION ALL
+         SELECT closure.id,
+                'store_closure'::text AS kind,
+                closure.local_date,
+                closure.starts_at,
+                closure.ends_at,
+                NULL AS staff_id,
+                NULL AS staff_display_name
+         FROM store_closure_intervals AS closure
+         WHERE closure.status = 'pending'
+           AND closure.local_date BETWEEN $1::date AND ($1::date + 13)
+       )
+       SELECT pending_change.id,
+              pending_change.kind,
+              to_char(pending_change.local_date, 'YYYY-MM-DD') AS local_date,
+              to_char(pending_change.starts_at, 'HH24:MI') AS starts_at,
+              to_char(pending_change.ends_at, 'HH24:MI') AS ends_at,
+              pending_change.staff_display_name,
               (
                 SELECT count(*)::int
                 FROM bookings AS booking
                 WHERE booking.status IN ('confirmed', 'checked_in')
-                  AND booking.staff_id = time_off.staff_id
+                  AND (
+                    pending_change.staff_id IS NULL
+                    OR booking.staff_id = pending_change.staff_id
+                  )
                   AND booking.occupancy_starts_at <
-                    ((time_off.local_date + time_off.ends_at) AT TIME ZONE 'Asia/Shanghai')
+                    ((pending_change.local_date + pending_change.ends_at) AT TIME ZONE 'Asia/Shanghai')
                   AND booking.occupancy_ends_at >
-                    ((time_off.local_date + time_off.starts_at) AT TIME ZONE 'Asia/Shanghai')
+                    ((pending_change.local_date + pending_change.starts_at) AT TIME ZONE 'Asia/Shanghai')
               ) AS affected_booking_count
-       FROM staff_time_off_intervals AS time_off
-       JOIN backoffice_accounts AS account ON account.id = time_off.staff_id
-       WHERE time_off.status = 'pending'
-         AND time_off.local_date BETWEEN $1::date AND ($1::date + 13)
-       UNION ALL
-       SELECT closure.id,
-              'store_closure'::text AS kind,
-              to_char(closure.local_date, 'YYYY-MM-DD') AS local_date,
-              to_char(closure.starts_at, 'HH24:MI') AS starts_at,
-              to_char(closure.ends_at, 'HH24:MI') AS ends_at,
-              NULL AS staff_display_name,
-              (
-                SELECT count(*)::int
-                FROM bookings AS booking
-                WHERE booking.status IN ('confirmed', 'checked_in')
-                  AND booking.occupancy_starts_at <
-                    ((closure.local_date + closure.ends_at) AT TIME ZONE 'Asia/Shanghai')
-                  AND booking.occupancy_ends_at >
-                    ((closure.local_date + closure.starts_at) AT TIME ZONE 'Asia/Shanghai')
-              ) AS affected_booking_count
-       FROM store_closure_intervals AS closure
-       WHERE closure.status = 'pending'
-         AND closure.local_date BETWEEN $1::date AND ($1::date + 13)
+       FROM pending_change
        ORDER BY local_date, starts_at, id`,
       [localDate],
     );
