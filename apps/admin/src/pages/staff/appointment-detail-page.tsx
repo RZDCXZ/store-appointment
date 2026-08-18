@@ -41,6 +41,8 @@ const eventLabels: Record<string, string> = {
   booking_checked_in: "已使用六位码到店核销",
   booking_late_checked_in: "已手动迟到核销",
   booking_no_show: "已人工标记爽约",
+  booking_completed: "服务已完成并生成门店服务记录",
+  booking_terminated: "服务已终止",
 };
 
 export function StaffAppointmentDetailPage(): React.JSX.Element {
@@ -121,6 +123,30 @@ export function StaffAppointmentDetailPage(): React.JSX.Element {
                 to={`/staff/appointments/${booking.id}/${booking.action === "late" ? "late" : "check-in"}`}
               >
                 {booking.action === "late" ? "处理迟到" : "输入核销码"}
+              </Link>
+            ) : null}
+            {booking.status === "checked_in" ? (
+              <span className="staff-current-action__actions">
+                <Link
+                  className="staff-primary-link staff-current-action__link"
+                  to={`/staff/appointments/${booking.id}/complete`}
+                >
+                  完成服务并保存记录
+                </Link>
+                <Link
+                  className="staff-danger-link"
+                  to={`/staff/appointments/${booking.id}/terminate`}
+                >
+                  服务终止
+                </Link>
+              </span>
+            ) : null}
+            {booking.status === "completed" && data.serviceRecord ? (
+              <Link
+                className="staff-primary-link staff-current-action__link"
+                to={`/staff/appointments/${booking.id}/service-record`}
+              >
+                查看门店服务记录
               </Link>
             ) : null}
           </section>

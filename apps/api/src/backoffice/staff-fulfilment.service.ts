@@ -10,6 +10,7 @@ import type {
   StaffBookingSummary,
   StaffPhoneRevealResponse,
   StaffTodayResponse,
+  StoreServiceRecord,
 } from "@rongguang/contracts";
 
 import { AuditService } from "../audit/audit.service.js";
@@ -77,6 +78,30 @@ interface StaffPetPhotoRow {
   staff_id: string;
   mime_type: "image/jpeg" | "image/png" | null;
   storage_key: string | null;
+}
+
+interface ServiceRecordRow {
+  id: string;
+  booking_id: string;
+  pet_snapshot: StoreServiceRecord["pet"];
+  primary_service_snapshot: StoreServiceRecord["primaryService"];
+  addon_snapshots: StoreServiceRecord["addons"];
+  staff_snapshot: StoreServiceRecord["staff"];
+  actual_starts_at: Date;
+  actual_ends_at: Date;
+  care_tags: StoreServiceRecord["careTags"];
+  internal_text: string | null;
+  created_at: Date;
+}
+
+interface ServiceRecordNoteRow {
+  id: string;
+  kind: "staff_note" | "manager_correction";
+  note_text: string;
+  author_type: "staff" | "manager";
+  author_id: string;
+  author_display_name: string;
+  created_at: Date;
 }
 
 const bookingSelect = `
@@ -326,7 +351,7 @@ export class StaffFulfilmentService {
     }
     if (row.staff_id !== identity.id) forbidden();
 
-    const [eventResult, historyResult] = await Promise.all([
+    const [eventResult, historyResult, serviceRecordResult] = await Promise.all([
       this.database.pool.query<BookingEventRow>(
         `
           SELECT id, event_type, actor_type, actor_id, payload, occurred_at
@@ -338,24 +363,46 @@ export class StaffFulfilmentService {
       ),
       this.database.pool.query<ServiceHistoryRow>(
         `
-          SELECT id AS booking_id,
-                 primary_service_name_snapshot AS service_name,
-                 addon_snapshots,
-                 staff_display_name_snapshot AS staff_name,
-                 completed_at
-          FROM bookings
-          WHERE pet_id = $1
-            AND status = 'completed'
-            AND completed_at IS NOT NULL
-          ORDER BY completed_at DESC, id
+          SELECT record.booking_id,
+                 record.primary_service_snapshot->>'name' AS service_name,
+                 record.addon_snapshots,
+                 record.staff_snapshot->>'displayName' AS staff_name,
+                 record.actual_ends_at AS completed_at
+          FROM store_service_records AS record
+          WHERE record.pet_snapshot->>'id' = $1
+          ORDER BY record.actual_ends_at DESC, record.id
           LIMIT 10
         `,
         [row.pet_id],
       ),
+      this.database.pool.query<ServiceRecordRow>(
+        `
+          SELECT id, booking_id, pet_snapshot, primary_service_snapshot,
+                 addon_snapshots, staff_snapshot, actual_starts_at,
+                 actual_ends_at, care_tags, internal_text, created_at
+          FROM store_service_records
+          WHERE booking_id = $1
+        `,
+        [bookingId],
+      ),
     ]);
     const booking = summary(row, Date.parse(getDemoNow()));
+    const serviceRecordRow = serviceRecordResult.rows[0];
+    const serviceRecordNotes = serviceRecordRow
+      ? await this.database.pool.query<ServiceRecordNoteRow>(
+          `
+            SELECT id, kind, note_text, author_type, author_id,
+                   author_display_name, created_at
+            FROM store_service_record_notes
+            WHERE service_record_id = $1
+            ORDER BY created_at, id
+          `,
+          [serviceRecordRow.id],
+        )
+      : null;
 
     return {
+      demoNow: getDemoNow(),
       booking: {
         ...booking,
         pet: {
@@ -385,6 +432,33 @@ export class StaffFulfilmentService {
         staffName: history.staff_name,
         completedAt: history.completed_at.toISOString(),
       })),
+      serviceRecord: serviceRecordRow
+        ? {
+            id: serviceRecordRow.id,
+            bookingId: serviceRecordRow.booking_id,
+            pet: serviceRecordRow.pet_snapshot,
+            primaryService: serviceRecordRow.primary_service_snapshot,
+            addons: serviceRecordRow.addon_snapshots,
+            staff: serviceRecordRow.staff_snapshot,
+            actualStartsAt: serviceRecordRow.actual_starts_at.toISOString(),
+            actualEndsAt: serviceRecordRow.actual_ends_at.toISOString(),
+            careTags: serviceRecordRow.care_tags,
+            internalText: serviceRecordRow.internal_text,
+            createdAt: serviceRecordRow.created_at.toISOString(),
+            notes:
+              serviceRecordNotes?.rows.map((note) => ({
+                id: note.id,
+                kind: note.kind,
+                text: note.note_text,
+                author: {
+                  type: note.author_type,
+                  id: note.author_id,
+                  displayName: note.author_display_name,
+                },
+                createdAt: note.created_at.toISOString(),
+              })) ?? [],
+          }
+        : null,
     };
   }
 

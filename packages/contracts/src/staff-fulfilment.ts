@@ -58,6 +58,7 @@ export interface StaffBookingListResponse {
 }
 
 export interface StaffBookingDetailResponse {
+  demoNow: string;
   booking: StaffBookingSummary & {
     pet: StaffBookingSummary["pet"] & {
       weightKg: number;
@@ -85,6 +86,7 @@ export interface StaffBookingDetailResponse {
     staffName: string;
     completedAt: string;
   }>;
+  serviceRecord: StoreServiceRecord | null;
 }
 
 export interface StaffPhoneRevealResponse {
@@ -101,6 +103,125 @@ export interface BookingCheckInInput {
 export interface BookingLateActionInput {
   idempotencyKey: string;
   reason: string;
+}
+
+export const storeServiceCareTags = ["情绪稳定", "需要慢速吹风", "换毛期"] as const;
+
+export type StoreServiceCareTag = (typeof storeServiceCareTags)[number];
+
+export interface BookingCompletionInput {
+  idempotencyKey: string;
+  careTags: StoreServiceCareTag[];
+  internalText: string | null;
+}
+
+export interface StoreServiceRecord {
+  id: string;
+  bookingId: string;
+  pet: {
+    id: string;
+    name: string;
+    species: "dog" | "cat";
+    weightKg: number;
+    petSize: "small" | "medium" | "large";
+  };
+  primaryService: {
+    id: string;
+    name: string;
+    priceCents: number;
+    durationMinutes: number;
+  };
+  addons: Array<{
+    id: string;
+    name: string;
+    priceCents: number;
+    durationMinutes: number;
+  }>;
+  staff: {
+    id: string;
+    displayName: string;
+  };
+  actualStartsAt: string;
+  actualEndsAt: string;
+  careTags: StoreServiceCareTag[];
+  internalText: string | null;
+  createdAt: string;
+  notes: StoreServiceRecordNote[];
+}
+
+export interface StoreServiceRecordNote {
+  id: string;
+  kind: "staff_note" | "manager_correction";
+  text: string;
+  author: {
+    type: "staff" | "manager";
+    id: string;
+    displayName: string;
+  };
+  createdAt: string;
+}
+
+export interface StoreServiceRecordNoteInput {
+  idempotencyKey: string;
+  text: string;
+}
+
+export interface StoreServiceRecordNoteResponse {
+  bookingId: string;
+  serviceRecordId: string;
+  occurredAt: string;
+  note: StoreServiceRecordNote;
+}
+
+export interface BookingCompletionResponse {
+  bookingId: string;
+  status: "completed";
+  outcome: "completed";
+  occurredAt: string;
+  actor: {
+    type: "staff" | "manager";
+    id: string;
+    displayName: string;
+  };
+  actualOccupancy: {
+    startsAt: string;
+    endsAt: string;
+  };
+  originalSchedule: {
+    startsAt: string;
+    endsAt: string;
+    occupancyStartsAt: string;
+    occupancyEndsAt: string;
+  };
+  serviceRecord: StoreServiceRecord;
+}
+
+export interface BookingTerminationInput {
+  idempotencyKey: string;
+  reason: string;
+}
+
+export interface BookingTerminationResponse {
+  bookingId: string;
+  status: "terminated";
+  outcome: "terminated";
+  occurredAt: string;
+  actor: {
+    type: "staff" | "manager";
+    id: string;
+    displayName: string;
+  };
+  reason: string;
+  actualOccupancy: {
+    startsAt: string;
+    endsAt: string;
+  } | null;
+  originalSchedule: {
+    startsAt: string;
+    endsAt: string;
+    occupancyStartsAt: string;
+    occupancyEndsAt: string;
+  };
 }
 
 export interface BookingFulfilmentResponse {

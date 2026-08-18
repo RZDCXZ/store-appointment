@@ -18,7 +18,9 @@ import { ApiOperation, ApiTags } from "@nestjs/swagger";
 import {
   backofficeNavigation,
   type BackofficeLandingResponse,
+  type BookingCompletionResponse,
   type BookingFulfilmentResponse,
+  type BookingTerminationResponse,
   type ManagerBookingDetailResponse,
   type ManagerCalendarResponse,
   type ManagerWorkbenchResponse,
@@ -26,6 +28,7 @@ import {
   type StaffBookingListResponse,
   type StaffPhoneRevealResponse,
   type StaffTodayResponse,
+  type StoreServiceRecordNoteResponse,
 } from "@rongguang/contracts";
 import type { FastifyReply } from "fastify";
 import type { Observable } from "rxjs";
@@ -109,6 +112,43 @@ export class BackofficeController {
   ): Promise<StaffTodayResponse> {
     reply.header("Cache-Control", "no-store");
     return this.staffFulfilment.today(request.backofficeIdentity);
+  }
+
+  @Post("bookings/:bookingId/complete")
+  @UseGuards(RequestOriginGuard)
+  @ApiOperation({ summary: "完成已到店服务并生成不可覆盖的门店服务记录" })
+  completeBooking(
+    @Param("bookingId") bookingId: string,
+    @Body() body: unknown,
+    @Req() request: AuthenticatedRequest,
+  ): Promise<BookingCompletionResponse> {
+    return this.bookingFulfilment.complete(request.backofficeIdentity, bookingId, body);
+  }
+
+  @Post("bookings/:bookingId/terminate")
+  @UseGuards(RequestOriginGuard)
+  @ApiOperation({ summary: "填写原因终止已到店服务并释放剩余容量" })
+  terminateBooking(
+    @Param("bookingId") bookingId: string,
+    @Body() body: unknown,
+    @Req() request: AuthenticatedRequest,
+  ): Promise<BookingTerminationResponse> {
+    return this.bookingFulfilment.terminate(request.backofficeIdentity, bookingId, body);
+  }
+
+  @Post("bookings/:bookingId/service-record/notes")
+  @UseGuards(RequestOriginGuard)
+  @ApiOperation({ summary: "在只读门店服务记录后追加员工说明或店长更正说明" })
+  appendServiceRecordNote(
+    @Param("bookingId") bookingId: string,
+    @Body() body: unknown,
+    @Req() request: AuthenticatedRequest,
+  ): Promise<StoreServiceRecordNoteResponse> {
+    return this.bookingFulfilment.appendServiceRecordNote(
+      request.backofficeIdentity,
+      bookingId,
+      body,
+    );
   }
 
   @Post("bookings/:bookingId/check-in")

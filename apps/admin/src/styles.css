@@ -3161,6 +3161,32 @@ img.identity-avatar {
   flex: 0 0 auto;
 }
 
+.staff-current-action__actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-left: auto;
+}
+
+.staff-current-action__actions .staff-current-action__link {
+  margin-left: 0;
+}
+
+.staff-danger-link {
+  display: inline-flex;
+  min-height: 40px;
+  align-items: center;
+  justify-content: center;
+  padding: 0 13px;
+  border: 1px solid #df9f95;
+  border-radius: 9px;
+  color: var(--danger-700);
+  background: var(--surface-strong);
+  font-size: 12px;
+  font-weight: 800;
+  text-decoration: none;
+}
+
 .staff-current-action small {
   color: var(--ink-600);
   font-size: 11px;
@@ -3639,6 +3665,234 @@ img.identity-avatar {
   opacity: 0.48;
 }
 
+.staff-complete-form,
+.staff-terminate-form,
+.staff-service-record,
+.staff-service-record-notes,
+.staff-service-record-note-form {
+  margin-top: 14px;
+  padding: 24px;
+  border: 1px solid var(--line-200);
+  border-radius: 15px;
+  background: var(--surface);
+}
+
+.staff-complete-form > header small,
+.staff-complete-form > header h2,
+.staff-complete-form > header p,
+.staff-service-record header small,
+.staff-service-record header h2,
+.staff-service-record header p,
+.staff-service-record-notes header small,
+.staff-service-record-notes header h2 {
+  display: block;
+  margin: 0;
+}
+
+.staff-complete-form > header small,
+.staff-service-record header small,
+.staff-service-record-notes header small {
+  color: var(--sage-700);
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+}
+
+.staff-complete-form > header h2,
+.staff-service-record header h2,
+.staff-service-record-notes header h2 {
+  margin-top: 5px;
+  font-size: 21px;
+}
+
+.staff-complete-form > header p,
+.staff-service-record header p {
+  margin-top: 7px;
+  color: var(--ink-600);
+  font-size: 13px;
+  line-height: 1.65;
+}
+
+.staff-care-tag-picker {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 22px 0 18px;
+  padding: 0;
+  border: 0;
+}
+
+.staff-care-tag-picker legend {
+  width: 100%;
+  margin-bottom: 2px;
+  color: var(--ink-700);
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.staff-care-tag-picker button {
+  min-height: 38px;
+  padding: 0 13px;
+  border: 1px solid var(--line-200);
+  border-radius: 999px;
+  color: var(--ink-700);
+  background: var(--surface-strong);
+  cursor: pointer;
+  font-weight: 700;
+}
+
+.staff-care-tag-picker button.selected {
+  border-color: var(--sage-500);
+  color: var(--sage-900);
+  background: var(--sage-100);
+}
+
+.staff-complete-form > label,
+.staff-terminate-form > label,
+.staff-service-record-note-form > label {
+  display: grid;
+  gap: 8px;
+  color: var(--ink-700);
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.staff-complete-form textarea,
+.staff-terminate-form textarea,
+.staff-service-record-note-form textarea {
+  width: 100%;
+  resize: vertical;
+}
+
+.staff-complete-form label small,
+.staff-terminate-form label small,
+.staff-service-record-note-form label small {
+  color: var(--ink-500);
+  font-weight: 400;
+  text-align: right;
+}
+
+.staff-complete-form > p {
+  margin: 14px 0 0;
+  padding: 12px;
+  border-radius: 9px;
+  color: var(--warning);
+  background: var(--warning-bg);
+  font-size: 13px;
+}
+
+.staff-complete-form > button,
+.staff-terminate-form > button,
+.staff-service-record-note-form > button {
+  width: 100%;
+  margin-top: 16px;
+}
+
+.staff-terminate-warning {
+  display: grid;
+  grid-template-columns: 24px minmax(0, 1fr);
+  gap: 11px;
+  margin-bottom: 18px;
+  padding: 15px;
+  border: 1px solid #e1aaa4;
+  border-radius: 11px;
+  color: var(--danger-700);
+  background: var(--danger-bg);
+}
+
+.staff-terminate-warning > svg {
+  width: 24px;
+  height: 24px;
+}
+
+.staff-terminate-warning p {
+  margin: 6px 0 0;
+  color: var(--ink-700);
+  font-size: 13px;
+  line-height: 1.65;
+}
+
+.staff-fulfilment-result--terminated {
+  border-color: #e6c1bc;
+  background: var(--coral-100);
+}
+
+.staff-service-record {
+  border-color: var(--sage-200);
+  background: var(--sage-50);
+}
+
+.staff-service-record dl {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 9px;
+  margin: 20px 0 0;
+}
+
+.staff-service-record dl > div {
+  padding: 12px;
+  border-radius: 10px;
+  background: rgb(255 255 255 / 68%);
+}
+
+.staff-service-record dt {
+  color: var(--ink-500);
+  font-size: 11px;
+}
+
+.staff-service-record dd {
+  margin: 5px 0 0;
+  color: var(--ink-900);
+  font-weight: 750;
+  line-height: 1.45;
+}
+
+.staff-service-record__notes {
+  display: grid;
+  gap: 6px;
+  margin-top: 14px;
+  padding: 15px;
+  border-top: 1px solid rgb(47 78 65 / 14%);
+}
+
+.staff-service-record__notes strong:not(:first-child) {
+  margin-top: 9px;
+}
+
+.staff-service-record__notes p {
+  margin: 0;
+  color: var(--ink-600);
+  line-height: 1.65;
+  white-space: pre-wrap;
+}
+
+.staff-service-record-notes ol {
+  display: grid;
+  gap: 10px;
+  margin: 18px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.staff-service-record-notes li {
+  padding: 14px;
+  border: 1px solid var(--line-light);
+  border-radius: 10px;
+  background: #f7f5f0;
+}
+
+.staff-service-record-notes li p {
+  margin: 7px 0 0;
+  color: var(--ink-700);
+  line-height: 1.6;
+  white-space: pre-wrap;
+}
+
+.staff-service-record-notes li p:last-child {
+  color: var(--ink-500);
+  font-size: 12px;
+}
+
 @media (max-width: 800px) {
   .backoffice-shell--staff .sidebar {
     display: grid;
@@ -3848,6 +4102,17 @@ img.identity-avatar {
     margin-left: 0;
   }
 
+  .staff-current-action__actions {
+    display: grid;
+    width: 100%;
+    margin-left: 0;
+    grid-template-columns: minmax(0, 1fr) auto;
+  }
+
+  .staff-current-action__actions .staff-current-action__link {
+    width: auto;
+  }
+
   .staff-fulfilment-summary {
     grid-template-columns: 1fr;
   }
@@ -3856,5 +4121,17 @@ img.identity-avatar {
   .staff-late-form,
   .staff-fulfilment-result {
     padding: 18px;
+  }
+
+  .staff-complete-form,
+  .staff-terminate-form,
+  .staff-service-record,
+  .staff-service-record-notes,
+  .staff-service-record-note-form {
+    padding: 18px;
+  }
+
+  .staff-service-record dl {
+    grid-template-columns: 1fr;
   }
 }

@@ -15,8 +15,11 @@ import { ManagerWorkbenchPage } from "./pages/manager/workbench-page";
 import { StaffAppointmentsPage } from "./pages/staff/appointments-page";
 import { StaffAppointmentDetailPage } from "./pages/staff/appointment-detail-page";
 import { StaffCheckInPage } from "./pages/staff/check-in-page";
+import { StaffCompletePage } from "./pages/staff/complete-page";
 import { StaffLatePage } from "./pages/staff/late-page";
 import { StaffPhoneRevealPage } from "./pages/staff/phone-reveal-page";
+import { StaffServiceRecordPage } from "./pages/staff/service-record-page";
+import { StaffTerminatePage } from "./pages/staff/terminate-page";
 import { StaffTodayPage } from "./pages/staff/today-page";
 import { RoleBoundary, RootRedirect } from "./protected-route";
 
@@ -76,6 +79,9 @@ export const routes: RouteObject[] = [
           { path: "appointments", element: <StaffAppointmentsPage /> },
           { path: "appointments/:bookingId", element: <StaffAppointmentDetailPage /> },
           { path: "appointments/:bookingId/check-in", element: <StaffCheckInPage /> },
+          { path: "appointments/:bookingId/complete", element: <StaffCompletePage /> },
+          { path: "appointments/:bookingId/terminate", element: <StaffTerminatePage /> },
+          { path: "appointments/:bookingId/service-record", element: <StaffServiceRecordPage /> },
           { path: "appointments/:bookingId/late", element: <StaffLatePage /> },
           { path: "appointments/:bookingId/phone", element: <StaffPhoneRevealPage /> },
         ],

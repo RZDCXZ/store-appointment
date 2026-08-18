@@ -2,7 +2,8 @@ import type { StaffBookingDetailResponse } from "@rongguang/contracts";
 
 import { formatShanghaiDateTime } from "./staff-booking-presentation";
 
-export type StaffFulfilmentCommand = "check_in" | "late_check_in" | "no_show";
+export type StaffFulfilmentCommand =
+  "check_in" | "late_check_in" | "no_show" | "complete" | "terminate" | "service_record_note";
 
 interface StaffFulfilmentResultData {
   outcome: "checked_in" | "no_show";
@@ -38,6 +39,10 @@ export function isFulfilmentFactConflict(status: number, code: string): boolean 
       "CHECK_IN_WINDOW_CLOSED",
       "LATE_CHECK_IN_TOO_EARLY",
       "NO_SHOW_TOO_EARLY",
+      "BOOKING_COMPLETION_NOT_ALLOWED",
+      "BOOKING_COMPLETION_TOO_EARLY",
+      "BOOKING_TERMINATION_NOT_ALLOWED",
+      "SERVICE_RECORD_NOT_FOUND",
     ].includes(code)
   );
 }

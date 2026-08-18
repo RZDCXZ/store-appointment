@@ -567,7 +567,7 @@ async function seed(client: PoolClient): Promise<void> {
         (
           'booking-maiya-completed', 'customer-gu-yan', 'pet-maiya', 'zhaohang',
           '2026-08-02T02:00:00.000Z', '2026-08-02T03:00:00.000Z',
-          '2026-08-02T02:00:00.000Z', '2026-08-02T03:15:00.000Z', 60, 'completed',
+          '2026-08-02T02:00:00.000Z', '2026-08-02T03:07:00.000Z', 60, 'completed',
           '麦芽', 'dog', 7.2, 'small', 'dog-basic-care', '犬基础洗护', 12800, 60,
           '[]'::jsonb, '["dog-basic-care"]'::jsonb, 12800, '赵航', 15,
           '2026-08-02T02:00:00.000Z', '2026-08-02T03:00:00.000Z',
@@ -578,7 +578,7 @@ async function seed(client: PoolClient): Promise<void> {
         (
           'booking-bohe-completed', 'customer-cheng-mo', 'pet-bohe', 'zhouning',
           '2026-08-06T02:00:00.000Z', '2026-08-06T03:30:00.000Z',
-          '2026-08-06T02:00:00.000Z', '2026-08-06T03:45:00.000Z', 90, 'completed',
+          '2026-08-06T02:00:00.000Z', '2026-08-06T03:37:00.000Z', 90, 'completed',
           '薄荷', 'cat', 4.8, 'small', 'cat-care', '猫咪洗护', 16800, 90,
           '[]'::jsonb, '["cat-care"]'::jsonb, 16800, '周宁', 15,
           '2026-08-06T02:00:00.000Z', '2026-08-06T03:30:00.000Z',
@@ -630,6 +630,40 @@ async function seed(client: PoolClient): Promise<void> {
       ),
       seedVerificationCodeDigest("customer-lu-yao", "booking-lizi-no-show", "booking-lizi-no-show"),
     ],
+  );
+
+  await client.query(
+    `
+      INSERT INTO store_service_records (
+        id, booking_id, pet_snapshot, primary_service_snapshot, addon_snapshots,
+        staff_snapshot, actual_starts_at, actual_ends_at, care_tags,
+        internal_text, created_at
+      )
+      VALUES
+        (
+          'service-record-maiya-completed', 'booking-maiya-completed',
+          '{"id":"pet-maiya","name":"麦芽","species":"dog","weightKg":7.2,"petSize":"small"}'::jsonb,
+          '{"id":"dog-basic-care","name":"犬基础洗护","priceCents":12800,"durationMinutes":60}'::jsonb,
+          '[]'::jsonb,
+          '{"id":"zhaohang","displayName":"赵航"}'::jsonb,
+          '2026-08-02T02:03:00.000Z', '2026-08-02T02:52:00.000Z',
+          '["换毛期"]'::jsonb,
+          '换毛期，背部除废毛时间较长；吹风时情绪稳定。',
+          '2026-08-02T02:52:00.000Z'
+        ),
+        (
+          'service-record-bohe-completed', 'booking-bohe-completed',
+          '{"id":"pet-bohe","name":"薄荷","species":"cat","weightKg":4.8,"petSize":"small"}'::jsonb,
+          '{"id":"cat-care","name":"猫咪洗护","priceCents":16800,"durationMinutes":90}'::jsonb,
+          '[]'::jsonb,
+          '{"id":"zhouning","displayName":"周宁"}'::jsonb,
+          '2026-08-06T02:02:00.000Z', '2026-08-06T03:22:00.000Z',
+          '["情绪稳定"]'::jsonb,
+          '洗护过程配合良好，耳部清洁完成。',
+          '2026-08-06T03:22:00.000Z'
+        )
+      ON CONFLICT (id) DO NOTHING
+    `,
   );
 
   await client.query(
@@ -710,7 +744,7 @@ async function seed(client: PoolClient): Promise<void> {
 async function reset(client: PoolClient): Promise<void> {
   await withTransaction(client, async () => {
     await client.query(
-      "TRUNCATE TABLE app_metadata, notification_outbox, audit_events, booking_events, booking_idempotency_keys, booking_fulfilment_idempotency_keys, staff_time_off_intervals, store_closure_intervals, staff_schedule_breaks, staff_schedule_shifts, staff_schedule_days, weekly_shift_template_breaks, weekly_shift_templates, store_business_hours, staff_skills, staff_members, privacy_consents, privacy_notices, bookings, pet_care_tags, pets, pet_photos, customer_sessions, demo_customer_profiles, customers, backoffice_sessions, backoffice_accounts",
+      "TRUNCATE TABLE app_metadata, notification_outbox, audit_events, booking_events, booking_idempotency_keys, booking_fulfilment_idempotency_keys, store_service_record_notes, store_service_records, staff_time_off_intervals, store_closure_intervals, staff_schedule_breaks, staff_schedule_shifts, staff_schedule_days, weekly_shift_template_breaks, weekly_shift_templates, store_business_hours, staff_skills, staff_members, privacy_consents, privacy_notices, bookings, pet_care_tags, pets, pet_photos, customer_sessions, demo_customer_profiles, customers, backoffice_sessions, backoffice_accounts",
     );
     await seed(client);
   });
