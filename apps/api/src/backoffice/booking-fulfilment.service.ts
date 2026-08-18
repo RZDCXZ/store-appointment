@@ -55,7 +55,10 @@ function parseCheckInInput(body: unknown): BookingCheckInInput {
       fieldErrors,
     });
   }
-  return input as unknown as BookingCheckInInput;
+  return {
+    idempotencyKey: input.idempotencyKey as string,
+    verificationCode: input.verificationCode as string,
+  };
 }
 
 function parseLateActionInput(body: unknown): BookingLateActionInput {

@@ -265,7 +265,14 @@ describe("到店核销、迟到与爽约", () => {
 
     const first = await app.inject(request);
     vi.stubEnv("DEMO_NOW", "2026-08-14T03:18:00.000Z");
-    const sameKeyRetry = await app.inject(request);
+    const sameKeyRetry = await app.inject({
+      ...request,
+      payload: {
+        verificationCode,
+        ignoredClientField: "不会参与业务摘要",
+        idempotencyKey: request.payload.idempotencyKey,
+      },
+    });
     const repeatedCheckIn = await app.inject({
       ...request,
       payload: { ...request.payload, idempotencyKey: "check-in-repeated-key" },
