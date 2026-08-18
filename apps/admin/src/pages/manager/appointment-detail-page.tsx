@@ -26,6 +26,21 @@ function localDate(value: string): string {
   }).format(new Date(value));
 }
 
+const actorLabels = {
+  customer: "顾客",
+  staff: "员工",
+  manager: "店长",
+  system: "系统",
+} as const;
+
+const notificationStatusLabels = {
+  pending: "待发送",
+  processing: "发送中",
+  sent: "已发送",
+  retry: "待重试",
+  failed: "发送失败",
+} as const;
+
 export function ManagerAppointmentDetailPage(): React.JSX.Element {
   const { bookingId = "" } = useParams();
   const resource = useManagerResource<ManagerBookingDetailResponse>(
@@ -33,6 +48,7 @@ export function ManagerAppointmentDetailPage(): React.JSX.Element {
     false,
   );
   const booking = resource.data?.booking;
+  const detail = resource.data;
 
   return (
     <main className="page-shell manager-booking-detail-page">
@@ -52,12 +68,13 @@ export function ManagerAppointmentDetailPage(): React.JSX.Element {
           </button>
         </section>
       ) : null}
-      {booking ? (
+      {booking && detail ? (
         <>
           <header className="manager-detail-header">
             <Link to={`/manager/appointments/calendar?date=${localDate(booking.startsAt)}`}>
               <ChevronLeftIcon /> 返回按员工日历
             </Link>
+            <Link to="/manager/appointments/list">返回预约列表</Link>
             <div>
               <span className={`manager-booking-status manager-booking-status--${booking.status}`}>
                 {managerBookingStatusLabels[booking.status]}
@@ -76,6 +93,15 @@ export function ManagerAppointmentDetailPage(): React.JSX.Element {
                 <p>
                   {booking.pet.name} · {booking.pet.species === "cat" ? "猫" : "犬"}
                 </p>
+                <p>
+                  {detail.petProfile.breed ?? "品种未记录"} · {detail.petProfile.weightKg} kg
+                </p>
+                <p>
+                  {detail.petProfile.careTags.length > 0
+                    ? detail.petProfile.careTags.join("、")
+                    : "无特别护理标签"}
+                </p>
+                {detail.petProfile.careNotes ? <p>{detail.petProfile.careNotes}</p> : null}
               </span>
               {booking.pet.photoPath ? (
                 <img src={booking.pet.photoPath} alt={booking.pet.name} />
@@ -106,9 +132,73 @@ export function ManagerAppointmentDetailPage(): React.JSX.Element {
               </span>
             </article>
           </section>
-          <section className="manager-detail-note">
-            <strong>当前事实来自预约 API</strong>
-            <p>直接访问或刷新本页都会按预约编号重新读取，不依赖工作台内的抽屉状态。</p>
+          <section className="manager-detail-facts">
+            <article>
+              <header>
+                <h2>门店服务记录</h2>
+                <p>履约后由员工留下，店长更正会保留痕迹。</p>
+              </header>
+              {detail.serviceRecord ? (
+                <div className="manager-detail-fact-list">
+                  <p>
+                    实际服务：{formatDateTime(detail.serviceRecord.actualStartsAt)} 至{" "}
+                    {formatDateTime(detail.serviceRecord.actualEndsAt)}
+                  </p>
+                  <p>{detail.serviceRecord.internalText ?? "未留下内部服务说明"}</p>
+                  {detail.serviceRecord.notes.map((note) => (
+                    <p key={note.id}>
+                      <small>{note.author.displayName}</small>
+                      <span>{note.text}</span>
+                    </p>
+                  ))}
+                </div>
+              ) : (
+                <p className="manager-detail-empty">预约尚未产生门店服务记录。</p>
+              )}
+            </article>
+            <article>
+              <header>
+                <h2>预约变更历史</h2>
+                <p>按时间记录预约生命周期事件。</p>
+              </header>
+              {detail.changeHistory.length > 0 ? (
+                <ol className="manager-detail-timeline">
+                  {detail.changeHistory.map((event) => (
+                    <li key={event.id}>
+                      <strong>
+                        {actorLabels[event.actorType]} · {event.type}
+                      </strong>
+                      <span>{formatDateTime(event.occurredAt)}</span>
+                      {event.reason ? <p>{event.reason}</p> : null}
+                    </li>
+                  ))}
+                </ol>
+              ) : (
+                <p className="manager-detail-empty">暂无变更记录。</p>
+              )}
+            </article>
+            <article>
+              <header>
+                <h2>通知记录</h2>
+                <p>用于核对预约通知的投递状态。</p>
+              </header>
+              {detail.notifications.length > 0 ? (
+                <ul className="manager-detail-timeline">
+                  {detail.notifications.map((notification) => (
+                    <li key={notification.id}>
+                      <strong>{notification.type}</strong>
+                      <span>
+                        {notificationStatusLabels[notification.status]} · 尝试{" "}
+                        {notification.attemptCount} 次
+                      </span>
+                      <p>{formatDateTime(notification.createdAt)}</p>
+                    </li>
+                  ))}
+                </ul>
+              ) : (
+                <p className="manager-detail-empty">暂无通知记录。</p>
+              )}
+            </article>
           </section>
         </>
       ) : null}

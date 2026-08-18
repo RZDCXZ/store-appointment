@@ -2,20 +2,26 @@ import { HttpException, HttpStatus, Inject, Injectable } from "@nestjs/common";
 import type {
   ManagerBookingDetailResponse,
   ManagerBookingFact,
+  ManagerBookingListFilters,
+  ManagerBookingListResponse,
   ManagerBookingStatus,
   ManagerBookingStatusSummary,
   ManagerCalendarBlock,
   ManagerCalendarResponse,
   ManagerCapacitySummary,
   ManagerStaffDay,
+  ManagerProxyBookingOptionsResponse,
   ManagerWorkbenchResponse,
   ManagerWorkbenchRisk,
+  StoreServiceRecord,
 } from "@rongguang/contracts";
 
 import { getDemoNow } from "../config/environment.js";
+import { bookingWindowFor } from "../booking-availability/availability.js";
 import { DatabaseService } from "../database/database.service.js";
-import { getShanghaiLocalDate } from "../schedule/schedule-date.js";
+import { getShanghaiLocalDate, isLocalDate } from "../schedule/schedule-date.js";
 import { ScheduleService } from "../schedule/schedule.service.js";
+import { ServiceCatalogService } from "../service-catalog/service-catalog.service.js";
 
 interface BookingRow {
   id: string;
@@ -56,6 +62,70 @@ interface FailedNotificationRow {
   booking_id: string;
   attempt_count: number;
   pet_name_snapshot: string;
+}
+
+interface ManagerPetProfileRow {
+  weight_kg: string;
+  breed: string | null;
+  care_notes: string | null;
+  care_tags: string[];
+}
+
+interface ManagerBookingEventRow {
+  id: string;
+  event_type: string;
+  actor_type: "customer" | "staff" | "manager" | "system";
+  actor_id: string | null;
+  payload: { reason?: string | null };
+  occurred_at: Date;
+}
+
+interface ManagerNotificationRow {
+  id: string;
+  notification_type: string;
+  status: "pending" | "processing" | "sent" | "retry" | "failed";
+  attempt_count: number;
+  created_at: Date;
+}
+
+interface ManagerServiceRecordRow {
+  id: string;
+  booking_id: string;
+  pet_snapshot: StoreServiceRecord["pet"];
+  primary_service_snapshot: StoreServiceRecord["primaryService"];
+  addon_snapshots: StoreServiceRecord["addons"];
+  staff_snapshot: StoreServiceRecord["staff"];
+  actual_starts_at: Date;
+  actual_ends_at: Date;
+  care_tags: StoreServiceRecord["careTags"];
+  internal_text: string | null;
+  created_at: Date;
+}
+
+interface ManagerServiceRecordNoteRow {
+  id: string;
+  kind: "staff_note" | "manager_correction";
+  note_text: string;
+  author_type: "staff" | "manager";
+  author_id: string;
+  author_display_name: string;
+  created_at: Date;
+}
+
+interface ManagerProxyOptionRow {
+  customer_id: string;
+  customer_display_name: string;
+  customer_phone: string;
+  pet_id: string | null;
+  pet_name: string | null;
+  pet_species: "dog" | "cat" | null;
+  pet_weight_kg: string | null;
+}
+
+interface ManagerProxyStaffRow {
+  id: string;
+  display_name: string;
+  skills: ManagerProxyBookingOptionsResponse["staff"][number]["skills"];
 }
 
 interface ClockInterval {
@@ -231,6 +301,19 @@ function bookingAffectsCapacity(status: ManagerBookingStatus): boolean {
   return status !== "cancelled" && status !== "no_show";
 }
 
+function petSize(weightKg: number): "small" | "medium" | "large" {
+  if (weightKg <= 10) return "small";
+  if (weightKg <= 25) return "medium";
+  return "large";
+}
+
+function managerCandidate(now: string): string {
+  const halfHourMilliseconds = 30 * 60_000;
+  return new Date(
+    Math.ceil(Date.parse(now) / halfHourMilliseconds) * halfHourMilliseconds,
+  ).toISOString();
+}
+
 function emptyStatusSummary(): ManagerBookingStatusSummary {
   return {
     confirmed: 0,
@@ -242,12 +325,208 @@ function emptyStatusSummary(): ManagerBookingStatusSummary {
   };
 }
 
+const bookingStatuses = new Set<ManagerBookingStatus>([
+  "confirmed",
+  "checked_in",
+  "completed",
+  "cancelled",
+  "no_show",
+  "terminated",
+]);
+
+function bookingListFilters(input: {
+  date?: string;
+  status?: string;
+  staffId?: string;
+  primaryServiceId?: string;
+  query?: string;
+}): ManagerBookingListFilters {
+  const fieldErrors: Record<string, string> = {};
+  const date = input.date?.trim() || null;
+  const status = input.status?.trim() || null;
+  const staffId = input.staffId?.trim() || null;
+  const primaryServiceId = input.primaryServiceId?.trim() || null;
+  const query = input.query?.trim() ?? "";
+
+  if (date && !isLocalDate(date)) {
+    fieldErrors.date = "请选择有效日期。";
+  }
+  if (status && !bookingStatuses.has(status as ManagerBookingStatus)) {
+    fieldErrors.status = "请选择有效预约状态。";
+  }
+  if (staffId && !/^[a-z0-9][a-z0-9-]{1,79}$/.test(staffId)) {
+    fieldErrors.staffId = "请选择有效员工。";
+  }
+  if (primaryServiceId && !/^[a-z0-9][a-z0-9-]{1,79}$/.test(primaryServiceId)) {
+    fieldErrors.primaryServiceId = "请选择有效主要服务。";
+  }
+  if (query.length > 50) {
+    fieldErrors.query = "搜索关键字不能超过 50 个字符。";
+  }
+  if (Object.keys(fieldErrors).length > 0) {
+    throw new HttpException(
+      { code: "VALIDATION_ERROR", message: "预约筛选条件无效。", fieldErrors },
+      HttpStatus.BAD_REQUEST,
+    );
+  }
+
+  return {
+    date,
+    status: status as ManagerBookingStatus | null,
+    staffId,
+    primaryServiceId,
+    query,
+  };
+}
+
 @Injectable()
 export class ManagerLiveBookingService {
   constructor(
     @Inject(DatabaseService) private readonly database: DatabaseService,
     @Inject(ScheduleService) private readonly schedules: ScheduleService,
+    @Inject(ServiceCatalogService) private readonly catalog: ServiceCatalogService,
   ) {}
+
+  async bookings(input: {
+    date?: string;
+    status?: string;
+    staffId?: string;
+    primaryServiceId?: string;
+    query?: string;
+  }): Promise<ManagerBookingListResponse> {
+    const filters = bookingListFilters(input);
+    const result = await this.database.pool.query<BookingRow>(
+      `
+        SELECT ${bookingSelect}
+        FROM bookings AS booking
+        JOIN customers AS customer ON customer.id = booking.customer_id
+        JOIN pets AS pet ON pet.id = booking.pet_id
+        WHERE ($1::date IS NULL OR (booking.starts_at AT TIME ZONE 'Asia/Shanghai')::date = $1::date)
+          AND ($2::text IS NULL OR booking.status = $2)
+          AND ($3::text IS NULL OR booking.staff_id = $3)
+          AND ($4::text IS NULL OR booking.primary_service_id_snapshot = $4)
+          AND (
+            $5::text = ''
+            OR customer.display_name ILIKE '%' || $5 || '%'
+            OR booking.pet_name_snapshot ILIKE '%' || $5 || '%'
+          )
+        ORDER BY booking.starts_at DESC, booking.id
+        LIMIT 200
+      `,
+      [filters.date, filters.status, filters.staffId, filters.primaryServiceId, filters.query],
+    );
+    const staff = await this.database.pool.query<{ id: string; display_name: string }>(
+      `
+        SELECT staff.id, account.display_name
+        FROM staff_members AS staff
+        JOIN backoffice_accounts AS account ON account.id = staff.id
+        WHERE staff.active = true AND account.active = true
+        ORDER BY staff.employee_number
+      `,
+    );
+
+    return {
+      appliedFilters: filters,
+      bookings: result.rows.map((row) => bookingRead(row).fact),
+      filterOptions: {
+        staff: staff.rows.map((member) => ({
+          id: member.id,
+          displayName: member.display_name,
+        })),
+        primaryServices: this.catalog.getStorefront().primaryServices.map((service) => ({
+          id: service.id,
+          name: service.name,
+        })),
+      },
+    };
+  }
+
+  async proxyBookingOptions(): Promise<ManagerProxyBookingOptionsResponse> {
+    const [profileResult, staffResult, noticeResult] = await Promise.all([
+      this.database.pool.query<ManagerProxyOptionRow>(
+        `
+          SELECT customer.id AS customer_id,
+                 customer.display_name AS customer_display_name,
+                 customer.phone AS customer_phone,
+                 pet.id AS pet_id,
+                 pet.name AS pet_name,
+                 pet.species AS pet_species,
+                 pet.weight_kg::text AS pet_weight_kg
+          FROM customers AS customer
+          LEFT JOIN pets AS pet
+            ON pet.customer_id = customer.id
+           AND pet.archived_at IS NULL
+          ORDER BY customer.display_name, customer.id, pet.created_at, pet.id
+        `,
+      ),
+      this.database.pool.query<ManagerProxyStaffRow>(
+        `
+          SELECT staff.id,
+                 account.display_name,
+                 COALESCE(
+                   array_agg(skill.skill_id ORDER BY skill.skill_id)
+                     FILTER (WHERE skill.skill_id IS NOT NULL),
+                   '{}'
+                 ) AS skills
+          FROM staff_members AS staff
+          JOIN backoffice_accounts AS account ON account.id = staff.id
+          LEFT JOIN staff_skills AS skill ON skill.staff_id = staff.id
+          WHERE staff.active = true AND account.active = true
+          GROUP BY staff.id, account.display_name, staff.employee_number
+          ORDER BY staff.employee_number
+        `,
+      ),
+      this.database.pool.query<{ version: string; title: string; summary: string }>(
+        "SELECT version, title, summary FROM privacy_notices WHERE is_current = true",
+      ),
+    ]);
+    const notice = noticeResult.rows[0];
+    if (!notice) {
+      throw new Error("当前隐私说明不存在，无法准备代客预约页面。");
+    }
+    const customers = new Map<string, ManagerProxyBookingOptionsResponse["customers"][number]>();
+    for (const row of profileResult.rows) {
+      const customer = customers.get(row.customer_id) ?? {
+        id: row.customer_id,
+        displayName: row.customer_display_name,
+        phoneMasked: phoneMasked(row.customer_phone),
+        pets: [],
+      };
+      if (row.pet_id && row.pet_name && row.pet_species && row.pet_weight_kg) {
+        const weightKg = Number(row.pet_weight_kg);
+        customer.pets.push({
+          id: row.pet_id,
+          name: row.pet_name,
+          species: row.pet_species,
+          weightKg,
+          petSize: petSize(weightKg),
+        });
+      }
+      customers.set(row.customer_id, customer);
+    }
+    const demoNow = getDemoNow();
+    const window = bookingWindowFor(demoNow);
+    const catalog = this.catalog.getStorefront();
+
+    return {
+      demoNow,
+      privacyNotice: notice,
+      window: { ...window, earliestStartsAt: managerCandidate(demoNow) },
+      customers: [...customers.values()],
+      staff: staffResult.rows.map((staff) => ({
+        id: staff.id,
+        displayName: staff.display_name,
+        skills: staff.skills,
+      })),
+      primaryServices: catalog.primaryServices.map((service) => ({
+        id: service.id,
+        name: service.name,
+        applicableSpecies: service.applicableSpecies,
+        availableAddonIds: service.availableAddonIds,
+      })),
+      addons: catalog.addons.map((addon) => ({ id: addon.id, name: addon.name })),
+    };
+  }
 
   async calendar(date?: string): Promise<ManagerCalendarResponse> {
     const schedule = await this.schedules.getPublishedSchedule(date);
@@ -430,7 +709,126 @@ export class ManagerLiveBookingService {
       );
     }
 
-    return { booking: bookingRead(row).fact };
+    const [petProfileResult, eventResult, notificationResult, serviceRecordResult] =
+      await Promise.all([
+        this.database.pool.query<ManagerPetProfileRow>(
+          `
+            SELECT pet.weight_kg::text,
+                   pet.breed,
+                   pet.care_notes,
+                   COALESCE(
+                     (
+                       SELECT jsonb_agg(tag.tag ORDER BY tag.tag)
+                       FROM pet_care_tags AS tag
+                       WHERE tag.pet_id = pet.id
+                     ),
+                     '[]'::jsonb
+                   ) AS care_tags
+            FROM pets AS pet
+            WHERE pet.id = $1
+          `,
+          [row.pet_id],
+        ),
+        this.database.pool.query<ManagerBookingEventRow>(
+          `
+            SELECT id, event_type, actor_type, actor_id, payload, occurred_at
+            FROM booking_events
+            WHERE booking_id = $1
+            ORDER BY occurred_at, sequence
+          `,
+          [bookingId],
+        ),
+        this.database.pool.query<ManagerNotificationRow>(
+          `
+            SELECT id, notification_type, status, attempt_count, created_at
+            FROM notification_outbox
+            WHERE booking_id = $1
+            ORDER BY created_at, sequence
+          `,
+          [bookingId],
+        ),
+        this.database.pool.query<ManagerServiceRecordRow>(
+          `
+            SELECT id, booking_id, pet_snapshot, primary_service_snapshot,
+                   addon_snapshots, staff_snapshot, actual_starts_at,
+                   actual_ends_at, care_tags, internal_text, created_at
+            FROM store_service_records
+            WHERE booking_id = $1
+          `,
+          [bookingId],
+        ),
+      ]);
+    const profile = petProfileResult.rows[0];
+    if (!profile) {
+      throw new Error(`预约 ${bookingId} 引用了不存在的宠物档案。`);
+    }
+    const serviceRecordRow = serviceRecordResult.rows[0];
+    const serviceRecordNotes = serviceRecordRow
+      ? await this.database.pool.query<ManagerServiceRecordNoteRow>(
+          `
+            SELECT id, kind, note_text, author_type, author_id,
+                   author_display_name, created_at
+            FROM store_service_record_notes
+            WHERE service_record_id = $1
+            ORDER BY created_at, id
+          `,
+          [serviceRecordRow.id],
+        )
+      : null;
+    const weightKg = Number(profile.weight_kg);
+
+    return {
+      booking: bookingRead(row).fact,
+      petProfile: {
+        weightKg,
+        petSize: petSize(weightKg),
+        breed: profile.breed,
+        careTags: profile.care_tags,
+        careNotes: profile.care_notes,
+      },
+      serviceRecord: serviceRecordRow
+        ? {
+            id: serviceRecordRow.id,
+            bookingId: serviceRecordRow.booking_id,
+            pet: serviceRecordRow.pet_snapshot,
+            primaryService: serviceRecordRow.primary_service_snapshot,
+            addons: serviceRecordRow.addon_snapshots,
+            staff: serviceRecordRow.staff_snapshot,
+            actualStartsAt: serviceRecordRow.actual_starts_at.toISOString(),
+            actualEndsAt: serviceRecordRow.actual_ends_at.toISOString(),
+            careTags: serviceRecordRow.care_tags,
+            internalText: serviceRecordRow.internal_text,
+            createdAt: serviceRecordRow.created_at.toISOString(),
+            notes:
+              serviceRecordNotes?.rows.map((note) => ({
+                id: note.id,
+                kind: note.kind,
+                text: note.note_text,
+                author: {
+                  type: note.author_type,
+                  id: note.author_id,
+                  displayName: note.author_display_name,
+                },
+                createdAt: note.created_at.toISOString(),
+              })) ?? [],
+          }
+        : null,
+      changeHistory: eventResult.rows.map((event) => ({
+        id: event.id,
+        type: event.event_type,
+        actorType: event.actor_type,
+        actorId: event.actor_id,
+        reason: event.payload.reason ?? null,
+        occurredAt: event.occurred_at.toISOString(),
+      })),
+      notifications: notificationResult.rows.map((notification) => ({
+        id: notification.id,
+        type: notification.notification_type,
+        status: notification.status,
+        attemptCount: notification.attempt_count,
+        createdAt: notification.created_at.toISOString(),
+      })),
+    };
   }
 
   private async dayBookings(localDate: string): Promise<BookingRead[]> {

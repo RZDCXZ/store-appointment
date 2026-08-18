@@ -1,10 +1,13 @@
 import type {
   PetSpecies,
+  BookingVerificationWindow,
+  ConfirmedBooking,
   PublishedScheduleShift,
   ScheduleBusinessHours,
   ScheduleWindowDay,
   StaffSkillId,
 } from "./index.js";
+import type { StoreServiceRecord } from "./staff-fulfilment.js";
 
 export type ManagerBookingStatus =
   "confirmed" | "checked_in" | "completed" | "cancelled" | "no_show" | "terminated";
@@ -115,6 +118,98 @@ export interface ManagerWorkbenchResponse {
 
 export interface ManagerBookingDetailResponse {
   booking: ManagerBookingFact;
+  petProfile: {
+    weightKg: number;
+    petSize: "small" | "medium" | "large";
+    breed: string | null;
+    careTags: string[];
+    careNotes: string | null;
+  };
+  serviceRecord: StoreServiceRecord | null;
+  changeHistory: Array<{
+    id: string;
+    type: string;
+    actorType: "customer" | "staff" | "manager" | "system";
+    actorId: string | null;
+    reason: string | null;
+    occurredAt: string;
+  }>;
+  notifications: Array<{
+    id: string;
+    type: string;
+    status: "pending" | "processing" | "sent" | "retry" | "failed";
+    attemptCount: number;
+    createdAt: string;
+  }>;
+}
+
+export interface ManagerBookingListFilters {
+  date: string | null;
+  status: ManagerBookingStatus | null;
+  staffId: string | null;
+  primaryServiceId: string | null;
+  query: string;
+}
+
+export interface ManagerBookingListResponse {
+  appliedFilters: ManagerBookingListFilters;
+  bookings: ManagerBookingFact[];
+  filterOptions: {
+    staff: Array<{ id: string; displayName: string }>;
+    primaryServices: Array<{ id: string; name: string }>;
+  };
+}
+
+export type ManagerOfflineConsentSource = "phone" | "chat" | "in_store";
+
+export interface ManagerProxyBookingResponse {
+  booking: ConfirmedBooking;
+  verificationCode: string;
+  verificationWindow: BookingVerificationWindow;
+  proxyRecord: {
+    privacyNoticeVersion: string;
+    offlineConsentSource: ManagerOfflineConsentSource;
+    manager: { id: string; displayName: string };
+    createdAt: string;
+  };
+}
+
+export interface ManagerProxyBookingOptionsResponse {
+  demoNow: string;
+  privacyNotice: {
+    version: string;
+    title: string;
+    summary: string;
+  };
+  window: {
+    startsOn: string;
+    endsOn: string;
+    earliestStartsAt: string;
+  };
+  customers: Array<{
+    id: string;
+    displayName: string;
+    phoneMasked: string;
+    pets: Array<{
+      id: string;
+      name: string;
+      species: PetSpecies;
+      weightKg: number;
+      petSize: "small" | "medium" | "large";
+    }>;
+  }>;
+  staff: Array<{
+    id: string;
+    displayName: string;
+    skills: StaffSkillId[];
+  }>;
+  primaryServices: Array<{
+    id: string;
+    name: string;
+    applicableSpecies: PetSpecies[];
+    availableAddonIds: string[];
+  }>;
+  addons: Array<{ id: string; name: string }>;
 }
 
 export interface ManagerRefreshHint {

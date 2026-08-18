@@ -22,6 +22,9 @@ import {
   type BookingFulfilmentResponse,
   type BookingTerminationResponse,
   type ManagerBookingDetailResponse,
+  type ManagerBookingListResponse,
+  type ManagerProxyBookingResponse,
+  type ManagerProxyBookingOptionsResponse,
   type ManagerCalendarResponse,
   type ManagerWorkbenchResponse,
   type StaffBookingDetailResponse,
@@ -39,6 +42,7 @@ import { RequestOriginGuard } from "../auth/request-origin.guard.js";
 import { SessionGuard } from "../auth/session.guard.js";
 import { SessionService } from "../auth/session.service.js";
 import { LiveRefreshService } from "../live-refresh/live-refresh.service.js";
+import { BookingService } from "../booking/booking.service.js";
 import { BookingFulfilmentService } from "./booking-fulfilment.service.js";
 import { ManagerLiveBookingService } from "./manager-live-booking.service.js";
 import { StaffFulfilmentService } from "./staff-fulfilment.service.js";
@@ -63,6 +67,7 @@ export class BackofficeController {
     @Inject(BookingFulfilmentService)
     private readonly bookingFulfilment: BookingFulfilmentService,
     @Inject(LiveRefreshService) private readonly liveRefresh: LiveRefreshService,
+    @Inject(BookingService) private readonly bookings: BookingService,
   ) {}
 
   @Get("manager/workbench")
@@ -84,6 +89,41 @@ export class BackofficeController {
   ): Promise<ManagerCalendarResponse> {
     reply.header("Cache-Control", "no-store");
     return this.managerBookings.calendar(date);
+  }
+
+  @Get("manager/bookings")
+  @UseGuards(ManagerGuard)
+  @ApiOperation({ summary: "按店长筛选条件读取预约列表" })
+  managerBookingList(
+    @Query("date") date: string | undefined,
+    @Query("status") status: string | undefined,
+    @Query("staffId") staffId: string | undefined,
+    @Query("primaryServiceId") primaryServiceId: string | undefined,
+    @Query("q") query: string | undefined,
+    @Res({ passthrough: true }) reply: FastifyReply,
+  ): Promise<ManagerBookingListResponse> {
+    reply.header("Cache-Control", "no-store");
+    return this.managerBookings.bookings({ date, status, staffId, primaryServiceId, query });
+  }
+
+  @Post("manager/proxy-bookings")
+  @UseGuards(ManagerGuard, RequestOriginGuard)
+  @ApiOperation({ summary: "店长按同一容量规则幂等创建代客预约" })
+  createManagerProxyBooking(
+    @Body() body: unknown,
+    @Req() request: AuthenticatedRequest,
+  ): Promise<ManagerProxyBookingResponse> {
+    return this.bookings.createProxy(request.backofficeIdentity, body);
+  }
+
+  @Get("manager/proxy-bookings/options")
+  @UseGuards(ManagerGuard)
+  @ApiOperation({ summary: "读取代客预约所需的档案、隐私、员工和服务选项" })
+  managerProxyBookingOptions(
+    @Res({ passthrough: true }) reply: FastifyReply,
+  ): Promise<ManagerProxyBookingOptionsResponse> {
+    reply.header("Cache-Control", "no-store");
+    return this.managerBookings.proxyBookingOptions();
   }
 
   @Get("manager/bookings/:bookingId")

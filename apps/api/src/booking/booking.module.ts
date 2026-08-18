@@ -12,5 +12,6 @@ import { CustomerMessageController } from "./customer-message.controller.js";
   imports: [BookingAvailabilityModule, CustomerModule, DatabaseModule, ServiceCatalogModule],
   controllers: [BookingController, CustomerMessageController],
   providers: [BookingService],
+  exports: [BookingService],
 })
 export class BookingModule {}

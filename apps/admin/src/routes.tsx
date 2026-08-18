@@ -4,6 +4,8 @@ import { AuthProvider } from "./auth-context";
 import { LoginPage } from "./login-page";
 import { ManagerAppointmentsPage } from "./pages/manager/appointments-page";
 import { ManagerAppointmentDetailPage } from "./pages/manager/appointment-detail-page";
+import { ManagerAppointmentListPage } from "./pages/manager/appointment-list-page";
+import { ManagerProxyBookingPage } from "./pages/manager/proxy-booking-page";
 import { ManagerBusinessPage } from "./pages/manager/business-page";
 import { ManagerCalendarPage } from "./pages/manager/calendar-page";
 import { ManagerCustomersPage } from "./pages/manager/customers-page";
@@ -55,7 +57,9 @@ export const routes: RouteObject[] = [
           { index: true, element: <Navigate to="workbench" replace /> },
           { path: "workbench", element: <ManagerWorkbenchPage /> },
           { path: "appointments", element: <ManagerAppointmentsPage /> },
+          { path: "appointments/list", element: <ManagerAppointmentListPage /> },
           { path: "appointments/calendar", element: <ManagerCalendarPage /> },
+          { path: "appointments/proxy", element: <ManagerProxyBookingPage /> },
           { path: "appointments/:bookingId", element: <ManagerAppointmentDetailPage /> },
           {
             path: "schedule",

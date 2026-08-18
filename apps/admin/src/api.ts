@@ -7,6 +7,7 @@ export class ApiError extends Error {
     readonly status: number,
     readonly code: string,
     message: string,
+    readonly details: Record<string, unknown> = {},
   ) {
     super(message);
   }
@@ -23,10 +24,10 @@ export async function apiFetch(path: string, init?: RequestInit): Promise<Respon
 }
 
 export async function readApiError(response: Response): Promise<ApiError> {
-  let body: Partial<ApiErrorResponse> = {};
+  let body: Partial<ApiErrorResponse> & Record<string, unknown> = {};
 
   try {
-    body = (await response.json()) as Partial<ApiErrorResponse>;
+    body = (await response.json()) as Partial<ApiErrorResponse> & Record<string, unknown>;
   } catch {
     // A non-JSON upstream response is reported with a stable recoverable message below.
   }
@@ -35,5 +36,6 @@ export async function readApiError(response: Response): Promise<ApiError> {
     response.status,
     body.code ?? "REQUEST_FAILED",
     body.message ?? `请求失败（HTTP ${response.status}），请稍后重试。`,
+    body,
   );
 }

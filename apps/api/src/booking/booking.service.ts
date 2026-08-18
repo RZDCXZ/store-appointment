@@ -21,6 +21,8 @@ import type {
   CustomerMessageDetailResponse,
   CustomerMessageKind,
   CustomerMessagesResponse,
+  ManagerOfflineConsentSource,
+  ManagerProxyBookingResponse,
   PetSize,
   RescheduleBookingOptionsResponse,
   RescheduleBookingInput,
@@ -38,6 +40,7 @@ import { getBookingCodeSecret, getDemoNow } from "../config/environment.js";
 import { DatabaseService } from "../database/database.service.js";
 import { getShanghaiLocalDate } from "../schedule/schedule-date.js";
 import { ServiceCatalogService } from "../service-catalog/service-catalog.service.js";
+import type { BackofficeIdentity } from "../auth/auth.types.js";
 
 interface PetRow {
   id: string;
@@ -111,6 +114,34 @@ interface IdempotencyRow {
   booking_id: string | null;
   response_status: number | null;
   response_body: unknown | null;
+}
+
+interface ManagerProxyIdempotencyRow {
+  request_digest: string;
+  booking_id: string;
+  customer_id: string;
+  privacy_notice_version: string;
+  offline_consent_source: ManagerOfflineConsentSource;
+  manager_display_name: string;
+  created_at: Date;
+}
+
+type ManagerProxyProfile =
+  | { kind: "existing"; customerId: string; petId: string }
+  | {
+      kind: "new";
+      customer: { displayName: string; phone: string };
+      pet: { name: string; species: "dog" | "cat"; weightKg: number };
+    };
+
+interface ParsedManagerProxyInput {
+  idempotencyKey: string;
+  profile: ManagerProxyProfile;
+  primaryServiceId: string;
+  addonIds: string[];
+  staffId: string;
+  startsAt: string;
+  offlineConsentSource: ManagerOfflineConsentSource;
 }
 
 interface StoredRescheduleSuccess {
@@ -240,6 +271,102 @@ function parseCreateInput(body: unknown): CreateBookingInput {
     staffPreference: staffPreference as CreateBookingInput["staffPreference"],
     startsAt: new Date(input.startsAt as string).toISOString(),
   };
+}
+
+function parseManagerProxyInput(body: unknown): ParsedManagerProxyInput {
+  const input = body && typeof body === "object" ? (body as Record<string, unknown>) : {};
+  const common = parseCreateInput({ ...input, petId: "proxy-pet" });
+  const fieldErrors: Record<string, string> = {};
+  const source = input.offlineConsentSource;
+
+  if (source !== "phone" && source !== "chat" && source !== "in_store") {
+    fieldErrors.offlineConsentSource = "请选择电话、聊天或到店确认来源。";
+  }
+
+  const profileInput =
+    input.profile && typeof input.profile === "object"
+      ? (input.profile as Record<string, unknown>)
+      : null;
+  let profile: ManagerProxyProfile | null = null;
+
+  if (profileInput?.kind === "existing") {
+    if (typeof profileInput.customerId !== "string" || !idPattern.test(profileInput.customerId)) {
+      fieldErrors.customerId = "请选择已有顾客。";
+    }
+    if (typeof profileInput.petId !== "string" || !idPattern.test(profileInput.petId)) {
+      fieldErrors.petId = "请选择已有宠物。";
+    }
+    if (!fieldErrors.customerId && !fieldErrors.petId) {
+      profile = {
+        kind: "existing",
+        customerId: profileInput.customerId as string,
+        petId: profileInput.petId as string,
+      };
+    }
+  } else if (profileInput?.kind === "new") {
+    const customer =
+      profileInput.customer && typeof profileInput.customer === "object"
+        ? (profileInput.customer as Record<string, unknown>)
+        : {};
+    const pet =
+      profileInput.pet && typeof profileInput.pet === "object"
+        ? (profileInput.pet as Record<string, unknown>)
+        : {};
+    const displayName = typeof customer.displayName === "string" ? customer.displayName.trim() : "";
+    const phone = typeof customer.phone === "string" ? customer.phone.trim() : "";
+    const petName = typeof pet.name === "string" ? pet.name.trim() : "";
+    const weightKg = typeof pet.weightKg === "number" ? pet.weightKg : Number.NaN;
+
+    if (displayName.length < 1 || displayName.length > 30) {
+      fieldErrors.customerName = "请填写 1–30 字顾客姓名。";
+    }
+    if (!/^1[3-9][0-9]{9}$/.test(phone)) {
+      fieldErrors.customerPhone = "请填写有效的中国大陆手机号。";
+    }
+    if (petName.length < 1 || petName.length > 30) {
+      fieldErrors.petName = "请填写 1–30 字宠物名称。";
+    }
+    if (pet.species !== "dog" && pet.species !== "cat") {
+      fieldErrors.petSpecies = "请选择犬或猫。";
+    }
+    if (!Number.isFinite(weightKg) || weightKg < 0.1 || weightKg > 99.99) {
+      fieldErrors.petWeightKg = "请填写 0.1–99.99kg 的当前体重。";
+    }
+    if (Object.keys(fieldErrors).length === 0) {
+      profile = {
+        kind: "new",
+        customer: { displayName, phone },
+        pet: {
+          name: petName,
+          species: pet.species as "dog" | "cat",
+          weightKg,
+        },
+      };
+    }
+  } else {
+    fieldErrors.profile = "请选择已有档案或填写新顾客与宠物最小资料。";
+  }
+
+  if (Object.keys(fieldErrors).length > 0 || !profile) {
+    validationError(fieldErrors);
+  }
+
+  return {
+    idempotencyKey: common.idempotencyKey,
+    profile,
+    primaryServiceId: common.primaryServiceId,
+    addonIds: common.addonIds,
+    staffId: common.staffId,
+    startsAt: common.startsAt,
+    offlineConsentSource: source as ManagerOfflineConsentSource,
+  };
+}
+
+function earliestManagerCandidate(now: string): string {
+  const halfHourMilliseconds = 30 * 60_000;
+  return new Date(
+    Math.ceil(Date.parse(now) / halfHourMilliseconds) * halfHourMilliseconds,
+  ).toISOString();
 }
 
 function petSizeFor(weightKg: number): PetSize {
@@ -578,57 +705,17 @@ export class BookingService {
       const selection = this.quote(pet, input.primaryServiceId, input.addonIds);
       const staff = await this.requireQualifiedStaff(client, input.staffId, selection);
       const interval = await this.requireAvailableInterval(client, input, selection);
-      const bookingId = randomUUID();
-      const code = verificationCode(customerId, bookingId, input.idempotencyKey);
       const createdAt = getDemoNow();
-
-      await client.query(
-        `
-          INSERT INTO bookings (
-            id, customer_id, pet_id, staff_id, starts_at, ends_at,
-            occupancy_starts_at, occupancy_ends_at, service_duration_minutes, status,
-            pet_name_snapshot, pet_species_snapshot, pet_weight_kg_snapshot, pet_size_snapshot,
-            primary_service_id_snapshot, primary_service_name_snapshot,
-            primary_service_price_cents, primary_service_duration_minutes,
-            addon_snapshots, required_skill_ids_snapshot, total_price_cents,
-            staff_display_name_snapshot, turnover_minutes,
-            original_starts_at, original_ends_at,
-            original_occupancy_starts_at, original_occupancy_ends_at,
-            verification_code_digest, verification_code_seed, created_at
-          )
-          VALUES (
-            $1, $2, $3, $4, $5, $6, $5, $7, $8, 'confirmed',
-            $9, $10, $11, $12, $13, $14, $15, $16,
-            $17::jsonb, $18::jsonb, $19, $20, 15,
-            $5, $6, $5, $7, $21, $22, $23
-          )
-        `,
-        [
-          bookingId,
-          customerId,
-          pet.id,
-          staff.id,
-          interval.startsAt,
-          interval.endsAt,
-          interval.turnoverEndsAt,
-          selection.serviceDurationMinutes,
-          pet.name,
-          pet.species,
-          Number(pet.weight_kg),
-          selection.pet.petSize,
-          selection.primaryService.id,
-          selection.primaryService.name,
-          selection.primaryService.priceCents,
-          selection.primaryService.durationMinutes,
-          JSON.stringify(selection.addons),
-          JSON.stringify(selection.requiredSkillIds),
-          selection.totalPriceCents,
-          staff.display_name,
-          verificationCodeDigest(bookingId, code),
-          input.idempotencyKey,
-          createdAt,
-        ],
-      );
+      const { bookingId, code } = await this.insertConfirmedBooking(client, {
+        customerId,
+        pet,
+        selection,
+        staff,
+        interval,
+        idempotencyKey: input.idempotencyKey,
+        actor: { type: "customer", id: customerId },
+        createdAt,
+      });
       await client.query(
         `
           INSERT INTO booking_idempotency_keys (
@@ -637,58 +724,6 @@ export class BookingService {
           VALUES ($1, 'create_booking', $2, $3, $4, $5)
         `,
         [customerId, input.idempotencyKey, digest, bookingId, createdAt],
-      );
-      const factPayload = JSON.stringify({
-        status: "confirmed",
-        petId: pet.id,
-        staffId: staff.id,
-        startsAt: interval.startsAt,
-        endsAt: interval.endsAt,
-        turnoverEndsAt: interval.turnoverEndsAt,
-        totalPriceCents: selection.totalPriceCents,
-      });
-      await client.query(
-        `
-          INSERT INTO booking_events (
-            id, booking_id, event_type, actor_type, actor_id, payload, occurred_at
-          )
-          VALUES ($1, $2, 'booking_confirmed', 'customer', $3, $4::jsonb, $5)
-        `,
-        [randomUUID(), bookingId, customerId, factPayload, createdAt],
-      );
-      await client.query(
-        `
-          INSERT INTO audit_events (
-            id, event_type, actor_type, actor_id, subject_type, subject_id, payload, occurred_at
-          )
-          VALUES ($1, 'booking_created', 'customer', $2, 'booking', $3, $4::jsonb, $5)
-        `,
-        [randomUUID(), customerId, bookingId, factPayload, createdAt],
-      );
-      await client.query(
-        `
-          INSERT INTO notification_outbox (
-            id, booking_id, customer_id, notification_type, payload,
-            status, available_at, created_at
-          )
-          VALUES (
-            $1, $2, $3, 'booking_confirmed', $4::jsonb,
-            'pending', $5, $5
-          )
-        `,
-        [
-          randomUUID(),
-          bookingId,
-          customerId,
-          JSON.stringify({
-            bookingId,
-            petName: pet.name,
-            serviceName: selection.primaryService.name,
-            staffName: staff.display_name,
-            startsAt: interval.startsAt,
-          }),
-          createdAt,
-        ],
       );
       const row = await this.findBookingRow(client, customerId, bookingId);
       await client.query("COMMIT");
@@ -724,6 +759,227 @@ export class BookingService {
         } catch (error) {
           releaseError =
             error instanceof Error ? error : new Error("预约幂等锁释放失败，连接不可复用。");
+        }
+      }
+      client.release(releaseError);
+    }
+  }
+
+  async createProxy(
+    manager: BackofficeIdentity,
+    body: unknown,
+  ): Promise<ManagerProxyBookingResponse> {
+    if (manager.role !== "manager") {
+      businessError("FORBIDDEN", "当前身份不能创建代客预约。", HttpStatus.FORBIDDEN);
+    }
+    const input = parseManagerProxyInput(body);
+    const digest = requestDigest(input);
+    const client = await this.database.pool.connect();
+    const lockKey = `${manager.id}:manager_proxy_booking:${input.idempotencyKey}`;
+    let lockHeld = false;
+
+    try {
+      await client.query("SELECT pg_advisory_lock(hashtextextended($1, 0))", [lockKey]);
+      lockHeld = true;
+      await client.query("BEGIN TRANSACTION ISOLATION LEVEL READ COMMITTED");
+      const existing = await client.query<ManagerProxyIdempotencyRow>(
+        `
+          SELECT idempotency.request_digest,
+                 idempotency.booking_id,
+                 booking.customer_id,
+                 record.privacy_notice_version,
+                 record.offline_consent_source,
+                 account.display_name AS manager_display_name,
+                 record.created_at
+          FROM manager_proxy_booking_idempotency_keys AS idempotency
+          JOIN bookings AS booking ON booking.id = idempotency.booking_id
+          JOIN manager_proxy_booking_records AS record ON record.booking_id = booking.id
+          JOIN backoffice_accounts AS account ON account.id = record.manager_id
+          WHERE idempotency.manager_id = $1 AND idempotency.idempotency_key = $2
+        `,
+        [manager.id, input.idempotencyKey],
+      );
+      const previous = existing.rows[0];
+
+      if (previous) {
+        if (previous.request_digest !== digest) {
+          businessError(
+            "IDEMPOTENCY_KEY_REUSED",
+            "这个幂等键已经用于另一份代客预约，请重新提交。",
+            HttpStatus.CONFLICT,
+          );
+        }
+        const row = await this.findBookingRow(client, previous.customer_id, previous.booking_id);
+        const code = activeVerificationCode(row);
+        if (!code) {
+          throw new Error("代客预约核销码摘要与服务端派生值不一致。");
+        }
+        await client.query("COMMIT");
+        return {
+          booking: asBooking(row),
+          verificationCode: code,
+          verificationWindow: verificationWindow(row),
+          proxyRecord: {
+            privacyNoticeVersion: previous.privacy_notice_version,
+            offlineConsentSource: previous.offline_consent_source,
+            manager: { id: manager.id, displayName: previous.manager_display_name },
+            createdAt: previous.created_at.toISOString(),
+          },
+        };
+      }
+
+      const createdAt = getDemoNow();
+      let customerId: string;
+      let pet: PetRow;
+
+      if (input.profile.kind === "existing") {
+        customerId = input.profile.customerId;
+        pet = await this.requireActivePet(client, customerId, input.profile.petId);
+      } else {
+        customerId = randomUUID();
+        const petId = randomUUID();
+        await client.query(
+          `
+            INSERT INTO customers (id, display_name, phone, created_at)
+            VALUES ($1, $2, $3, $4)
+          `,
+          [customerId, input.profile.customer.displayName, input.profile.customer.phone, createdAt],
+        );
+        await client.query(
+          `
+            INSERT INTO pets (
+              id, customer_id, name, species, weight_kg, created_at, updated_at
+            )
+            VALUES ($1, $2, $3, $4, $5, $6, $6)
+          `,
+          [
+            petId,
+            customerId,
+            input.profile.pet.name,
+            input.profile.pet.species,
+            input.profile.pet.weightKg,
+            createdAt,
+          ],
+        );
+        pet = {
+          id: petId,
+          name: input.profile.pet.name,
+          species: input.profile.pet.species,
+          weight_kg: String(input.profile.pet.weightKg),
+          archived_at: null,
+        };
+      }
+
+      const noticeResult = await client.query<{ version: string }>(
+        "SELECT version FROM privacy_notices WHERE is_current = true FOR SHARE",
+      );
+      const noticeVersion = noticeResult.rows[0]?.version;
+      if (!noticeVersion) {
+        throw new Error("当前隐私说明不存在，无法记录代客预约同意事实。");
+      }
+      await client.query(
+        `
+          INSERT INTO privacy_consents (customer_id, notice_version, source, consented_at)
+          VALUES ($1, $2, 'manager_offline', $3)
+          ON CONFLICT (customer_id, notice_version) DO NOTHING
+        `,
+        [customerId, noticeVersion, createdAt],
+      );
+
+      const createInput: CreateBookingInput = {
+        idempotencyKey: input.idempotencyKey,
+        petId: pet.id,
+        primaryServiceId: input.primaryServiceId,
+        addonIds: input.addonIds,
+        staffId: input.staffId,
+        staffPreference: { kind: "specified", staffId: input.staffId },
+        startsAt: input.startsAt,
+      };
+      const selection = this.quote(pet, input.primaryServiceId, input.addonIds);
+      const staff = await this.requireQualifiedStaff(client, input.staffId, selection);
+      const interval = await this.requireAvailableInterval(
+        client,
+        createInput,
+        selection,
+        null,
+        "manager",
+      );
+      const { bookingId, code } = await this.insertConfirmedBooking(client, {
+        customerId,
+        pet,
+        selection,
+        staff,
+        interval,
+        idempotencyKey: input.idempotencyKey,
+        actor: { type: "manager", id: manager.id },
+        createdAt,
+        extraFactPayload: {
+          channel: "manager_proxy",
+          privacyNoticeVersion: noticeVersion,
+          offlineConsentSource: input.offlineConsentSource,
+        },
+      });
+      await client.query(
+        `
+          INSERT INTO manager_proxy_booking_records (
+            booking_id, privacy_notice_version, offline_consent_source, manager_id, created_at
+          )
+          VALUES ($1, $2, $3, $4, $5)
+        `,
+        [bookingId, noticeVersion, input.offlineConsentSource, manager.id, createdAt],
+      );
+      await client.query(
+        `
+          INSERT INTO manager_proxy_booking_idempotency_keys (
+            manager_id, idempotency_key, request_digest, booking_id, created_at
+          )
+          VALUES ($1, $2, $3, $4, $5)
+        `,
+        [manager.id, input.idempotencyKey, digest, bookingId, createdAt],
+      );
+      const row = await this.findBookingRow(client, customerId, bookingId);
+      await client.query("COMMIT");
+      return {
+        booking: asBooking(row),
+        verificationCode: code,
+        verificationWindow: verificationWindow(row),
+        proxyRecord: {
+          privacyNoticeVersion: noticeVersion,
+          offlineConsentSource: input.offlineConsentSource,
+          manager: { id: manager.id, displayName: manager.displayName },
+          createdAt,
+        },
+      };
+    } catch (error) {
+      await client.query("ROLLBACK").catch(() => undefined);
+      const databaseError = error as DatabaseError;
+      if (
+        this.isBookingTimeConflict(error) ||
+        databaseError.code === "23P01" ||
+        databaseError.code === "40001" ||
+        databaseError.code === "40P01"
+      ) {
+        businessError(
+          "BOOKING_TIME_CONFLICT",
+          "这个时段刚被占用，代客预约没有建立，请重新选择。",
+          HttpStatus.CONFLICT,
+          { nextStep: "time" },
+        );
+      }
+      throw error;
+    } finally {
+      let releaseError: Error | undefined;
+      if (lockHeld) {
+        try {
+          const unlocked = await client.query<{ unlocked: boolean }>(
+            "SELECT pg_advisory_unlock(hashtextextended($1, 0)) AS unlocked",
+            [lockKey],
+          );
+          if (!unlocked.rows[0]?.unlocked) {
+            releaseError = new Error("代客预约幂等锁未能释放，连接不可复用。");
+          }
+        } catch (error) {
+          releaseError = error instanceof Error ? error : new Error("代客预约幂等锁释放失败。");
         }
       }
       client.release(releaseError);
@@ -1247,6 +1503,122 @@ export class BookingService {
     }
   }
 
+  private async insertConfirmedBooking(
+    client: PoolClient,
+    facts: {
+      customerId: string;
+      pet: PetRow;
+      selection: BookingSelectionQuote;
+      staff: StaffRow;
+      interval: { startsAt: string; endsAt: string; turnoverEndsAt: string };
+      idempotencyKey: string;
+      actor: { type: "customer" | "manager"; id: string };
+      createdAt: string;
+      extraFactPayload?: Record<string, unknown>;
+    },
+  ): Promise<{ bookingId: string; code: string }> {
+    const bookingId = randomUUID();
+    const code = verificationCode(facts.customerId, bookingId, facts.idempotencyKey);
+    await client.query(
+      `
+        INSERT INTO bookings (
+          id, customer_id, pet_id, staff_id, starts_at, ends_at,
+          occupancy_starts_at, occupancy_ends_at, service_duration_minutes, status,
+          pet_name_snapshot, pet_species_snapshot, pet_weight_kg_snapshot, pet_size_snapshot,
+          primary_service_id_snapshot, primary_service_name_snapshot,
+          primary_service_price_cents, primary_service_duration_minutes,
+          addon_snapshots, required_skill_ids_snapshot, total_price_cents,
+          staff_display_name_snapshot, turnover_minutes,
+          original_starts_at, original_ends_at,
+          original_occupancy_starts_at, original_occupancy_ends_at,
+          verification_code_digest, verification_code_seed, created_at
+        )
+        VALUES (
+          $1, $2, $3, $4, $5, $6, $5, $7, $8, 'confirmed',
+          $9, $10, $11, $12, $13, $14, $15, $16,
+          $17::jsonb, $18::jsonb, $19, $20, 15,
+          $5, $6, $5, $7, $21, $22, $23
+        )
+      `,
+      [
+        bookingId,
+        facts.customerId,
+        facts.pet.id,
+        facts.staff.id,
+        facts.interval.startsAt,
+        facts.interval.endsAt,
+        facts.interval.turnoverEndsAt,
+        facts.selection.serviceDurationMinutes,
+        facts.pet.name,
+        facts.pet.species,
+        Number(facts.pet.weight_kg),
+        facts.selection.pet.petSize,
+        facts.selection.primaryService.id,
+        facts.selection.primaryService.name,
+        facts.selection.primaryService.priceCents,
+        facts.selection.primaryService.durationMinutes,
+        JSON.stringify(facts.selection.addons),
+        JSON.stringify(facts.selection.requiredSkillIds),
+        facts.selection.totalPriceCents,
+        facts.staff.display_name,
+        verificationCodeDigest(bookingId, code),
+        facts.idempotencyKey,
+        facts.createdAt,
+      ],
+    );
+    const factPayload = JSON.stringify({
+      status: "confirmed",
+      petId: facts.pet.id,
+      staffId: facts.staff.id,
+      startsAt: facts.interval.startsAt,
+      endsAt: facts.interval.endsAt,
+      turnoverEndsAt: facts.interval.turnoverEndsAt,
+      totalPriceCents: facts.selection.totalPriceCents,
+      ...facts.extraFactPayload,
+    });
+    await client.query(
+      `
+        INSERT INTO booking_events (
+          id, booking_id, event_type, actor_type, actor_id, payload, occurred_at
+        )
+        VALUES ($1, $2, 'booking_confirmed', $3, $4, $5::jsonb, $6)
+      `,
+      [randomUUID(), bookingId, facts.actor.type, facts.actor.id, factPayload, facts.createdAt],
+    );
+    await client.query(
+      `
+        INSERT INTO audit_events (
+          id, event_type, actor_type, actor_id, subject_type, subject_id, payload, occurred_at
+        )
+        VALUES ($1, 'booking_created', $2, $3, 'booking', $4, $5::jsonb, $6)
+      `,
+      [randomUUID(), facts.actor.type, facts.actor.id, bookingId, factPayload, facts.createdAt],
+    );
+    await client.query(
+      `
+        INSERT INTO notification_outbox (
+          id, booking_id, customer_id, notification_type, payload,
+          status, available_at, created_at
+        )
+        VALUES ($1, $2, $3, 'booking_confirmed', $4::jsonb, 'pending', $5, $5)
+      `,
+      [
+        randomUUID(),
+        bookingId,
+        facts.customerId,
+        JSON.stringify({
+          bookingId,
+          petName: facts.pet.name,
+          serviceName: facts.selection.primaryService.name,
+          staffName: facts.staff.display_name,
+          startsAt: facts.interval.startsAt,
+        }),
+        facts.createdAt,
+      ],
+    );
+    return { bookingId, code };
+  }
+
   private async throwRescheduleTimeConflict(
     customerId: string,
     bookingId: string,
@@ -1681,6 +2053,7 @@ export class BookingService {
     input: CreateBookingInput,
     selection: BookingSelectionQuote,
     excludeBookingId: string | null = null,
+    actor: "customer" | "manager" = "customer",
   ): Promise<{ startsAt: string; endsAt: string; turnoverEndsAt: string }> {
     const startsAt = new Date(input.startsAt);
     const endsAt = new Date(startsAt.getTime() + selection.serviceDurationMinutes * 60_000);
@@ -1688,12 +2061,16 @@ export class BookingService {
     const localDate = getShanghaiLocalDate(startsAt);
     const window = bookingWindowFor(getDemoNow());
     const localMinute = localMinuteOfDay(startsAt);
+    const earliestCandidate =
+      actor === "manager"
+        ? earliestManagerCandidate(getDemoNow())
+        : earliestCustomerCandidate(getDemoNow());
 
     if (
       startsAt.getUTCSeconds() !== 0 ||
       startsAt.getUTCMilliseconds() !== 0 ||
       localMinute % 30 !== 0 ||
-      startsAt.getTime() < Date.parse(earliestCustomerCandidate(getDemoNow())) ||
+      startsAt.getTime() < Date.parse(earliestCandidate) ||
       localDate < window.startsOn ||
       localDate > window.endsOn ||
       getShanghaiLocalDate(turnoverEndsAt) !== localDate
