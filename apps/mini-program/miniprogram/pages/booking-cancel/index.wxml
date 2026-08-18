@@ -1,0 +1,72 @@
+<view class="change-page">
+  <view wx:if="{{pageState === 'loading'}}" class="change-state">
+    <text class="change-state__mark">消</text>
+    <text class="change-state__title">正在读取当前预约</text>
+    <text class="change-state__body">确认页面会说明取消后的容量与核销码变化。</text>
+  </view>
+
+  <view wx:elif="{{pageState === 'auth'}}" class="change-state">
+    <text class="change-state__mark">顾</text>
+    <text class="change-state__title">请重新选择演示顾客</text>
+    <text class="change-state__body">恢复身份后会回到这笔预约的取消页面。</text>
+    <button class="primary-button" bindtap="chooseCustomer">选择演示顾客</button>
+  </view>
+
+  <view wx:elif="{{pageState === 'missing'}}" class="change-state change-state--danger">
+    <text class="change-state__mark">!</text>
+    <text class="change-state__title">缺少预约身份</text>
+    <text class="change-state__body">请从预约详情重新进入取消流程。</text>
+  </view>
+
+  <view wx:elif="{{pageState === 'forbidden'}}" class="change-state change-state--danger">
+    <text class="change-state__mark">!</text>
+    <text class="change-state__title">无法查看这笔预约</text>
+    <text class="change-state__body">{{errorMessage}}</text>
+  </view>
+
+  <view wx:elif="{{pageState === 'contact'}}" class="change-state">
+    <text class="change-state__mark">店</text>
+    <text class="change-state__eyebrow">当前预约不会改变</text>
+    <text class="change-state__title">请联系门店处理</text>
+    <text class="change-state__body">{{contactMessage}}</text>
+    <button class="primary-button" bindtap="keepBooking">查看当前预约</button>
+  </view>
+
+  <view wx:elif="{{pageState === 'error'}}" class="change-state change-state--danger">
+    <text class="change-state__mark">!</text>
+    <text class="change-state__title">预约详情没有加载出来</text>
+    <text class="change-state__body">{{errorMessage}}</text>
+    <button class="primary-button" bindtap="retry">重新加载</button>
+  </view>
+
+  <view wx:elif="{{pageState === 'success'}}" class="change-state">
+    <text class="change-state__mark">✓</text>
+    <text class="change-state__eyebrow">{{statusLabel}}</text>
+    <text class="change-state__title">预约已取消</text>
+    <text class="change-state__body">原时段已经释放，原六位核销码已失效。消息页会保留本次模拟通知。</text>
+    <button class="primary-button" bindtap="viewBooking">查看预约详情</button>
+  </view>
+
+  <block wx:else>
+    <view class="change-heading">
+      <text class="change-heading__eyebrow">MP-15 · 顾客取消</text>
+      <text class="change-heading__title">确认取消预约</text>
+      <text class="change-heading__body">这是终态操作，提交前请确认本次安排。</text>
+    </view>
+    <view class="arrangement-card">
+      <text class="arrangement-card__eyebrow">将要取消</text>
+      <text class="arrangement-card__date">{{petServiceLabel}}</text>
+      <text class="arrangement-card__meta">{{scheduleLabel}}</text>
+    </view>
+    <view class="conflict-band">{{consequenceLabel}}</view>
+    <text class="section-title">取消原因</text>
+    <view class="reason-panel">
+      <button wx:for="{{reasons}}" wx:key="*this" class="reason-button {{selectedReason === item ? 'reason-button--selected' : ''}}" data-reason="{{item}}" bindtap="chooseReason">
+        <text>{{item}}</text><text wx:if="{{selectedReason === item}}" class="slot-button__check">✓</text>
+      </button>
+    </view>
+    <view wx:if="{{errorMessage}}" class="error-band">{{errorMessage}}</view>
+    <button class="danger-button" loading="{{pageState === 'submitting'}}" disabled="{{pageState === 'submitting'}}" bindtap="submit">确认取消预约</button>
+    <button class="text-button" bindtap="keepBooking">保留预约</button>
+  </block>
+</view>

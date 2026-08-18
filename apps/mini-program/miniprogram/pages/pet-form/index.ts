@@ -1,10 +1,4 @@
-import {
-  petCareTags,
-  type PetCoatType,
-  type PetProfileInput,
-  type PetSex,
-  type PetSpecies,
-} from "@rongguang/contracts";
+import type { PetCoatType, PetProfileInput, PetSex, PetSpecies } from "@rongguang/contracts";
 
 import { CustomerApiError } from "../../services/customer-api";
 import { loadCustomerContext, openCustomerSelector } from "../../services/customer-session";
@@ -25,6 +19,16 @@ import {
 import { fetchStorefrontCatalog } from "../../services/storefront-catalog";
 
 type PageState = "loading" | "ready" | "error" | "forbidden" | "auth";
+
+// 微信原生编译器不会把 workspace 包打进小程序运行时；保持值常量在端内，类型仍由 contracts 约束。
+const petCareTags = [
+  "怕吹风",
+  "对陌生犬敏感",
+  "不喜欢碰脚",
+  "易紧张",
+  "需要慢速吹干",
+  "耳部需轻柔",
+] as const;
 
 interface PetFormData {
   name: string;

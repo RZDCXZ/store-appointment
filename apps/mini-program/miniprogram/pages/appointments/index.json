@@ -1,3 +1,5 @@
 {
-  "navigationBarTitleText": "预约记录"
+  "navigationBarTitleText": "预约记录",
+  "enablePullDownRefresh": true,
+  "backgroundTextStyle": "dark"
 }

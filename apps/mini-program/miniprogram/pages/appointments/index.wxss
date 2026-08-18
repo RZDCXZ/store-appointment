@@ -1,5 +1,194 @@
-.connection-note {
+.appointments-page {
+  padding-bottom: calc(env(safe-area-inset-bottom) + 44rpx);
+}
+
+.segmented {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8rpx;
+  padding: 8rpx;
+  border-radius: 22rpx;
+  background: rgba(221, 215, 203, 0.52);
+}
+
+.segment-button {
+  min-height: 76rpx;
+  margin: 0;
+  border-radius: 17rpx;
+  color: #61706a;
+  background: transparent;
+  font-size: 27rpx;
+  font-weight: 600;
+}
+
+.segment-button::after {
+  border: 0;
+}
+
+.segment-button.active {
+  color: #3f6253;
+  background: #fffcf7;
+  box-shadow: 0 4rpx 12rpx rgba(63, 98, 83, 0.08);
+}
+
+.records-refresh {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16rpx;
   margin-top: 20rpx;
+  padding: 18rpx 22rpx;
+  border-radius: 18rpx;
+  color: #376e91;
+  background: rgba(55, 110, 145, 0.08);
+  font-size: 25rpx;
+}
+
+.records-refresh--error {
   color: #9a5d1f;
-  font-size: 28rpx;
+  background: #f8ead6;
+}
+
+.records-refresh__retry {
+  flex: none;
+  margin: 0;
+  padding: 0;
+  color: inherit;
+  background: transparent;
+  font-size: 25rpx;
+  font-weight: 700;
+}
+
+.records-refresh__retry::after {
+  border: 0;
+}
+
+.record-list {
+  display: flex;
+  flex-direction: column;
+  margin-top: 24rpx;
+}
+
+.record-card {
+  display: flex;
+  align-items: center;
+  box-sizing: border-box;
+  width: 100%;
+  min-height: 226rpx;
+  margin: 0 0 20rpx;
+  padding: 28rpx;
+  border: 1rpx solid #ddd7cb;
+  border-radius: 28rpx;
+  color: #24312c;
+  background: #fffcf7;
+  text-align: left;
+}
+
+.record-card--pressed {
+  opacity: 0.78;
+}
+
+.record-date {
+  display: flex;
+  align-items: center;
+  flex-direction: column;
+  justify-content: center;
+  align-self: stretch;
+  box-sizing: border-box;
+  width: 136rpx;
+  flex: none;
+  margin-right: 24rpx;
+  padding-right: 22rpx;
+  border-right: 1rpx solid #ddd7cb;
+}
+
+.record-date__day {
+  color: #3f6253;
+  font-size: 54rpx;
+  font-variant-numeric: tabular-nums;
+  font-weight: 700;
+  line-height: 1;
+}
+
+.record-date__context {
+  margin-top: 10rpx;
+  color: #61706a;
+  font-size: 22rpx;
+  white-space: nowrap;
+}
+
+.record-main {
+  display: flex;
+  align-items: flex-start;
+  flex-direction: column;
+  min-width: 0;
+  flex: 1;
+}
+
+.record-status {
+  display: inline-flex;
+  padding: 8rpx 13rpx;
+  border-radius: 999rpx;
+  font-size: 22rpx;
+  font-weight: 700;
+  line-height: 1;
+}
+
+.record-status--info {
+  color: #376e91;
+  background: rgba(55, 110, 145, 0.1);
+}
+
+.record-status--success {
+  color: #3f6253;
+  background: #e4ece6;
+}
+
+.record-status--warning {
+  color: #9a5d1f;
+  background: #f8ead6;
+}
+
+.record-status--danger {
+  color: #a84444;
+  background: #f9e2dc;
+}
+
+.record-status--neutral {
+  color: #61706a;
+  background: #ece9e3;
+}
+
+.record-time {
+  margin-top: 14rpx;
+  font-size: 36rpx;
+  font-variant-numeric: tabular-nums;
+  font-weight: 700;
+}
+
+.record-service {
+  max-width: 100%;
+  margin-top: 8rpx;
+  overflow: hidden;
+  font-size: 26rpx;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.record-staff {
+  margin-top: 7rpx;
+  color: #61706a;
+  font-size: 23rpx;
+}
+
+.record-chevron {
+  flex: none;
+  margin-left: 18rpx;
+  color: #6f8f7e;
+  font-size: 42rpx;
+  font-weight: 300;
+}
+
+.records-empty {
+  min-height: 500rpx;
 }

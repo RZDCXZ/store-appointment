@@ -1,0 +1,107 @@
+<view class="change-page">
+  <view wx:if="{{pageState === 'loading'}}" class="change-state">
+    <text class="change-state__mark">期</text>
+    <text class="change-state__title">正在读取可约安排</text>
+    <text class="change-state__body">当前安排会持续有效，直到新安排确认成功。</text>
+  </view>
+
+  <view wx:elif="{{pageState === 'auth'}}" class="change-state">
+    <text class="change-state__mark">顾</text>
+    <text class="change-state__title">请重新选择演示顾客</text>
+    <text class="change-state__body">恢复身份后会回到这笔预约的改期页面。</text>
+    <button class="primary-button" bindtap="chooseCustomer">选择演示顾客</button>
+  </view>
+
+  <view wx:elif="{{pageState === 'missing'}}" class="change-state change-state--danger">
+    <text class="change-state__mark">!</text>
+    <text class="change-state__title">缺少预约身份</text>
+    <text class="change-state__body">请从预约详情重新进入改期。</text>
+  </view>
+
+  <view wx:elif="{{pageState === 'forbidden'}}" class="change-state change-state--danger">
+    <text class="change-state__mark">!</text>
+    <text class="change-state__title">无法查看这笔预约</text>
+    <text class="change-state__body">{{errorMessage}}</text>
+  </view>
+
+  <view wx:elif="{{pageState === 'contact'}}" class="change-state">
+    <text class="change-state__mark">店</text>
+    <text class="change-state__eyebrow">当前安排保持不变</text>
+    <text class="change-state__title">请联系门店处理</text>
+    <text class="change-state__body">{{contactMessage}}</text>
+    <view class="arrangement-card">
+      <text class="arrangement-card__eyebrow">当前安排</text>
+      <text class="arrangement-card__date">{{originalDateLabel}}</text>
+      <text class="arrangement-card__time">{{originalTimeLabel}}</text>
+      <text class="arrangement-card__meta">{{originalStaffLabel}} · {{petServiceLabel}}</text>
+    </view>
+    <button class="primary-button" bindtap="keepOriginal">查看当前预约</button>
+  </view>
+
+  <view wx:elif="{{pageState === 'error'}}" class="change-state change-state--danger">
+    <text class="change-state__mark">!</text>
+    <text class="change-state__title">可约安排没有加载出来</text>
+    <text class="change-state__body">{{errorMessage}}</text>
+    <button class="primary-button" bindtap="retry">重新加载</button>
+    <button class="text-button" bindtap="keepOriginal">保留原安排</button>
+  </view>
+
+  <view wx:elif="{{pageState === 'success'}}">
+    <view class="change-state" style="min-height:auto;padding-top:24rpx;padding-bottom:20rpx">
+      <text class="change-state__mark">✓</text>
+      <text class="change-state__eyebrow">改期成功</text>
+      <text class="change-state__title">新的安排已确认</text>
+    </view>
+    <view class="compare-panel">
+      <view class="compare-panel__old">
+        <text class="compare-panel__label">原安排</text>
+        <text class="compare-panel__value">{{previousScheduleLabel}}</text>
+      </view>
+      <view>
+        <text class="compare-panel__label">新安排</text>
+        <text class="compare-panel__value">{{nextScheduleLabel}}</text>
+      </view>
+    </view>
+    <view class="code-updated">
+      <text class="code-updated__label">核销码已更新，旧核销码不再有效</text>
+      <text class="code-updated__code">{{verificationCode}}</text>
+    </view>
+    <button class="primary-button" bindtap="viewBooking">查看新预约</button>
+  </view>
+
+  <block wx:else>
+    <view class="change-heading">
+      <text class="change-heading__eyebrow">MP-15 · 顾客改期</text>
+      <text class="change-heading__title">选择新安排</text>
+      <text class="change-heading__body">宠物、主要服务与价格保持不变；如需更换，请取消后重新预约。</text>
+    </view>
+    <view class="arrangement-card">
+      <text class="arrangement-card__eyebrow">当前安排持续有效，直到改期成功</text>
+      <text class="arrangement-card__date">{{originalDateLabel}}</text>
+      <text class="arrangement-card__time">{{originalTimeLabel}}</text>
+      <text class="arrangement-card__meta">{{originalStaffLabel}} · {{petServiceLabel}}</text>
+    </view>
+    <view class="notice-band">新安排失败时不会释放或改动当前安排。</view>
+    <view wx:if="{{conflictMessage}}" class="conflict-band">
+      <text>{{conflictMessage}}</text>
+      <text wx:if="{{suggestions.length}}" class="section-title">相近建议</text>
+      <view class="choice-panel">
+        <button wx:for="{{suggestions}}" wx:key="key" class="suggestion-button" data-staff-id="{{item.staffId}}" data-starts-at="{{item.startsAt}}" bindtap="chooseSuggestion">
+          <view><text class="slot-button__main">{{item.dateLabel}} · {{item.timeLabel}}</text><text class="slot-button__meta">{{item.staffLabel}}</text></view>
+          <text class="slot-button__check">选用</text>
+        </button>
+      </view>
+    </view>
+    <text class="section-title">真实可约时段</text>
+    <view class="choice-panel">
+      <button wx:for="{{slots}}" wx:key="key" class="slot-button {{selectedKey === item.key ? 'slot-button--selected' : ''}}" data-staff-id="{{item.staffId}}" data-starts-at="{{item.startsAt}}" bindtap="selectSlot">
+        <view><text class="slot-button__main">{{item.dateLabel}} · {{item.timeLabel}}</text><text class="slot-button__meta">{{item.staffLabel}} · 可完成全部服务</text></view>
+        <text wx:if="{{selectedKey === item.key}}" class="slot-button__check">✓</text>
+      </button>
+    </view>
+    <view wx:if="{{!slots.length}}" class="notice-band">十四日内暂无其他可约安排，请保留原安排或联系门店。</view>
+    <view wx:if="{{errorMessage}}" class="error-band">{{errorMessage}}</view>
+    <button class="primary-button" loading="{{pageState === 'submitting'}}" disabled="{{pageState === 'submitting' || !selectedStartsAt}}" bindtap="submit">确认新安排</button>
+    <button class="text-button" bindtap="keepOriginal">保留原安排</button>
+  </block>
+</view>

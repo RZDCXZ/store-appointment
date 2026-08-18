@@ -147,4 +147,40 @@ describe("原生小程序项目契约", () => {
       ),
     );
   });
+
+  it("MP-13、MP-14 与 MP-16 使用可直接打开并可刷新恢复的真实原生页面", async () => {
+    const appConfig = JSON.parse(
+      await readFile(new URL("../miniprogram/app.json", import.meta.url), "utf8"),
+    ) as { pages: string[] };
+    const customerFactPages = [
+      "pages/appointments/index",
+      "pages/booking-detail/index",
+      "pages/messages/index",
+    ];
+
+    expect(appConfig.pages).toEqual(expect.arrayContaining(customerFactPages));
+    await Promise.all(
+      customerFactPages.flatMap((page) =>
+        ["ts", "json", "wxml", "wxss"].map((extension) =>
+          access(new URL(`../miniprogram/${page}.${extension}`, import.meta.url)),
+        ),
+      ),
+    );
+  });
+
+  it("MP-15 改期与取消是按预约身份直接恢复的独立原生页面", async () => {
+    const appConfig = JSON.parse(
+      await readFile(new URL("../miniprogram/app.json", import.meta.url), "utf8"),
+    ) as { pages: string[] };
+    const customerChangePages = ["pages/booking-reschedule/index", "pages/booking-cancel/index"];
+
+    expect(appConfig.pages).toEqual(expect.arrayContaining(customerChangePages));
+    await Promise.all(
+      customerChangePages.flatMap((page) =>
+        ["ts", "json", "wxml", "wxss"].map((extension) =>
+          access(new URL(`../miniprogram/${page}.${extension}`, import.meta.url)),
+        ),
+      ),
+    );
+  });
 });

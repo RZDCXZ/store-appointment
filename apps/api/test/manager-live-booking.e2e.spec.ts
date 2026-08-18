@@ -227,9 +227,14 @@ describe("店长工作台即时看到预约", () => {
       },
     });
 
-    await database.pool.query("UPDATE bookings SET status = 'cancelled' WHERE id = $1", [
-      bookingId,
-    ]);
+    await database.pool.query(
+      `
+        UPDATE bookings
+        SET status = 'cancelled', occupancy_starts_at = NULL, occupancy_ends_at = NULL
+        WHERE id = $1
+      `,
+      [bookingId],
+    );
     try {
       const cancelledCalendar = await app.inject({
         method: "GET",
@@ -243,9 +248,16 @@ describe("店长工作台即时看到预约", () => {
         );
       expect(cancelledBlock).toMatchObject({ affectedBookingCount: 0 });
     } finally {
-      await database.pool.query("UPDATE bookings SET status = 'confirmed' WHERE id = $1", [
-        bookingId,
-      ]);
+      await database.pool.query(
+        `
+          UPDATE bookings
+          SET status = 'confirmed',
+              occupancy_starts_at = starts_at,
+              occupancy_ends_at = ends_at + turnover_minutes * interval '1 minute'
+          WHERE id = $1
+        `,
+        [bookingId],
+      );
     }
   });
 

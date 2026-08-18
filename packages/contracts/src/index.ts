@@ -462,9 +462,12 @@ export interface BookingConflictSuggestion {
   };
 }
 
-export interface ConfirmedBooking {
+export type CustomerBookingStatus =
+  "confirmed" | "checked_in" | "completed" | "terminated" | "cancelled" | "no_show";
+
+export interface CustomerBooking {
   id: string;
-  status: "confirmed";
+  status: CustomerBookingStatus;
   pet: {
     id: string;
     name: string;
@@ -490,13 +493,111 @@ export interface ConfirmedBooking {
     occupancyStartsAt: string;
     occupancyEndsAt: string;
   };
+  completedAt: string | null;
   createdAt: string;
 }
 
-export interface BookingDetailResponse {
-  booking: ConfirmedBooking;
+export type ConfirmedBooking = CustomerBooking;
+
+export interface BookingVerificationWindow {
+  opensAt: string;
+  closesAt: string;
+  description: "可在开始前 30 分钟至开始后 15 分钟内出示";
 }
 
-export interface CreateBookingResponse extends BookingDetailResponse {
+export interface BookingFactResponse {
+  booking: CustomerBooking;
+  verificationCode: string | null;
+  verificationWindow: BookingVerificationWindow | null;
+}
+
+export interface CustomerBookingActions {
+  canCancel: boolean;
+  canReschedule: boolean;
+  cutoffAt: string;
+  message: string;
+}
+
+export interface CustomerBookingSchedule {
+  staff: {
+    id: string;
+    displayName: string;
+  };
+  startsAt: string;
+  endsAt: string;
+  turnoverEndsAt: string;
+}
+
+export interface CustomerBookingChange {
+  id: string;
+  kind: "customer_cancelled" | "customer_rescheduled";
+  actor: {
+    type: "customer";
+    id: string;
+  };
+  reason: string;
+  previous: CustomerBookingSchedule;
+  next: CustomerBookingSchedule | null;
+  occurredAt: string;
+}
+
+export interface BookingDetailResponse extends BookingFactResponse {
+  customerActions: CustomerBookingActions;
+  changeHistory: CustomerBookingChange[];
+}
+
+export interface CreateBookingResponse extends BookingFactResponse {
   verificationCode: string;
+  verificationWindow: BookingVerificationWindow;
+}
+
+export interface CancelBookingInput {
+  idempotencyKey: string;
+  reason: string;
+}
+
+export type CancelBookingResponse = BookingDetailResponse;
+
+export interface RescheduleBookingOptionsResponse {
+  booking: CustomerBooking;
+  customerActions: CustomerBookingActions;
+  availability: BookingAvailabilityResponse | null;
+}
+
+export interface RescheduleBookingInput {
+  idempotencyKey: string;
+  staffId: string;
+  startsAt: string;
+}
+
+export interface RescheduleBookingResponse extends BookingDetailResponse {
+  verificationCode: string;
+  verificationWindow: BookingVerificationWindow;
+}
+
+export interface CustomerBookingHistoryResponse {
+  demoNow: string;
+  upcoming: CustomerBooking[];
+  history: CustomerBooking[];
+}
+
+export type CustomerMessageKind =
+  "booking_confirmed" | "booking_rescheduled" | "booking_cancelled" | "booking_reminder";
+
+export interface CustomerMessage {
+  id: string;
+  kind: CustomerMessageKind;
+  title: string;
+  body: string;
+  occurredAt: string;
+  bookingId: string;
+  actionLabel: "查看预约" | "查看核销码";
+}
+
+export interface CustomerMessagesResponse {
+  messages: CustomerMessage[];
+}
+
+export interface CustomerMessageDetailResponse {
+  message: CustomerMessage;
 }

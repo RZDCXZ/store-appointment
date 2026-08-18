@@ -33,6 +33,7 @@ const recoverablePagePaths = new Set([
   "/pages/booking-conflict/index",
   "/pages/booking-confirm/index",
   "/pages/booking-success/index",
+  "/pages/booking-detail/index",
 ]);
 
 function isRecoverablePath(value: string): boolean {

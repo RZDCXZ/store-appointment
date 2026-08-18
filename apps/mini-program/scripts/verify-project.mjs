@@ -42,7 +42,18 @@ const requiredFiles = [
   "miniprogram/pages/privacy-consent/index.ts",
   "miniprogram/pages/privacy-consent/index.wxml",
   "miniprogram/pages/privacy-consent/index.wxss",
-  ...["booking-pet", "booking-service", "booking-staff", "booking-time"].flatMap((page) =>
+  ...[
+    "booking-pet",
+    "booking-service",
+    "booking-staff",
+    "booking-time",
+    "booking-conflict",
+    "booking-confirm",
+    "booking-success",
+    "booking-detail",
+    "booking-reschedule",
+    "booking-cancel",
+  ].flatMap((page) =>
     ["json", "ts", "wxml", "wxss"].map(
       (extension) => `miniprogram/pages/${page}/index.${extension}`,
     ),
@@ -86,6 +97,12 @@ export async function verifyProject() {
     "pages/booking-service/index",
     "pages/booking-staff/index",
     "pages/booking-time/index",
+    "pages/booking-conflict/index",
+    "pages/booking-confirm/index",
+    "pages/booking-success/index",
+    "pages/booking-detail/index",
+    "pages/booking-reschedule/index",
+    "pages/booking-cancel/index",
   ];
 
   if (!requiredPages.every((page) => appConfig.pages?.includes(page))) {

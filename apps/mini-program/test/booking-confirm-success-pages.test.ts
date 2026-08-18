@@ -147,6 +147,7 @@ const booking = {
     occupancyStartsAt: "2026-08-26T05:00:00.000Z",
     occupancyEndsAt: "2026-08-26T06:30:00.000Z",
   },
+  completedAt: null,
   createdAt: "2026-08-13T02:50:00.000Z",
 } as const;
 
@@ -172,9 +173,22 @@ describe("MP-10 确认与 MP-11 成功页面", () => {
     mocks.fetchBookingAvailability.mockResolvedValue(availability);
     mocks.createConfirmedBooking.mockResolvedValue({
       verificationCode: "729416",
+      verificationWindow: {
+        opensAt: "2026-08-26T04:30:00.000Z",
+        closesAt: "2026-08-26T05:15:00.000Z",
+        description: "可在开始前 30 分钟至开始后 15 分钟内出示",
+      },
       booking,
     } satisfies CreateBookingResponse);
-    mocks.fetchBookingDetail.mockResolvedValue({ booking } satisfies BookingDetailResponse);
+    mocks.fetchBookingDetail.mockResolvedValue({
+      booking,
+      verificationCode: "729416",
+      verificationWindow: {
+        opensAt: "2026-08-26T04:30:00.000Z",
+        closesAt: "2026-08-26T05:15:00.000Z",
+        description: "可在开始前 30 分钟至开始后 15 分钟内出示",
+      },
+    } satisfies BookingDetailResponse);
     vi.stubGlobal("wx", { redirectTo: vi.fn() });
   });
 

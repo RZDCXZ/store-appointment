@@ -1,33 +1,87 @@
-<import src="../../templates/customer-auth-prompt.wxml" />
-
-<view class="page-screen">
+<view class="page-screen appointments-page">
   <view class="page-heading">
     <view>
       <text class="page-heading__brand">茸光</text>
       <text class="page-heading__title">预约记录</text>
-      <text class="page-heading__subtitle">未来预约与历史预约</text>
+      <text class="page-heading__subtitle">{{demoTimeLabel}}</text>
     </view>
     <button class="identity-pill" bindtap="chooseCustomer">{{customer ? customer.displayName : '演示身份'}}</button>
   </view>
 
-  <view wx:if="{{authState === 'active' || authState === 'unavailable'}}">
-    <view class="demo-mark">演示模式 · {{customer.story}}</view>
-    <view class="story-card surface-card">
-      <text class="story-card__label">当前顾客</text>
-      <text class="story-card__title">{{customer.displayName}}</text>
-      <text class="story-card__body">{{customer.phoneMasked}} · 只会按当前 Bearer 会话读取本人预约。</text>
-    </view>
-    <view class="empty-panel surface-card">
-      <text class="empty-panel__mark">约</text>
-      <text class="empty-panel__title">预约页面已独立就绪</text>
-      <text class="empty-panel__body">后续预约数据会在这里按未来与历史分段展示，刷新后仍由当前会话恢复身份。</text>
-      <text wx:if="{{connectionMessage}}" class="connection-note">{{connectionMessage}}</text>
-    </view>
+  <view wx:if="{{pageState === 'auth'}}" class="empty-panel surface-card">
+    <text class="empty-panel__mark">顾</text>
+    <text class="empty-panel__title">请先选择演示顾客</text>
+    <text class="empty-panel__body">预约记录只会读取当前顾客自己的数据。</text>
+    <button class="primary-button" bindtap="chooseCustomer">选择演示顾客</button>
   </view>
 
-  <template
-    wx:elif="{{authState !== 'loading'}}"
-    is="customer-auth-prompt"
-    data="{{authState: authState, contextLabel: '当前预约记录路径'}}"
-  />
+  <view wx:elif="{{pageState === 'loading'}}" class="empty-panel surface-card">
+    <text class="empty-panel__mark">茸</text>
+    <text class="empty-panel__title">正在整理预约记录</text>
+    <text class="empty-panel__body">未来与历史预约会分别显示。</text>
+  </view>
+
+  <view wx:elif="{{pageState === 'error'}}" class="empty-panel surface-card">
+    <text class="empty-panel__mark">!</text>
+    <text class="empty-panel__title">预约记录没有加载出来</text>
+    <text class="empty-panel__body">{{errorMessage}}</text>
+    <button class="primary-button" bindtap="retry">重新加载</button>
+  </view>
+
+  <block wx:else>
+    <view class="segmented" role="tablist" aria-label="预约记录分组">
+      <button class="segment-button {{activeSegment === 'upcoming' ? 'active' : ''}}" data-segment="upcoming" bindtap="switchSegment">未来预约 · {{upcoming.length}}</button>
+      <button class="segment-button {{activeSegment === 'history' ? 'active' : ''}}" data-segment="history" bindtap="switchSegment">历史预约 · {{history.length}}</button>
+    </view>
+
+    <view wx:if="{{refreshing || errorMessage}}" class="records-refresh {{errorMessage ? 'records-refresh--error' : ''}}">
+      <text>{{errorMessage ? '更新失败，当前仍显示上次记录。' : '正在重新拉取最新状态…'}}</text>
+      <button wx:if="{{errorMessage}}" class="records-refresh__retry" bindtap="retry">重试</button>
+    </view>
+
+    <view wx:if="{{pageState === 'empty'}}" class="empty-panel surface-card records-empty">
+      <text class="empty-panel__mark">约</text>
+      <text class="empty-panel__title">还没有预约</text>
+      <text class="empty-panel__body">创建第一笔预约后，当前安排和历史事实都会保留在这里。</text>
+      <button class="primary-button" bindtap="startBooking">开始新预约</button>
+    </view>
+
+    <view wx:elif="{{activeSegment === 'upcoming' && upcoming.length === 0}}" class="empty-panel surface-card records-empty">
+      <text class="empty-panel__mark">约</text>
+      <text class="empty-panel__title">未来没有预约</text>
+      <text class="empty-panel__body">已结束或取消的预约可在历史预约中查看。</text>
+      <button class="primary-button" bindtap="startBooking">开始新预约</button>
+    </view>
+
+    <view wx:elif="{{activeSegment === 'history' && history.length === 0}}" class="empty-panel surface-card records-empty">
+      <text class="empty-panel__mark">史</text>
+      <text class="empty-panel__title">还没有历史预约</text>
+      <text class="empty-panel__body">服务完成、取消或爽约后会保留预约快照。</text>
+    </view>
+
+    <view wx:else class="record-list">
+      <view
+        wx:for="{{activeSegment === 'upcoming' ? upcoming : history}}"
+        wx:key="id"
+        class="record-card"
+        data-id="{{item.id}}"
+        bindtap="openBooking"
+        hover-class="record-card--pressed"
+        role="button"
+        aria-label="{{item.petServiceLabel}}，{{item.statusLabel}}，查看详情"
+      >
+        <view class="record-date">
+          <text class="record-date__day">{{item.day}}</text>
+          <text class="record-date__context">{{item.dateContext}}</text>
+        </view>
+        <view class="record-main">
+          <text class="record-status record-status--{{item.statusTone}}">{{item.statusLabel}}</text>
+          <text class="record-time">{{item.timeLabel}}</text>
+          <text class="record-service">{{item.petServiceLabel}}</text>
+          <text class="record-staff">{{item.staffLabel}} · 具体员工</text>
+        </view>
+        <text class="record-chevron">›</text>
+      </view>
+    </view>
+  </block>
 </view>

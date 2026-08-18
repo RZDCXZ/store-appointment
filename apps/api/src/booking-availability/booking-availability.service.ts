@@ -32,6 +32,8 @@ interface DiscoveryInput {
   primaryServiceId?: string;
   addonIds?: string;
   staffId?: string;
+  excludeBookingId?: string;
+  selectionOverride?: BookingSelectionQuote;
 }
 
 interface PetRow {
@@ -227,7 +229,10 @@ export class BookingAvailabilityService {
         );
       }
 
-      const selection = this.quote(pet, primaryServiceId, addonIds);
+      const selection = input.selectionOverride ?? this.quote(pet, primaryServiceId, addonIds);
+      if (selection.pet.id !== pet.id || selection.primaryService.id !== primaryServiceId) {
+        selectionError("改期必须保留原宠物与主要服务。");
+      }
       const staffResult = await client.query<StaffRow>(
         `
             SELECT staff.id,
@@ -295,10 +300,11 @@ export class BookingAvailabilityService {
                    service_duration_minutes::int AS service_minutes
             FROM bookings
             WHERE status NOT IN ('cancelled', 'no_show')
+              AND ($3::text IS NULL OR id <> $3)
               AND starts_at < (($2::date + 1)::timestamp AT TIME ZONE 'Asia/Shanghai')
               AND ends_at > ($1::date::timestamp AT TIME ZONE 'Asia/Shanghai')
           `,
-        [window.startsOn, window.endsOn],
+        [window.startsOn, window.endsOn, input.excludeBookingId ?? null],
       );
       const timeOffResult = await client.query<StaffCapacityBlockRow>(
         `

@@ -1,7 +1,16 @@
 import type { CreateBookingResponse } from "@rongguang/contracts";
 import { describe, expect, it, vi } from "vitest";
 
-import { createConfirmedBooking, fetchBookingDetail } from "../miniprogram/services/booking-api";
+import {
+  createConfirmedBooking,
+  cancelBooking,
+  fetchBookingDetail,
+  fetchBookingHistory,
+  fetchRescheduleOptions,
+  fetchCustomerMessage,
+  fetchCustomerMessages,
+  rescheduleBooking,
+} from "../miniprogram/services/booking-api";
 import {
   chooseBookingPet,
   chooseBookingService,
@@ -27,6 +36,55 @@ function memoryStorage(): BookingDraftStorage {
 }
 
 describe("预约创建客户端", () => {
+  it("预约记录、详情和模拟消息都使用顾客作用域的直接读取路径", async () => {
+    const request = vi.fn((options: Parameters<CustomerApiRequestClient["request"]>[0]) => {
+      options.success({ statusCode: 200, data: {} });
+    });
+    const client = { request };
+    const context = { apiBaseUrl: "http://api.test", accessToken: "token" };
+
+    await fetchBookingHistory(client, context);
+    await fetchBookingDetail("booking-mine", client, context);
+    await fetchCustomerMessages(client, context);
+    await fetchCustomerMessage("message-mine", client, context);
+    await fetchRescheduleOptions("booking-mine", client, context);
+    await rescheduleBooking(
+      "booking-mine",
+      {
+        idempotencyKey: "reschedule-client-key",
+        staffId: "chenjia",
+        startsAt: "2026-08-15T03:00:00.000Z",
+      },
+      client,
+      context,
+    );
+    await cancelBooking(
+      "booking-mine",
+      { idempotencyKey: "cancel-client-key", reason: "行程变化" },
+      client,
+      context,
+    );
+
+    expect(request.mock.calls.map(([options]) => [options.method, options.url])).toEqual([
+      ["GET", "http://api.test/miniapp/bookings"],
+      ["GET", "http://api.test/miniapp/bookings/booking-mine"],
+      ["GET", "http://api.test/miniapp/messages"],
+      ["GET", "http://api.test/miniapp/messages/message-mine"],
+      ["GET", "http://api.test/miniapp/bookings/booking-mine/reschedule-options"],
+      ["POST", "http://api.test/miniapp/bookings/booking-mine/reschedule"],
+      ["POST", "http://api.test/miniapp/bookings/booking-mine/cancel"],
+    ]);
+    expect(request.mock.calls.at(-2)?.[0].data).toEqual({
+      idempotencyKey: "reschedule-client-key",
+      staffId: "chenjia",
+      startsAt: "2026-08-15T03:00:00.000Z",
+    });
+    expect(request.mock.calls.at(-1)?.[0].data).toEqual({
+      idempotencyKey: "cancel-client-key",
+      reason: "行程变化",
+    });
+  });
+
   it("为完整草稿附加稳定幂等键，并可按预约身份重新读取服务端事实", async () => {
     const storage = memoryStorage();
     chooseBookingPet("pet-tuanzi", storage);
@@ -43,6 +101,11 @@ describe("预约创建客户端", () => {
     );
     const response = {
       verificationCode: "729416",
+      verificationWindow: {
+        opensAt: "2026-08-26T04:30:00.000Z",
+        closesAt: "2026-08-26T05:15:00.000Z",
+        description: "可在开始前 30 分钟至开始后 15 分钟内出示",
+      },
       booking: { id: "booking-created" },
     } as CreateBookingResponse;
     const request = vi.fn((options: Parameters<CustomerApiRequestClient["request"]>[0]) => {

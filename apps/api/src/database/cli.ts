@@ -1,10 +1,11 @@
-import { createHash } from "node:crypto";
+import { createHash, createHmac } from "node:crypto";
 import { mkdir, readdir, readFile, rm } from "node:fs/promises";
 
 import { Pool, type PoolClient } from "pg";
 
 import {
   getDatabaseUrl,
+  getBookingCodeSecret,
   getDemoNow,
   getPetUploadDirectory,
   redactDatabaseUrl,
@@ -13,6 +14,34 @@ import { hashPassword } from "../auth/password.js";
 import { addLocalDays, getLocalWeekday, getShanghaiLocalDate } from "../schedule/schedule-date.js";
 
 const migrationsDirectory = new URL("../../database/migrations/", import.meta.url);
+
+function seedVerificationCode(
+  customerId: string,
+  bookingId: string,
+  seed: string,
+  version = 1,
+): string {
+  const digest = createHmac("sha256", getBookingCodeSecret())
+    .update(
+      version === 1
+        ? `${customerId}:${seed}:${bookingId}`
+        : `${customerId}:${seed}:${bookingId}:v${version}`,
+    )
+    .digest();
+  return String(digest.readUInt32BE(0) % 1_000_000).padStart(6, "0");
+}
+
+function seedVerificationCodeDigest(
+  customerId: string,
+  bookingId: string,
+  seed: string,
+  version = 1,
+): string {
+  const code = seedVerificationCode(customerId, bookingId, seed, version);
+  return createHmac("sha256", getBookingCodeSecret())
+    .update(`booking-code:${bookingId}:${code}`)
+    .digest("hex");
+}
 
 async function ensureMigrationTable(client: PoolClient): Promise<void> {
   await client.query(`
@@ -119,7 +148,6 @@ async function seed(client: PoolClient): Promise<void> {
   await client.query("DELETE FROM staff_schedule_days");
   await client.query("DELETE FROM weekly_shift_templates");
   await client.query("DELETE FROM staff_skills");
-  await client.query("DELETE FROM staff_members");
   await client.query("DELETE FROM store_business_hours");
 
   const staff = [
@@ -158,10 +186,16 @@ async function seed(client: PoolClient): Promise<void> {
   ] as const;
 
   for (const member of staff) {
-    await client.query("INSERT INTO staff_members (id, employee_number) VALUES ($1, $2)", [
-      member.id,
-      member.employeeNumber,
-    ]);
+    await client.query(
+      `
+        INSERT INTO staff_members (id, employee_number)
+        VALUES ($1, $2)
+        ON CONFLICT (id) DO UPDATE
+        SET employee_number = excluded.employee_number,
+            active = true
+      `,
+      [member.id, member.employeeNumber],
+    );
 
     for (const skill of member.skills) {
       await client.query("INSERT INTO staff_skills (staff_id, skill_id) VALUES ($1, $2)", [
@@ -433,7 +467,7 @@ async function seed(client: PoolClient): Promise<void> {
         staff_display_name_snapshot, turnover_minutes,
         original_starts_at, original_ends_at,
         original_occupancy_starts_at, original_occupancy_ends_at,
-        verification_code_digest
+        verification_code_digest, verification_code_seed
       )
       VALUES (
         'booking-bohe-future',
@@ -452,7 +486,7 @@ async function seed(client: PoolClient): Promise<void> {
         '陈嘉', 15,
         '2026-08-14T03:00:00.000Z', '2026-08-14T04:30:00.000Z',
         '2026-08-14T03:00:00.000Z', '2026-08-14T04:45:00.000Z',
-        repeat('0', 64)
+        $1, 'booking-bohe-future'
       )
       ON CONFLICT (id) DO UPDATE
       SET staff_id = excluded.staff_id,
@@ -479,7 +513,119 @@ async function seed(client: PoolClient): Promise<void> {
             original_ends_at = excluded.original_ends_at,
             original_occupancy_starts_at = excluded.original_occupancy_starts_at,
             original_occupancy_ends_at = excluded.original_occupancy_ends_at,
-            verification_code_digest = excluded.verification_code_digest
+            verification_code_digest = excluded.verification_code_digest,
+            verification_code_seed = excluded.verification_code_seed
+    `,
+    [seedVerificationCodeDigest("customer-cheng-mo", "booking-bohe-future", "booking-bohe-future")],
+  );
+
+  await client.query(
+    `
+      INSERT INTO bookings (
+        id, customer_id, pet_id, staff_id, starts_at, ends_at,
+        occupancy_starts_at, occupancy_ends_at, service_duration_minutes, status,
+        pet_name_snapshot, pet_species_snapshot, pet_weight_kg_snapshot, pet_size_snapshot,
+        primary_service_id_snapshot, primary_service_name_snapshot,
+        primary_service_price_cents, primary_service_duration_minutes,
+        addon_snapshots, required_skill_ids_snapshot, total_price_cents,
+        staff_display_name_snapshot, turnover_minutes,
+        original_starts_at, original_ends_at,
+        original_occupancy_starts_at, original_occupancy_ends_at,
+        verification_code_digest, verification_code_seed, completed_at
+      )
+      VALUES
+        (
+          'booking-bohe-completed', 'customer-cheng-mo', 'pet-bohe', 'zhouning',
+          '2026-08-06T02:00:00.000Z', '2026-08-06T03:30:00.000Z',
+          '2026-08-06T02:00:00.000Z', '2026-08-06T03:45:00.000Z', 90, 'completed',
+          '薄荷', 'cat', 4.8, 'small', 'cat-care', '猫咪洗护', 16800, 90,
+          '[]'::jsonb, '["cat-care"]'::jsonb, 16800, '周宁', 15,
+          '2026-08-06T02:00:00.000Z', '2026-08-06T03:30:00.000Z',
+          '2026-08-06T02:00:00.000Z', '2026-08-06T03:45:00.000Z',
+          $1, 'booking-bohe-completed',
+          '2026-08-06T03:22:00.000Z'
+        ),
+        (
+          'booking-lizi-cancelled', 'customer-lu-yao', 'pet-lizi', 'linxia',
+          '2026-08-01T02:00:00.000Z', '2026-08-01T03:30:00.000Z',
+          NULL, NULL, 90, 'cancelled',
+          '栗子', 'dog', 28.6, 'large', 'dog-basic-care', '犬基础洗护', 22800, 90,
+          '[]'::jsonb, '["dog-basic-care"]'::jsonb, 22800, '林夏', 15,
+          '2026-08-01T02:00:00.000Z', '2026-08-01T03:30:00.000Z',
+          '2026-08-01T02:00:00.000Z', '2026-08-01T03:45:00.000Z',
+          $2, 'booking-lizi-cancelled', NULL
+        ),
+        (
+          'booking-lizi-no-show', 'customer-lu-yao', 'pet-lizi', 'zhaohang',
+          '2026-07-18T03:00:00.000Z', '2026-07-18T04:30:00.000Z',
+          '2026-07-18T03:00:00.000Z', '2026-07-18T04:45:00.000Z', 90, 'no_show',
+          '栗子', 'dog', 28.6, 'large', 'dog-basic-care', '犬基础洗护', 22800, 90,
+          '[]'::jsonb, '["dog-basic-care"]'::jsonb, 22800, '赵航', 15,
+          '2026-07-18T03:00:00.000Z', '2026-07-18T04:30:00.000Z',
+          '2026-07-18T03:00:00.000Z', '2026-07-18T04:45:00.000Z',
+          $3, 'booking-lizi-no-show', NULL
+        )
+      ON CONFLICT (id) DO UPDATE
+      SET status = excluded.status,
+          completed_at = excluded.completed_at,
+          verification_code_digest = excluded.verification_code_digest,
+          verification_code_seed = excluded.verification_code_seed
+    `,
+    [
+      seedVerificationCodeDigest(
+        "customer-cheng-mo",
+        "booking-bohe-completed",
+        "booking-bohe-completed",
+      ),
+      seedVerificationCodeDigest(
+        "customer-lu-yao",
+        "booking-lizi-cancelled",
+        "booking-lizi-cancelled",
+      ),
+      seedVerificationCodeDigest("customer-lu-yao", "booking-lizi-no-show", "booking-lizi-no-show"),
+    ],
+  );
+
+  await client.query(
+    `
+      INSERT INTO booking_events (
+        id, booking_id, event_type, actor_type, actor_id, payload, occurred_at
+      )
+      VALUES
+        (
+          'event-bohe-future-confirmed', 'booking-bohe-future', 'booking_confirmed',
+          'customer', 'customer-cheng-mo', '{"status":"confirmed"}'::jsonb,
+          '2026-08-13T02:42:00.000Z'
+        ),
+        (
+          'event-bohe-completed-confirmed', 'booking-bohe-completed', 'booking_confirmed',
+          'customer', 'customer-cheng-mo', '{"status":"confirmed"}'::jsonb,
+          '2026-08-01T01:20:00.000Z'
+        )
+      ON CONFLICT (id) DO NOTHING
+    `,
+  );
+
+  await client.query(
+    `
+      INSERT INTO notification_outbox (
+        id, booking_id, customer_id, notification_type, payload,
+        status, available_at, created_at
+      )
+      VALUES
+        (
+          'notification-bohe-future-confirmed', 'booking-bohe-future',
+          'customer-cheng-mo', 'booking_confirmed',
+          '{"bookingId":"booking-bohe-future","petName":"薄荷","serviceName":"猫咪洗护","staffName":"陈嘉","startsAt":"2026-08-14T03:00:00.000Z"}'::jsonb,
+          'sent', '2026-08-13T02:42:00.000Z', '2026-08-13T02:42:00.000Z'
+        ),
+        (
+          'notification-bohe-completed-confirmed', 'booking-bohe-completed',
+          'customer-cheng-mo', 'booking_confirmed',
+          '{"bookingId":"booking-bohe-completed","petName":"薄荷","serviceName":"猫咪洗护","staffName":"周宁","startsAt":"2026-08-06T02:00:00.000Z"}'::jsonb,
+          'sent', '2026-08-01T01:20:00.000Z', '2026-08-01T01:20:00.000Z'
+        )
+      ON CONFLICT (id) DO NOTHING
     `,
   );
 
@@ -495,7 +641,7 @@ async function seed(client: PoolClient): Promise<void> {
     `,
   );
 
-  console.info("种子已写入：茸光本地演示元数据、账号、排班容量、顾客、宠物与隐私同意");
+  console.info("种子已写入：茸光本地演示元数据、排班、顾客、宠物、预约与消息");
 }
 
 async function reset(client: PoolClient): Promise<void> {

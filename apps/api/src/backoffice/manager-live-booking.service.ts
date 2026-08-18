@@ -34,8 +34,8 @@ interface BookingRow {
   status: ManagerBookingStatus;
   starts_at: Date;
   ends_at: Date;
-  occupancy_starts_at: Date;
-  occupancy_ends_at: Date;
+  occupancy_starts_at: Date | null;
+  occupancy_ends_at: Date | null;
   total_price_cents: number;
   service_duration_minutes: number;
   turnover_minutes: number;
@@ -65,7 +65,7 @@ interface ClockInterval {
 
 interface BookingRead {
   fact: ManagerBookingFact;
-  occupancy: ClockInterval;
+  occupancy: ClockInterval | null;
 }
 
 const bookingSelect = `
@@ -98,6 +98,9 @@ function phoneMasked(phone: string): string {
 }
 
 function bookingRead(row: BookingRow): BookingRead {
+  const plannedTurnoverEndsAt = new Date(
+    row.ends_at.getTime() + row.turnover_minutes * 60_000,
+  ).toISOString();
   return {
     fact: {
       id: row.id,
@@ -121,15 +124,18 @@ function bookingRead(row: BookingRow): BookingRead {
       staff: { id: row.staff_id, displayName: row.staff_display_name_snapshot },
       startsAt: row.starts_at.toISOString(),
       endsAt: row.ends_at.toISOString(),
-      turnoverEndsAt: row.occupancy_ends_at.toISOString(),
+      turnoverEndsAt: row.occupancy_ends_at?.toISOString() ?? plannedTurnoverEndsAt,
       totalPriceCents: row.total_price_cents,
       serviceDurationMinutes: row.service_duration_minutes,
       turnoverMinutes: row.turnover_minutes,
     },
-    occupancy: {
-      startsAt: localClockMinutes(row.occupancy_starts_at.toISOString()),
-      endsAt: localClockMinutes(row.occupancy_ends_at.toISOString()),
-    },
+    occupancy:
+      row.occupancy_starts_at && row.occupancy_ends_at
+        ? {
+            startsAt: localClockMinutes(row.occupancy_starts_at.toISOString()),
+            endsAt: localClockMinutes(row.occupancy_ends_at.toISOString()),
+          }
+        : null,
   };
 }
 
@@ -285,7 +291,10 @@ export class ManagerLiveBookingService {
       const dayBookingReads = bookingReads.filter((item) => item.fact.staff.id === day.staff.id);
       const dayBlocks = blocks.filter((block) => !block.staffId || block.staffId === day.staff.id);
       const bookingIntervals = dayBookingReads
-        .filter((item) => bookingAffectsCapacity(item.fact.status))
+        .filter(
+          (item): item is BookingRead & { occupancy: ClockInterval } =>
+            bookingAffectsCapacity(item.fact.status) && Boolean(item.occupancy),
+        )
         .map((item) => item.occupancy);
       const blockIntervals = dayBlocks.map((block) => ({
         startsAt: clockMinutes(block.startsAt),

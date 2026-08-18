@@ -1,8 +1,6 @@
-<import src="../../templates/customer-auth-prompt.wxml" />
-
-<view class="page-screen">
+<view class="page-screen messages-page">
   <view class="page-heading">
-    <view>
+    <view class="notice-band__content">
       <text class="page-heading__brand">茸光</text>
       <text class="page-heading__title">消息</text>
       <text class="page-heading__subtitle">确认、变更与到店提醒</text>
@@ -10,25 +8,66 @@
     <button class="identity-pill" bindtap="chooseCustomer">{{customer ? customer.displayName : '演示身份'}}</button>
   </view>
 
-  <view class="notice-band">模拟消息 · 不会真实发送微信通知</view>
-
-  <view wx:if="{{authState === 'active' || authState === 'unavailable'}}">
-    <view class="story-card surface-card">
-      <text class="story-card__label">当前演示故事</text>
-      <text class="story-card__title">{{customer.story}}</text>
-      <text class="story-card__body">消息读取将始终跟随 {{customer.displayName}} 的服务端会话范围。</text>
-    </view>
-    <view class="empty-panel surface-card">
-      <text class="empty-panel__mark">信</text>
-      <text class="empty-panel__title">暂无模拟消息</text>
-      <text class="empty-panel__body">预约确认、改期、取消和开始前提醒会出现在这个独立页面。</text>
-      <text wx:if="{{connectionMessage}}" class="connection-note">{{connectionMessage}}</text>
+  <view class="notice-band">
+    <text class="notice-band__mark">i</text>
+    <view>
+      <text class="notice-band__title">模拟微信消息</text>
+      <text class="notice-band__body">以下内容由预约事实生成，不会真实发送微信通知。</text>
     </view>
   </view>
 
-  <template
-    wx:elif="{{authState !== 'loading'}}"
-    is="customer-auth-prompt"
-    data="{{authState: authState, contextLabel: '当前消息路径'}}"
-  />
+  <view wx:if="{{pageState === 'auth'}}" class="empty-panel surface-card">
+    <text class="empty-panel__mark">顾</text>
+    <text class="empty-panel__title">请先选择演示顾客</text>
+    <text class="empty-panel__body">消息只会读取当前顾客自己的预约通知。</text>
+    <button class="primary-button" bindtap="chooseCustomer">选择演示顾客</button>
+  </view>
+
+  <view wx:elif="{{pageState === 'loading'}}" class="empty-panel surface-card">
+    <text class="empty-panel__mark">信</text>
+    <text class="empty-panel__title">正在读取模拟消息</text>
+  </view>
+
+  <view wx:elif="{{pageState === 'error'}}" class="empty-panel surface-card">
+    <text class="empty-panel__mark">!</text>
+    <text class="empty-panel__title">模拟消息没有加载出来</text>
+    <text class="empty-panel__body">{{errorMessage}}</text>
+    <button class="primary-button" bindtap="retry">重新加载</button>
+  </view>
+
+  <view wx:elif="{{pageState === 'empty'}}" class="empty-panel surface-card messages-empty">
+    <text class="empty-panel__mark">信</text>
+    <text class="empty-panel__title">暂无模拟消息</text>
+    <text class="empty-panel__body">预约确认、改期、取消和开始前提醒会出现在这里。</text>
+  </view>
+
+  <block wx:else>
+    <view wx:if="{{refreshing || errorMessage}}" class="messages-refresh {{errorMessage ? 'messages-refresh--error' : ''}}">
+      <text>{{errorMessage ? errorMessage : '正在重新拉取最新消息…'}}</text>
+      <button wx:if="{{errorMessage}}" class="messages-refresh__retry" bindtap="retry">重试</button>
+    </view>
+
+    <view class="message-list">
+      <view
+        wx:for="{{messages}}"
+        wx:key="id"
+        class="message-row"
+        data-id="{{item.id}}"
+        bindtap="openMessage"
+        hover-class="message-row--pressed"
+        role="button"
+        aria-label="{{item.title}}，{{item.body}}，{{item.actionLabel}}"
+      >
+        <text class="message-icon">{{item.iconLabel}}</text>
+        <view class="message-content">
+          <view class="message-title-row">
+            <text class="message-title">{{item.title}}</text>
+            <text class="message-time">{{item.timeLabel}}</text>
+          </view>
+          <text class="message-body">{{item.body}}</text>
+          <text class="message-action">{{openingMessageId === item.id ? '正在打开…' : item.actionLabel}}</text>
+        </view>
+      </view>
+    </view>
+  </block>
 </view>
