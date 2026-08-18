@@ -100,6 +100,7 @@ export function ManagerProxyBookingPage(): React.JSX.Element {
     options?.addons.filter((addon) => selectedService?.availableAddonIds.includes(addon.id)) ?? [];
 
   function changeDraft(next: Partial<ProxyDraft>): void {
+    requestKey.current = idempotencyKey();
     setDraft((current) => ({ ...current, ...next }));
     setError("");
     setFieldErrors({});

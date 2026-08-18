@@ -297,7 +297,19 @@ describe("店长即时预约页面", () => {
       const url = String(input);
       if (url.endsWith("/auth/session")) return jsonResponse({ account: managerAccount });
       if (url.endsWith("/backoffice/manager/bookings/booking-live")) {
-        return jsonResponse({ booking });
+        return jsonResponse({
+          booking,
+          petProfile: {
+            weightKg: 4.2,
+            petSize: "small",
+            breed: "英国短毛猫",
+            careTags: [],
+            careNotes: null,
+          },
+          serviceRecord: null,
+          changeHistory: [],
+          notifications: [],
+        });
       }
       throw new Error(`未处理请求：${url}`);
     });

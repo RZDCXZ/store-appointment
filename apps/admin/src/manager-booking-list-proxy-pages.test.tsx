@@ -378,7 +378,8 @@ describe("店长预约列表与代客预约页面", () => {
     expect(await screen.findByText("271828")).toBeInTheDocument();
   });
 
-  it("MG-05 时间冲突时保留原选择供店长调整", async () => {
+  it("MG-05 时间冲突时保留原选择，并用新幂等键提交建议时段", async () => {
+    const submittedBodies: Record<string, unknown>[] = [];
     vi.spyOn(globalThis, "fetch").mockImplementation(async (input, init) => {
       const url = String(input);
       if (url.endsWith("/auth/session")) return jsonResponse({ account: managerAccount });
@@ -386,6 +387,27 @@ describe("店长预约列表与代客预约页面", () => {
         return jsonResponse(proxyOptions);
       }
       if (url.endsWith("/backoffice/manager/proxy-bookings") && init?.method === "POST") {
+        submittedBodies.push(JSON.parse(String(init.body)) as Record<string, unknown>);
+        if (submittedBodies.length > 1) {
+          return jsonResponse(
+            {
+              booking: { ...booking, id: "booking-proxy-suggestion" },
+              verificationCode: "161803",
+              verificationWindow: {
+                opensAt: "2026-08-13T04:30:00.000Z",
+                closesAt: "2026-08-13T05:15:00.000Z",
+                description: "到店时出示",
+              },
+              proxyRecord: {
+                privacyNoticeVersion: "2026.08",
+                offlineConsentSource: "phone",
+                manager: { id: "manager", displayName: "沈青" },
+                createdAt: "2026-08-13T02:50:00.000Z",
+              },
+            },
+            201,
+          );
+        }
         return jsonResponse(
           {
             code: "BOOKING_TIME_CONFLICT",
@@ -433,5 +455,11 @@ describe("店长预约列表与代客预约页面", () => {
     expect(screen.getByLabelText("开始时间")).toHaveValue("2026-08-13T11:00");
     fireEvent.click(screen.getByRole("button", { name: "赵航 · 2026-08-13 13:00" }));
     expect(screen.getByLabelText("开始时间")).toHaveValue("2026-08-13T13:00");
+    fireEvent.click(screen.getByRole("button", { name: "建立代客预约" }));
+
+    expect(await screen.findByRole("heading", { name: "代客预约已建立" })).toBeInTheDocument();
+    expect(submittedBodies).toHaveLength(2);
+    expect(submittedBodies[1]).toMatchObject({ startsAt: "2026-08-13T05:00:00.000Z" });
+    expect(submittedBodies[1]?.idempotencyKey).not.toBe(submittedBodies[0]?.idempotencyKey);
   });
 });
