@@ -9,6 +9,8 @@ export default defineConfig({
   retries: 0,
   reporter: "line",
   timeout: 30_000,
+  // E2E scenarios intentionally share and reset the deterministic demo database.
+  workers: 1,
   use: {
     baseURL: "http://127.0.0.1:5174",
     screenshot: "only-on-failure",

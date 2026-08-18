@@ -1,10 +1,12 @@
 import {
+  Body,
   Controller,
   Get,
   HttpException,
   HttpStatus,
   Inject,
   Param,
+  Post,
   Query,
   Req,
   Res,
@@ -19,16 +21,22 @@ import {
   type ManagerBookingDetailResponse,
   type ManagerCalendarResponse,
   type ManagerWorkbenchResponse,
+  type StaffBookingDetailResponse,
+  type StaffBookingListResponse,
+  type StaffPhoneRevealResponse,
+  type StaffTodayResponse,
 } from "@rongguang/contracts";
 import type { FastifyReply } from "fastify";
 import type { Observable } from "rxjs";
 
 import type { AuthenticatedRequest } from "../auth/auth.types.js";
 import { ManagerGuard } from "../auth/manager.guard.js";
+import { RequestOriginGuard } from "../auth/request-origin.guard.js";
 import { SessionGuard } from "../auth/session.guard.js";
 import { SessionService } from "../auth/session.service.js";
 import { LiveRefreshService } from "../live-refresh/live-refresh.service.js";
 import { ManagerLiveBookingService } from "./manager-live-booking.service.js";
+import { StaffFulfilmentService } from "./staff-fulfilment.service.js";
 
 function forbidden(): never {
   throw new HttpException(
@@ -45,6 +53,8 @@ export class BackofficeController {
     @Inject(SessionService) private readonly sessions: SessionService,
     @Inject(ManagerLiveBookingService)
     private readonly managerBookings: ManagerLiveBookingService,
+    @Inject(StaffFulfilmentService)
+    private readonly staffFulfilment: StaffFulfilmentService,
     @Inject(LiveRefreshService) private readonly liveRefresh: LiveRefreshService,
   ) {}
 
@@ -85,6 +95,54 @@ export class BackofficeController {
   @ApiOperation({ summary: "发送仅用于回源刷新的店长 SSE 提示" })
   managerEvents(): Observable<MessageEvent> {
     return this.liveRefresh.managerEvents();
+  }
+
+  @Get("staff/today")
+  @ApiOperation({ summary: "读取当前员工本人今日工作与行动队列" })
+  staffTodayFacts(
+    @Req() request: AuthenticatedRequest,
+    @Res({ passthrough: true }) reply: FastifyReply,
+  ): Promise<StaffTodayResponse> {
+    reply.header("Cache-Control", "no-store");
+    return this.staffFulfilment.today(request.backofficeIdentity);
+  }
+
+  @Get("staff/bookings")
+  @ApiOperation({ summary: "读取当前员工本人预约" })
+  staffBookings(
+    @Req() request: AuthenticatedRequest,
+    @Res({ passthrough: true }) reply: FastifyReply,
+  ): Promise<StaffBookingListResponse> {
+    reply.header("Cache-Control", "no-store");
+    return this.staffFulfilment.bookings(request.backofficeIdentity);
+  }
+
+  @Get("staff/bookings/:bookingId")
+  @ApiOperation({ summary: "读取当前员工获分配预约的履约资料" })
+  staffBookingDetail(
+    @Param("bookingId") bookingId: string,
+    @Req() request: AuthenticatedRequest,
+    @Res({ passthrough: true }) reply: FastifyReply,
+  ): Promise<StaffBookingDetailResponse> {
+    reply.header("Cache-Control", "no-store");
+    return this.staffFulfilment.bookingDetail(request.backofficeIdentity, bookingId);
+  }
+
+  @Post("staff/bookings/:bookingId/customer-phone/reveal")
+  @UseGuards(RequestOriginGuard)
+  @ApiOperation({ summary: "当前分配员工确认后揭示完整手机号并追加审计事实" })
+  revealStaffBookingCustomerPhone(
+    @Param("bookingId") bookingId: string,
+    @Body() body: { confirmed?: boolean } | undefined,
+    @Req() request: AuthenticatedRequest,
+    @Res({ passthrough: true }) reply: FastifyReply,
+  ): Promise<StaffPhoneRevealResponse> {
+    reply.header("Cache-Control", "no-store");
+    return this.staffFulfilment.revealCustomerPhone(
+      request.backofficeIdentity,
+      bookingId,
+      body?.confirmed === true,
+    );
   }
 
   @Get("staff/:staffId/today")

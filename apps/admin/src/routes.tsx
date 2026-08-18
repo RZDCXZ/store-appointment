@@ -13,6 +13,8 @@ import { ManagerServicesPage } from "./pages/manager/services-page";
 import { ManagerSystemPage } from "./pages/manager/system-page";
 import { ManagerWorkbenchPage } from "./pages/manager/workbench-page";
 import { StaffAppointmentsPage } from "./pages/staff/appointments-page";
+import { StaffAppointmentDetailPage } from "./pages/staff/appointment-detail-page";
+import { StaffPhoneRevealPage } from "./pages/staff/phone-reveal-page";
 import { StaffTodayPage } from "./pages/staff/today-page";
 import { RoleBoundary, RootRedirect } from "./protected-route";
 
@@ -70,6 +72,8 @@ export const routes: RouteObject[] = [
           { index: true, element: <Navigate to="today" replace /> },
           { path: "today", element: <StaffTodayPage /> },
           { path: "appointments", element: <StaffAppointmentsPage /> },
+          { path: "appointments/:bookingId", element: <StaffAppointmentDetailPage /> },
+          { path: "appointments/:bookingId/phone", element: <StaffPhoneRevealPage /> },
         ],
       },
       { path: "*", element: <RouteError /> },

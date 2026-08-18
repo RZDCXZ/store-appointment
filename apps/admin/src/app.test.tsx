@@ -171,7 +171,16 @@ describe("后台登录与角色路由", () => {
       .mockResolvedValueOnce(jsonResponse({ code: "UNAUTHENTICATED" }, 401))
       .mockResolvedValueOnce(jsonResponse({ account: staffAccount }, 201))
       .mockResolvedValueOnce(
-        jsonResponse({ account: staffAccount, navigation: ["今日工作", "我的预约"] }),
+        jsonResponse({
+          timeZone: "Asia/Shanghai",
+          demoNow: "2026-08-13T02:50:00.000Z",
+          localDate: "2026-08-13",
+          identity: { id: "linxia", displayName: "林夏" },
+          shifts: [],
+          nextBooking: null,
+          actionQueue: [],
+          bookings: [],
+        }),
       );
     const router = createMemoryRouter(routes, { initialEntries: ["/login"] });
 
@@ -187,6 +196,8 @@ describe("后台登录与角色路由", () => {
     fireEvent.submit(screen.getByRole("button", { name: "进入管理端" }).closest("form")!);
 
     expect(await screen.findByRole("heading", { name: "我的今日工作" })).toBeVisible();
+    expect(screen.getByText("林夏 · 员工")).toBeVisible();
+    expect(screen.getByRole("heading", { name: "今天没有待履约预约" })).toBeVisible();
     expect(
       within(screen.getByRole("navigation", { name: "员工导航" }))
         .getAllByRole("link")

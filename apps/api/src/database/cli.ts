@@ -348,6 +348,16 @@ async function seed(client: PoolClient): Promise<void> {
     );
   }
 
+  await client.query(
+    `
+      INSERT INTO customers (id, display_name, phone)
+      VALUES ('customer-gu-yan', '顾言', '13712345678')
+      ON CONFLICT (id) DO UPDATE
+      SET display_name = excluded.display_name,
+          phone = excluded.phone
+    `,
+  );
+
   await client.query("UPDATE privacy_notices SET is_current = false WHERE is_current");
   await client.query(
     `
@@ -409,6 +419,21 @@ async function seed(client: PoolClient): Promise<void> {
       archivedAt: "2026-08-02T04:00:00.000Z",
       careTags: ["耳部需轻柔"],
     },
+    {
+      id: "pet-maiya",
+      customerId: "customer-gu-yan",
+      name: "麦芽",
+      species: "dog",
+      weightKg: 7.2,
+      breed: "柴犬",
+      sex: "female",
+      birthDate: "2023-01-12",
+      coatType: "double",
+      seedPhotoPath: "/assets/brand/pet-tuanzi-shiba.jpg",
+      careNotes: "先让麦芽熟悉环境，吹风时从低档开始。",
+      archivedAt: null,
+      careTags: ["怕吹风", "需要慢速吹干"],
+    },
   ] as const;
 
   for (const pet of demoPets) {
@@ -469,25 +494,27 @@ async function seed(client: PoolClient): Promise<void> {
         original_occupancy_starts_at, original_occupancy_ends_at,
         verification_code_digest, verification_code_seed
       )
-      VALUES (
-        'booking-bohe-future',
-        'customer-cheng-mo',
-        'pet-bohe',
-        'chenjia',
-        '2026-08-14T03:00:00.000Z',
-        '2026-08-14T04:30:00.000Z',
-        '2026-08-14T03:00:00.000Z',
-        '2026-08-14T04:45:00.000Z',
-        90,
-        'confirmed',
-        '薄荷', 'cat', 4.8, 'small',
-        'cat-care', '猫咪洗护', 16800, 90,
-        '[]'::jsonb, '["cat-care"]'::jsonb, 16800,
-        '陈嘉', 15,
-        '2026-08-14T03:00:00.000Z', '2026-08-14T04:30:00.000Z',
-        '2026-08-14T03:00:00.000Z', '2026-08-14T04:45:00.000Z',
-        $1, 'booking-bohe-future'
-      )
+      VALUES
+        (
+          'booking-maiya-today', 'customer-gu-yan', 'pet-maiya', 'linxia',
+          '2026-08-13T03:00:00.000Z', '2026-08-13T04:00:00.000Z',
+          '2026-08-13T03:00:00.000Z', '2026-08-13T04:15:00.000Z', 60, 'confirmed',
+          '麦芽', 'dog', 7.2, 'small', 'dog-basic-care', '犬基础洗护', 12800, 60,
+          '[]'::jsonb, '["dog-basic-care"]'::jsonb, 12800, '林夏', 15,
+          '2026-08-13T03:00:00.000Z', '2026-08-13T04:00:00.000Z',
+          '2026-08-13T03:00:00.000Z', '2026-08-13T04:15:00.000Z',
+          $1, 'booking-maiya-today'
+        ),
+        (
+          'booking-bohe-future', 'customer-cheng-mo', 'pet-bohe', 'chenjia',
+          '2026-08-14T03:00:00.000Z', '2026-08-14T04:30:00.000Z',
+          '2026-08-14T03:00:00.000Z', '2026-08-14T04:45:00.000Z', 90, 'confirmed',
+          '薄荷', 'cat', 4.8, 'small', 'cat-care', '猫咪洗护', 16800, 90,
+          '[]'::jsonb, '["cat-care"]'::jsonb, 16800, '陈嘉', 15,
+          '2026-08-14T03:00:00.000Z', '2026-08-14T04:30:00.000Z',
+          '2026-08-14T03:00:00.000Z', '2026-08-14T04:45:00.000Z',
+          $2, 'booking-bohe-future'
+        )
       ON CONFLICT (id) DO UPDATE
       SET staff_id = excluded.staff_id,
           starts_at = excluded.starts_at,
@@ -516,7 +543,10 @@ async function seed(client: PoolClient): Promise<void> {
             verification_code_digest = excluded.verification_code_digest,
             verification_code_seed = excluded.verification_code_seed
     `,
-    [seedVerificationCodeDigest("customer-cheng-mo", "booking-bohe-future", "booking-bohe-future")],
+    [
+      seedVerificationCodeDigest("customer-gu-yan", "booking-maiya-today", "booking-maiya-today"),
+      seedVerificationCodeDigest("customer-cheng-mo", "booking-bohe-future", "booking-bohe-future"),
+    ],
   );
 
   await client.query(
@@ -535,6 +565,17 @@ async function seed(client: PoolClient): Promise<void> {
       )
       VALUES
         (
+          'booking-maiya-completed', 'customer-gu-yan', 'pet-maiya', 'zhaohang',
+          '2026-08-02T02:00:00.000Z', '2026-08-02T03:00:00.000Z',
+          '2026-08-02T02:00:00.000Z', '2026-08-02T03:15:00.000Z', 60, 'completed',
+          '麦芽', 'dog', 7.2, 'small', 'dog-basic-care', '犬基础洗护', 12800, 60,
+          '[]'::jsonb, '["dog-basic-care"]'::jsonb, 12800, '赵航', 15,
+          '2026-08-02T02:00:00.000Z', '2026-08-02T03:00:00.000Z',
+          '2026-08-02T02:00:00.000Z', '2026-08-02T03:15:00.000Z',
+          $1, 'booking-maiya-completed',
+          '2026-08-02T02:52:00.000Z'
+        ),
+        (
           'booking-bohe-completed', 'customer-cheng-mo', 'pet-bohe', 'zhouning',
           '2026-08-06T02:00:00.000Z', '2026-08-06T03:30:00.000Z',
           '2026-08-06T02:00:00.000Z', '2026-08-06T03:45:00.000Z', 90, 'completed',
@@ -542,7 +583,7 @@ async function seed(client: PoolClient): Promise<void> {
           '[]'::jsonb, '["cat-care"]'::jsonb, 16800, '周宁', 15,
           '2026-08-06T02:00:00.000Z', '2026-08-06T03:30:00.000Z',
           '2026-08-06T02:00:00.000Z', '2026-08-06T03:45:00.000Z',
-          $1, 'booking-bohe-completed',
+          $2, 'booking-bohe-completed',
           '2026-08-06T03:22:00.000Z'
         ),
         (
@@ -553,7 +594,7 @@ async function seed(client: PoolClient): Promise<void> {
           '[]'::jsonb, '["dog-basic-care"]'::jsonb, 22800, '林夏', 15,
           '2026-08-01T02:00:00.000Z', '2026-08-01T03:30:00.000Z',
           '2026-08-01T02:00:00.000Z', '2026-08-01T03:45:00.000Z',
-          $2, 'booking-lizi-cancelled', NULL
+          $3, 'booking-lizi-cancelled', NULL
         ),
         (
           'booking-lizi-no-show', 'customer-lu-yao', 'pet-lizi', 'zhaohang',
@@ -563,7 +604,7 @@ async function seed(client: PoolClient): Promise<void> {
           '[]'::jsonb, '["dog-basic-care"]'::jsonb, 22800, '赵航', 15,
           '2026-07-18T03:00:00.000Z', '2026-07-18T04:30:00.000Z',
           '2026-07-18T03:00:00.000Z', '2026-07-18T04:45:00.000Z',
-          $3, 'booking-lizi-no-show', NULL
+          $4, 'booking-lizi-no-show', NULL
         )
       ON CONFLICT (id) DO UPDATE
       SET status = excluded.status,
@@ -572,6 +613,11 @@ async function seed(client: PoolClient): Promise<void> {
           verification_code_seed = excluded.verification_code_seed
     `,
     [
+      seedVerificationCodeDigest(
+        "customer-gu-yan",
+        "booking-maiya-completed",
+        "booking-maiya-completed",
+      ),
       seedVerificationCodeDigest(
         "customer-cheng-mo",
         "booking-bohe-completed",
@@ -593,6 +639,16 @@ async function seed(client: PoolClient): Promise<void> {
       )
       VALUES
         (
+          'event-maiya-today-confirmed', 'booking-maiya-today', 'booking_confirmed',
+          'customer', 'customer-gu-yan', '{"status":"confirmed"}'::jsonb,
+          '2026-08-12T06:15:00.000Z'
+        ),
+        (
+          'event-maiya-completed-confirmed', 'booking-maiya-completed', 'booking_confirmed',
+          'customer', 'customer-gu-yan', '{"status":"confirmed"}'::jsonb,
+          '2026-07-30T01:25:00.000Z'
+        ),
+        (
           'event-bohe-future-confirmed', 'booking-bohe-future', 'booking_confirmed',
           'customer', 'customer-cheng-mo', '{"status":"confirmed"}'::jsonb,
           '2026-08-13T02:42:00.000Z'
@@ -613,6 +669,12 @@ async function seed(client: PoolClient): Promise<void> {
         status, available_at, created_at
       )
       VALUES
+        (
+          'notification-maiya-today-confirmed', 'booking-maiya-today',
+          'customer-gu-yan', 'booking_confirmed',
+          '{"bookingId":"booking-maiya-today","petName":"麦芽","serviceName":"犬基础洗护","staffName":"林夏","startsAt":"2026-08-13T03:00:00.000Z"}'::jsonb,
+          'sent', '2026-08-12T06:15:00.000Z', '2026-08-12T06:15:00.000Z'
+        ),
         (
           'notification-bohe-future-confirmed', 'booking-bohe-future',
           'customer-cheng-mo', 'booking_confirmed',

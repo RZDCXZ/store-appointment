@@ -1,4 +1,5 @@
 export * from "./manager-live-booking.js";
+export * from "./staff-fulfilment.js";
 
 export interface HealthResponse {
   service: "rongguang-api";
