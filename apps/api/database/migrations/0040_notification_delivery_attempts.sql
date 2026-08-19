@@ -16,5 +16,8 @@ CREATE TABLE notification_delivery_attempts (
   UNIQUE (notification_id, attempt_number)
 );
 
+CREATE INDEX notification_delivery_attempts_task_time_idx
+ON notification_delivery_attempts (notification_id, attempt_number);
+
 COMMENT ON TABLE notification_delivery_attempts IS
   'Immutable observable results for every simulated WeChat delivery attempt.';

@@ -24,18 +24,34 @@ export class LiveRefreshService {
   constructor(@Inject(DatabaseService) private readonly database: DatabaseService) {}
 
   managerEvents(): Observable<MessageEvent> {
-    return defer(() => from(this.bookingVersion())).pipe(
+    return merge(
+      of(this.event({ scope: "manager-live-bookings", reason: "connected" })),
+      this.versionChanges(() => this.bookingVersion(), {
+        scope: "manager-live-bookings",
+        reason: "booking-changed",
+      }),
+      this.versionChanges(() => this.notificationVersion(), {
+        scope: "manager-notifications",
+        reason: "notification-changed",
+      }),
+      interval(20_000).pipe(
+        map(() => this.event({ scope: "manager-live-bookings", reason: "heartbeat" })),
+      ),
+    );
+  }
+
+  private versionChanges(
+    readVersion: () => Promise<string>,
+    hint: ManagerRefreshHint,
+  ): Observable<MessageEvent> {
+    return defer(() => from(readVersion())).pipe(
       switchMap((initialVersion) =>
-        merge(
-          of(this.event("connected")),
-          timer(750, 750).pipe(
-            switchMap(() => from(this.bookingVersion()).pipe(catchError(() => EMPTY))),
-            startWith(initialVersion),
-            distinctUntilChanged(),
-            skip(1),
-            map(() => this.event("booking-changed")),
-          ),
-          interval(20_000).pipe(map(() => this.event("heartbeat"))),
+        timer(750, 750).pipe(
+          switchMap(() => from(readVersion()).pipe(catchError(() => EMPTY))),
+          startWith(initialVersion),
+          distinctUntilChanged(),
+          skip(1),
+          map(() => this.event(hint)),
         ),
       ),
     );
@@ -55,10 +71,39 @@ export class LiveRefreshService {
     return `${version?.count ?? "0"}:${version?.latest_created_at ?? ""}`;
   }
 
-  private event(reason: ManagerRefreshHint["reason"]): MessageEvent {
+  private async notificationVersion(): Promise<string> {
+    const result = await this.database.pool.query<{
+      count: string;
+      attempt_count: string;
+      pending_count: string;
+      retry_count: string;
+      failed_count: string;
+      sent_count: string;
+    }>(`
+      SELECT
+        count(*)::text AS count,
+        coalesce(sum(attempt_count), 0)::text AS attempt_count,
+        count(*) FILTER (WHERE status IN ('pending', 'processing'))::text AS pending_count,
+        count(*) FILTER (WHERE status = 'retry')::text AS retry_count,
+        count(*) FILTER (WHERE status = 'failed')::text AS failed_count,
+        count(*) FILTER (WHERE status = 'sent')::text AS sent_count
+      FROM notification_outbox
+    `);
+    const version = result.rows[0];
+    return [
+      version?.count ?? "0",
+      version?.attempt_count ?? "0",
+      version?.pending_count ?? "0",
+      version?.retry_count ?? "0",
+      version?.failed_count ?? "0",
+      version?.sent_count ?? "0",
+    ].join(":");
+  }
+
+  private event(hint: ManagerRefreshHint): MessageEvent {
     return {
-      data: { scope: "manager-live-bookings", reason } satisfies ManagerRefreshHint,
-      type: reason === "heartbeat" ? "heartbeat" : "refresh",
+      data: hint,
+      type: hint.reason === "heartbeat" ? "heartbeat" : "refresh",
       retry: 1_000,
     };
   }

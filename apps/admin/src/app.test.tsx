@@ -81,9 +81,10 @@ describe("后台登录与角色路由", () => {
   it("店长登录后恢复目标路由且只看到店长导航", async () => {
     vi.spyOn(globalThis, "fetch")
       .mockResolvedValueOnce(jsonResponse({ code: "UNAUTHENTICATED" }, 401))
-      .mockResolvedValueOnce(jsonResponse({ account: managerAccount }, 201));
+      .mockResolvedValueOnce(jsonResponse({ account: managerAccount }, 201))
+      .mockResolvedValueOnce(jsonResponse({ channel: "模拟微信通道", tasks: [] }));
     const router = createMemoryRouter(routes, {
-      initialEntries: ["/login?returnTo=%2Fmanager%2Fsystem%3Ftab%3Daudit"],
+      initialEntries: ["/login?returnTo=%2Fmanager%2Fsystem%2Fnotifications%3Ftab%3Daudit"],
     });
 
     render(<RouterProvider router={router} />);
@@ -94,7 +95,7 @@ describe("后台登录与角色路由", () => {
     });
     fireEvent.submit(screen.getByRole("button", { name: "进入管理端" }).closest("form")!);
 
-    expect(await screen.findByRole("heading", { name: "系统" })).toBeVisible();
+    expect(await screen.findByRole("heading", { name: "通知任务" })).toBeVisible();
     expect(
       within(screen.getByRole("navigation", { name: "店长导航" }))
         .getAllByRole("link")
@@ -102,7 +103,7 @@ describe("后台登录与角色路由", () => {
     ).toEqual(["工作台", "预约", "排班", "服务", "顾客", "经营", "系统"]);
     expect(screen.getByText(/上海演示时间：2026年8月13日.*10:50/)).toBeVisible();
     expect(screen.queryByText("今日工作")).not.toBeInTheDocument();
-    expect(router.state.location.pathname).toBe("/manager/system");
+    expect(router.state.location.pathname).toBe("/manager/system/notifications");
     expect(router.state.location.search).toBe("?tab=audit");
   });
 

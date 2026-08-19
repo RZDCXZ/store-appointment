@@ -318,7 +318,11 @@ function WorkbenchTimeline({ data }: { data: ManagerWorkbenchResponse }) {
 }
 
 export function ManagerWorkbenchPage(): React.JSX.Element {
-  const resource = useManagerResource<ManagerWorkbenchResponse>("/backoffice/manager/workbench");
+  const resource = useManagerResource<ManagerWorkbenchResponse>(
+    "/backoffice/manager/workbench",
+    true,
+    ["manager-live-bookings", "manager-notifications"],
+  );
 
   return (
     <main className="page-shell manager-workbench-page">

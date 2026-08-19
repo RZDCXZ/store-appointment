@@ -143,10 +143,10 @@ describe("通知失败、重试与预约提醒", () => {
         VALUES (
           $1, 'booking-bohe-future', 'customer-cheng-mo', 'booking_rescheduled',
           '{"bookingId":"booking-bohe-future"}'::jsonb,
-          'pending', 0, clock_timestamp(), clock_timestamp(), 3
+          'pending', 0, $2, $2, 3
         )
       `,
-      [notificationId],
+      [notificationId, "2026-08-13T02:50:00.000Z"],
     );
 
     const deadline = Date.now() + 2_000;

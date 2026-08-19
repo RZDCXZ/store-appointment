@@ -359,7 +359,12 @@ export interface ManagerProxyBookingOptionsResponse {
   addons: Array<{ id: string; name: string }>;
 }
 
-export interface ManagerRefreshHint {
-  scope: "manager-live-bookings";
-  reason: "connected" | "booking-changed" | "heartbeat";
-}
+export type ManagerRefreshHint =
+  | {
+      scope: "manager-live-bookings";
+      reason: "connected" | "booking-changed" | "heartbeat";
+    }
+  | {
+      scope: "manager-notifications";
+      reason: "notification-changed";
+    };

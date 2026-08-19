@@ -20,10 +20,8 @@ import { ManagerCapacityChangePage } from "./pages/manager/capacity-change-page"
 import { ManagerCapacityChangeResolutionPage } from "./pages/manager/capacity-change-resolution-page";
 import { ManagerServicesPage } from "./pages/manager/services-page";
 import { ManagerStaffPage } from "./pages/manager/staff-page";
-import {
-  ManagerNotificationDetailPage,
-  ManagerNotificationListPage,
-} from "./pages/manager/notification-pages";
+import { ManagerNotificationDetailPage } from "./pages/manager/notification-detail-page";
+import { ManagerNotificationListPage } from "./pages/manager/notification-list-page";
 import { ManagerWorkbenchPage } from "./pages/manager/workbench-page";
 import { StaffAppointmentsPage } from "./pages/staff/appointments-page";
 import { StaffAppointmentDetailPage } from "./pages/staff/appointment-detail-page";

@@ -21,7 +21,8 @@
 | MG-13     | 员工账号与技能    | Web 后台   | `/manager/services/staff`                            | `apps/admin/src/pages/manager/staff-page.tsx`                      | 已完成 | 技能矩阵键盘操作、错误提示、角色边界与浏览器刷新测试      |
 | —         | 店长顾客入口      | Web 后台   | `/manager/customers`                                 | `apps/admin/src/pages/manager/customers-page.tsx`                  | 骨架   | Vite history fallback + 独立路由测试                      |
 | —         | 店长经营入口      | Web 后台   | `/manager/business`                                  | `apps/admin/src/pages/manager/business-page.tsx`                   | 骨架   | Vite history fallback + 独立路由测试                      |
-| —         | 店长系统入口      | Web 后台   | `/manager/system`                                    | `apps/admin/src/pages/manager/system-page.tsx`                     | 骨架   | Vite history fallback + 独立路由测试                      |
+| MG-15     | 通知任务列表      | Web 后台   | `/manager/system/notifications`                      | `apps/admin/src/pages/manager/notification-list-page.tsx`          | 已完成 | 独立路由、空态／失败态测试 + Playwright 直达刷新          |
+| MG-15     | 通知任务详情      | Web 后台   | `/manager/system/notifications/:notificationId`      | `apps/admin/src/pages/manager/notification-detail-page.tsx`        | 已完成 | 风险入口、尝试详情、人工重试 + Playwright 直达刷新        |
 | MP-01     | 顾客首页          | 微信小程序 | `pages/home/index`                                   | `apps/mini-program/miniprogram/pages/home/`                        | 已完成 | 项目契约测试 + 开发者工具实机加载                         |
 | MP-02     | 服务列表          | 微信小程序 | `pages/services/index`                               | `apps/mini-program/miniprogram/pages/services/`                    | 已完成 | 页面登记 + 开发者工具直接打开                             |
 | MP-02     | 服务详情          | 微信小程序 | `pages/service-detail/index?id=:serviceId`           | `apps/mini-program/miniprogram/pages/service-detail/`              | 已完成 | 首页跳转 + 详情刷新恢复（2026-08-15）                     |

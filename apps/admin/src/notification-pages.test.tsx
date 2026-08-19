@@ -1,4 +1,4 @@
-import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { createMemoryRouter, RouterProvider } from "react-router-dom";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
@@ -38,6 +38,11 @@ const attempts = [1, 2, 3].map((number) => ({
   detail: "模拟微信通道发送失败",
 }));
 
+const failedDetail = {
+  task: { ...failedTask, attempts },
+  businessFactNotice: "通知失败不会撤销已经成立的预约事实。",
+} as const;
+
 function jsonResponse(body: unknown, status = 200): Response {
   return new Response(JSON.stringify(body), {
     status,
@@ -45,9 +50,34 @@ function jsonResponse(body: unknown, status = 200): Response {
   });
 }
 
+class FakeEventSource {
+  static instance: FakeEventSource | null = null;
+  onopen: (() => void) | null = null;
+  onerror: (() => void) | null = null;
+  private refreshListener: ((event: Event) => void) | null = null;
+
+  constructor(readonly url: string) {
+    FakeEventSource.instance = this;
+    queueMicrotask(() => this.onopen?.());
+  }
+
+  addEventListener(type: string, listener: EventListener): void {
+    if (type === "refresh") this.refreshListener = listener;
+  }
+
+  removeEventListener(): void {}
+
+  close(): void {}
+
+  emitRefresh(data: object): void {
+    this.refreshListener?.({ data: JSON.stringify(data) } as MessageEvent<string>);
+  }
+}
+
 afterEach(() => {
   cleanup();
   vi.restoreAllMocks();
+  vi.unstubAllGlobals();
 });
 
 describe("MG-15 通知任务页面", () => {
@@ -91,6 +121,87 @@ describe("MG-15 通知任务页面", () => {
     expect(router.state.location.pathname).toBe("/manager/system/notifications");
   });
 
+  it("通知状态变化提示只触发回源刷新，页面不把 SSE 当作事实", async () => {
+    FakeEventSource.instance = null;
+    vi.stubGlobal("EventSource", FakeEventSource);
+    let reads = 0;
+    vi.spyOn(globalThis, "fetch").mockImplementation(async (input) => {
+      const url = String(input);
+      if (url.endsWith("/auth/session")) return jsonResponse({ account: managerAccount });
+      if (url.endsWith("/backoffice/manager/notifications")) {
+        reads += 1;
+        return jsonResponse({
+          channel: "模拟微信通道",
+          tasks: [{ ...failedTask, status: reads === 1 ? "manual_retry_required" : "sent" }],
+        });
+      }
+      throw new Error(`未处理请求：${url}`);
+    });
+    const router = createMemoryRouter(routes, {
+      initialEntries: ["/manager/system/notifications"],
+    });
+    render(<RouterProvider router={router} />);
+
+    expect(await screen.findByText("需人工重试")).toBeVisible();
+    act(() => {
+      FakeEventSource.instance?.emitRefresh({
+        scope: "manager-notifications",
+        reason: "notification-changed",
+      });
+    });
+    await waitFor(() => expect(reads).toBe(2));
+    expect(await screen.findByText("已发送")).toBeVisible();
+  });
+
+  it("列表加载后可展示空状态", async () => {
+    let resolveList!: (response: Response) => void;
+    vi.spyOn(globalThis, "fetch").mockImplementation(async (input) => {
+      const url = String(input);
+      if (url.endsWith("/auth/session")) return jsonResponse({ account: managerAccount });
+      if (url.endsWith("/backoffice/manager/notifications")) {
+        return new Promise<Response>((resolve) => {
+          resolveList = resolve;
+        });
+      }
+      throw new Error(`未处理请求：${url}`);
+    });
+    const router = createMemoryRouter(routes, {
+      initialEntries: ["/manager/system/notifications"],
+    });
+    render(<RouterProvider router={router} />);
+
+    expect(await screen.findByRole("heading", { name: "正在读取通知事实…" })).toBeVisible();
+    await waitFor(() => expect(resolveList).toBeTypeOf("function"));
+    await act(async () => {
+      resolveList(jsonResponse({ channel: "模拟微信通道", tasks: [] }));
+    });
+    expect(await screen.findByText("当前没有通知任务")).toBeVisible();
+  });
+
+  it("列表读取失败可以重试，无权限不会伪装成普通空状态", async () => {
+    let reads = 0;
+    vi.spyOn(globalThis, "fetch").mockImplementation(async (input) => {
+      const url = String(input);
+      if (url.endsWith("/auth/session")) return jsonResponse({ account: managerAccount });
+      if (url.endsWith("/backoffice/manager/notifications")) {
+        reads += 1;
+        return reads === 1
+          ? jsonResponse({ code: "TEMPORARY_FAILURE", message: "通知任务暂时无法读取" }, 503)
+          : jsonResponse({ code: "FORBIDDEN", message: "没有权限读取通知任务" }, 403);
+      }
+      throw new Error(`未处理请求：${url}`);
+    });
+    const router = createMemoryRouter(routes, {
+      initialEntries: ["/manager/system/notifications"],
+    });
+    render(<RouterProvider router={router} />);
+
+    expect(await screen.findByText("通知任务暂时无法读取")).toBeVisible();
+    fireEvent.click(screen.getByRole("button", { name: "重新读取" }));
+    expect(await screen.findByRole("heading", { name: "没有权限读取通知任务" })).toBeVisible();
+    expect(screen.queryByText("当前没有通知任务")).not.toBeInTheDocument();
+  });
+
   it("详情直达后恢复尝试记录，并支持失败注入与人工重试", async () => {
     let detailReads = 0;
     const requests: Array<{ url: string; method: string; body: string | null }> = [];
@@ -101,10 +212,7 @@ describe("MG-15 通知任务页面", () => {
       if (url.endsWith("/auth/session")) return jsonResponse({ account: managerAccount });
       if (url.endsWith("/backoffice/manager/notifications/notification-seed-final-failed")) {
         detailReads += 1;
-        return jsonResponse({
-          task: { ...failedTask, attempts },
-          businessFactNotice: "通知失败不会撤销已经成立的预约事实。",
-        });
+        return jsonResponse(failedDetail);
       }
       if (
         url.endsWith(
@@ -162,5 +270,40 @@ describe("MG-15 通知任务页面", () => {
     expect(router.state.location.pathname).toBe(
       "/manager/system/notifications/notification-seed-final-failed",
     );
+  });
+
+  it("详情读取可重试，写失败保留已有尝试且不显示假成功", async () => {
+    let detailReads = 0;
+    vi.spyOn(globalThis, "fetch").mockImplementation(async (input, init) => {
+      const url = String(input);
+      if (url.endsWith("/auth/session")) return jsonResponse({ account: managerAccount });
+      if (url.endsWith("/backoffice/manager/notifications/notification-seed-final-failed")) {
+        detailReads += 1;
+        return detailReads === 1
+          ? jsonResponse({ code: "TEMPORARY_FAILURE", message: "通知详情暂时无法读取" }, 503)
+          : jsonResponse(failedDetail);
+      }
+      if (
+        url.endsWith(
+          "/backoffice/manager/notifications/notification-seed-final-failed/manual-retry",
+        ) &&
+        init?.method === "POST"
+      ) {
+        return jsonResponse({ code: "CHANNEL_UNAVAILABLE", message: "模拟通道暂时不可用" }, 503);
+      }
+      throw new Error(`未处理请求：${url}`);
+    });
+    const router = createMemoryRouter(routes, {
+      initialEntries: ["/manager/system/notifications/notification-seed-final-failed"],
+    });
+    render(<RouterProvider router={router} />);
+
+    expect(await screen.findByText("通知详情暂时无法读取")).toBeVisible();
+    fireEvent.click(screen.getByRole("button", { name: "重新读取" }));
+    expect(await screen.findByText("累计尝试 3 次")).toBeVisible();
+    fireEvent.click(screen.getByRole("button", { name: "人工重试" }));
+    expect(await screen.findByText("模拟通道暂时不可用")).toBeVisible();
+    expect(screen.getByText("累计尝试 3 次")).toBeVisible();
+    expect(screen.queryByText("人工重试已受理，正在读取最新结果。")).not.toBeInTheDocument();
   });
 });

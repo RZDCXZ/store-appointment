@@ -12,7 +12,11 @@ export interface ManagerResource<T> extends BackofficeResource<T> {
   refresh: () => void;
 }
 
-function useManagerRefreshHints(enabled: boolean, refresh: () => void): LiveConnectionState {
+function useManagerRefreshHints(
+  enabled: boolean,
+  refresh: () => void,
+  scopeKey: string,
+): LiveConnectionState {
   const [connection, setConnection] = useState<LiveConnectionState>(
     enabled ? "connecting" : "disabled",
   );
@@ -24,13 +28,18 @@ function useManagerRefreshHints(enabled: boolean, refresh: () => void): LiveConn
     }
 
     let opened = false;
+    const scopes = scopeKey.split(":");
     const source = new EventSource(createApiUrl("/backoffice/manager/events"), {
       withCredentials: true,
     });
     const handleRefresh = (event: Event) => {
       try {
         const hint = JSON.parse((event as MessageEvent<string>).data) as ManagerRefreshHint;
-        if (hint.scope === "manager-live-bookings" && hint.reason === "booking-changed") {
+        if (
+          scopes.includes(hint.scope) &&
+          hint.reason !== "connected" &&
+          hint.reason !== "heartbeat"
+        ) {
           refresh();
         }
       } catch {
@@ -50,14 +59,18 @@ function useManagerRefreshHints(enabled: boolean, refresh: () => void): LiveConn
       source.removeEventListener("refresh", handleRefresh);
       source.close();
     };
-  }, [enabled, refresh]);
+  }, [enabled, refresh, scopeKey]);
 
   return connection;
 }
 
-export function useManagerResource<T>(path: string, live = true): ManagerResource<T> {
+export function useManagerResource<T>(
+  path: string,
+  live = true,
+  scopes: readonly ManagerRefreshHint["scope"][] = ["manager-live-bookings"],
+): ManagerResource<T> {
   const resource = useBackofficeResource<T>(path);
-  const connection = useManagerRefreshHints(live, resource.refresh);
+  const connection = useManagerRefreshHints(live, resource.refresh, scopes.join(":"));
 
   return { ...resource, connection };
 }

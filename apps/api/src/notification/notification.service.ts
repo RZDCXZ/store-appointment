@@ -20,8 +20,9 @@ import type {
 } from "@rongguang/contracts";
 
 import type { BackofficeIdentity } from "../auth/auth.types.js";
-import { getDemoNow, getNotificationRetryBackoffMilliseconds } from "../config/environment.js";
+import { getNotificationRetryBackoffMilliseconds } from "../config/environment.js";
 import { DatabaseService } from "../database/database.service.js";
+import { NOTIFICATION_CLOCK, type NotificationClock } from "./notification.clock.js";
 
 interface NotificationTaskRow {
   id: string;
@@ -121,24 +122,32 @@ const notificationSelect = `
 export class NotificationService implements OnModuleInit, OnModuleDestroy {
   private readonly logger = new Logger(NotificationService.name);
   private timer: ReturnType<typeof setInterval> | null = null;
-  private processing = false;
+  private activeWorkerCycle: Promise<void> | null = null;
+  private stopping = false;
 
-  constructor(@Inject(DatabaseService) private readonly database: DatabaseService) {}
+  constructor(
+    @Inject(DatabaseService) private readonly database: DatabaseService,
+    @Inject(NOTIFICATION_CLOCK) private readonly clock: NotificationClock,
+  ) {}
 
   async onModuleInit(): Promise<void> {
     await this.database.pool.query(
       `UPDATE notification_outbox
        SET status = CASE WHEN attempt_count >= 3 THEN 'failed' ELSE 'retry' END,
-           available_at = clock_timestamp()
+           available_at = $1
        WHERE status = 'processing'`,
+      [this.clock.now()],
     );
+    this.stopping = false;
     this.timer = setInterval(() => void this.runWorkerCycle(), 100);
     void this.runWorkerCycle();
   }
 
-  onModuleDestroy(): void {
+  async onModuleDestroy(): Promise<void> {
+    this.stopping = true;
     if (this.timer) clearInterval(this.timer);
     this.timer = null;
+    await this.activeWorkerCycle;
   }
 
   async list(): Promise<ManagerNotificationListResponse> {
@@ -202,7 +211,7 @@ export class NotificationService implements OnModuleInit, OnModuleDestroy {
     manager: BackofficeIdentity,
   ): Promise<ManagerNotificationManualRetryResponse> {
     const client = await this.database.pool.connect();
-    const acceptedAt = getDemoNow();
+    const acceptedAt = this.clock.now().toISOString();
     try {
       await client.query("BEGIN");
       const result = await client.query<{ attempt_count: number }>(
@@ -216,10 +225,10 @@ export class NotificationService implements OnModuleInit, OnModuleDestroy {
       if (!task) this.notFound();
       const updated = await client.query(
         `UPDATE notification_outbox
-         SET status = 'pending', available_at = clock_timestamp()
+         SET status = 'pending', available_at = $2
          WHERE id = $1 AND status = 'failed'
          RETURNING id`,
-        [notificationId],
+        [notificationId, acceptedAt],
       );
       if (updated.rowCount === 0) {
         throw new HttpException(
@@ -267,9 +276,19 @@ export class NotificationService implements OnModuleInit, OnModuleDestroy {
     );
   }
 
-  private async runWorkerCycle(): Promise<void> {
-    if (this.processing) return;
-    this.processing = true;
+  private runWorkerCycle(): Promise<void> {
+    if (this.stopping) return Promise.resolve();
+    if (this.activeWorkerCycle) return this.activeWorkerCycle;
+
+    const cycle = this.processWorkerCycle();
+    this.activeWorkerCycle = cycle;
+    void cycle.finally(() => {
+      if (this.activeWorkerCycle === cycle) this.activeWorkerCycle = null;
+    });
+    return cycle;
+  }
+
+  private async processWorkerCycle(): Promise<void> {
     try {
       await this.createDueReminders();
       const task = await this.claimNextTask();
@@ -279,13 +298,11 @@ export class NotificationService implements OnModuleInit, OnModuleDestroy {
         "模拟微信通知工作器处理失败",
         error instanceof Error ? error.stack : String(error),
       );
-    } finally {
-      this.processing = false;
     }
   }
 
   private async createDueReminders(): Promise<void> {
-    const demoNow = getDemoNow();
+    const demoNow = this.clock.now().toISOString();
     await this.database.pool.query(
       `INSERT INTO notification_outbox (
          id, booking_id, customer_id, notification_type, payload,
@@ -303,7 +320,7 @@ export class NotificationService implements OnModuleInit, OnModuleDestroy {
                 'startsAt', booking.starts_at
               ),
               'pending',
-              clock_timestamp(),
+              $1::timestamptz,
               $1::timestamptz
        FROM bookings AS booking
        WHERE booking.status = 'confirmed'
@@ -322,7 +339,7 @@ export class NotificationService implements OnModuleInit, OnModuleDestroy {
          SELECT id
          FROM notification_outbox
          WHERE status IN ('pending', 'retry')
-           AND available_at <= clock_timestamp()
+           AND available_at <= $1
          ORDER BY available_at, sequence
          FOR UPDATE SKIP LOCKED
          LIMIT 1
@@ -332,6 +349,7 @@ export class NotificationService implements OnModuleInit, OnModuleDestroy {
        FROM next_task
        WHERE notification.id = next_task.id
        RETURNING notification.id`,
+      [this.clock.now()],
     );
     return result.rows[0] ?? null;
   }
@@ -360,8 +378,7 @@ export class NotificationService implements OnModuleInit, OnModuleDestroy {
       const mode: ManagerNotificationAttempt["mode"] =
         row.attempt_count < 3 ? "automatic" : "manual";
       const failed = row.simulated_failures_remaining > 0;
-      const deliveryClock = new Date();
-      const attemptedAt = new Date(getDemoNow());
+      const attemptedAt = this.clock.now();
       const result: ManagerNotificationAttempt["result"] = failed ? "failed" : "sent";
       const detail = failed ? "已注入的模拟微信通道失败" : "模拟微信通道发送成功";
       await client.query(
@@ -377,12 +394,12 @@ export class NotificationService implements OnModuleInit, OnModuleDestroy {
           `UPDATE notification_outbox
            SET status = 'sent', attempt_count = $2, available_at = $3
            WHERE id = $1`,
-          [task.id, attemptNumber, deliveryClock],
+          [task.id, attemptNumber, attemptedAt],
         );
       } else {
         const automaticRetry = mode === "automatic" && attemptNumber < 3;
         const availableAt = new Date(
-          deliveryClock.getTime() + getNotificationRetryBackoffMilliseconds(),
+          attemptedAt.getTime() + getNotificationRetryBackoffMilliseconds(),
         );
         await client.query(
           `UPDATE notification_outbox

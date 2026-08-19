@@ -23,6 +23,16 @@ async function loginAsManager(page: Page): Promise<void> {
 test("MG-15 从风险队列直达失败详情，刷新恢复，并可注入失败后人工重试成功", async ({ page }) => {
   await loginAsManager(page);
 
+  await page.goto("/manager/system/notifications");
+  await expect(page.getByRole("heading", { name: "通知任务" })).toBeVisible();
+  await expect(page.getByRole("link", { name: "查看预约改期通知" })).toHaveAttribute(
+    "href",
+    "/manager/system/notifications/notification-seed-final-failed",
+  );
+  await page.reload();
+  await expect(page.getByText("需人工重试")).toBeVisible();
+  await page.goto("/manager/workbench");
+
   const risk = page.getByRole("link", { name: /通知最终失败/ });
   await expect(risk).toHaveAttribute(
     "href",
