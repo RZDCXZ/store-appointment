@@ -20,7 +20,6 @@
 
 .rights-hero__title {
   margin-top: 10rpx;
-  font-family: serif;
   font-size: 48rpx;
   font-weight: 700;
 }
@@ -123,7 +122,6 @@
 
 .summary-card__value {
   color: #3f6253;
-  font-family: serif;
   font-size: 44rpx;
   font-weight: 700;
 }

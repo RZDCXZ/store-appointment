@@ -1,9 +1,19 @@
+import { access, unlink } from "node:fs/promises";
+import { join } from "node:path";
+
 import type { NestFastifyApplication } from "@nestjs/platform-fastify";
 import type { CustomerDataExport, CustomerDataRightsStatusResponse } from "@rongguang/contracts";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 
 import { createApplication } from "../src/bootstrap.js";
+import { getPetUploadDirectory } from "../src/config/environment.js";
 import { DatabaseService } from "../src/database/database.service.js";
+
+const historyEventId = "event-lu-data-rights-history";
+const correctionEventId = "event-lu-data-rights-correction";
+const notificationId = "notification-lu-data-rights";
+const capacityChangeId = "store-closure-lu-data-rights";
+const capacityResolutionId = "capacity-resolution-lu-data-rights";
 
 async function customerAuthorization(
   app: NestFastifyApplication,
@@ -44,6 +54,7 @@ describe("顾客数据导出与匿名化删除", () => {
   let database: DatabaseService;
   let chengAuthorization: string;
   let luAuthorization: string;
+  let uploadedPhotoStorageKey = "";
 
   beforeAll(async () => {
     vi.stubEnv("DEMO_NOW", "2026-08-13T02:50:00.000Z");
@@ -55,6 +66,18 @@ describe("顾客数据导出与匿名化删除", () => {
   });
 
   afterAll(async () => {
+    await database.pool.query("DELETE FROM store_closure_intervals WHERE id = $1", [
+      capacityChangeId,
+    ]);
+    await database.pool.query("DELETE FROM notification_outbox WHERE id = $1", [notificationId]);
+    await database.pool.query("DELETE FROM booking_events WHERE id = ANY($1::text[])", [
+      [historyEventId, correctionEventId],
+    ]);
+    await database.pool.query("UPDATE pets SET photo_id = NULL WHERE id = 'pet-lizi'");
+    await database.pool.query("DELETE FROM pet_photos WHERE customer_id = 'customer-lu-yao'");
+    if (uploadedPhotoStorageKey) {
+      await unlink(join(getPetUploadDirectory(), uploadedPhotoStorageKey)).catch(() => undefined);
+    }
     await database.pool.query(
       `UPDATE customers
        SET display_name = '陆遥', phone = '13690247519', anonymized_at = NULL
@@ -261,6 +284,160 @@ describe("顾客数据导出与匿名化删除", () => {
       code: "ANONYMIZATION_CONFIRMATION_REQUIRED",
     });
 
+    const pngBytes = Buffer.from([
+      0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0x00, 0x00, 0x00, 0x0d,
+    ]);
+    const uploadResponse = await app.inject({
+      method: "POST",
+      url: "/miniapp/pet-photos",
+      headers: { authorization: luAuthorization },
+      payload: { mimeType: "image/png", base64Data: pngBytes.toString("base64") },
+    });
+    expect(uploadResponse.statusCode).toBe(201);
+    const uploadedPhotoId = uploadResponse.json<{ photo: { id: string } }>().photo.id;
+    const photoRow = await database.pool.query<{ storage_key: string }>(
+      "SELECT storage_key FROM pet_photos WHERE id = $1",
+      [uploadedPhotoId],
+    );
+    uploadedPhotoStorageKey = photoRow.rows[0]?.storage_key ?? "";
+    expect(uploadedPhotoStorageKey).not.toBe("");
+    await database.pool.query("UPDATE pets SET photo_id = $2 WHERE id = $1", [
+      "pet-lizi",
+      uploadedPhotoId,
+    ]);
+
+    const previousSchedule = {
+      staff: { id: "linxia", displayName: "林夏" },
+      startsAt: "2026-07-01T03:00:00.000Z",
+      endsAt: "2026-07-01T04:30:00.000Z",
+      turnoverEndsAt: "2026-07-01T04:45:00.000Z",
+    };
+    const nextSchedule = {
+      staff: { id: "chenjia", displayName: "陈嘉" },
+      startsAt: "2026-07-02T03:00:00.000Z",
+      endsAt: "2026-07-02T04:30:00.000Z",
+      turnoverEndsAt: "2026-07-02T04:45:00.000Z",
+    };
+    const previousSelection = {
+      pet: {
+        id: "pet-lizi",
+        name: "栗子",
+        species: "dog",
+        weightKg: 28.6,
+        petSize: "large",
+      },
+      primaryService: { id: "dog-care", name: "犬只洗护", priceCents: 22800 },
+      addons: [],
+      requiredSkillIds: ["dog-basic-care"],
+      totalPriceCents: 22800,
+      serviceDurationMinutes: 90,
+    };
+    const nextSelection = {
+      ...previousSelection,
+      pet: { ...previousSelection.pet, weightKg: 27.8 },
+      totalPriceCents: 21800,
+    };
+    await database.pool.query(
+      `INSERT INTO booking_events (
+         id, booking_id, event_type, actor_type, actor_id, payload, occurred_at
+       ) VALUES
+         ($1, 'booking-lizi-cancelled', 'booking_rescheduled', 'customer',
+          'customer-lu-yao', $2::jsonb, '2026-07-02T02:50:00.000Z'),
+         ($3, 'booking-lizi-cancelled', 'booking_content_corrected', 'manager',
+          'manager', $4::jsonb, '2026-07-02T02:55:00.000Z')`,
+      [
+        historyEventId,
+        JSON.stringify({
+          reason: "陆遥来电要求改期",
+          previous: previousSchedule,
+          next: nextSchedule,
+        }),
+        correctionEventId,
+        JSON.stringify({
+          reason: "栗子的体重已更新",
+          previous: previousSelection,
+          next: nextSelection,
+        }),
+      ],
+    );
+    await database.pool.query(
+      `INSERT INTO notification_outbox (
+         id, booking_id, customer_id, notification_type, payload,
+         status, available_at, created_at
+       ) VALUES (
+         $1, 'booking-lizi-cancelled', 'customer-lu-yao', 'booking_content_corrected',
+         $2::jsonb, 'pending', '2026-07-02T03:00:00.000Z', '2026-07-02T03:00:00.000Z'
+       )`,
+      [
+        notificationId,
+        JSON.stringify({
+          bookingId: "booking-lizi-cancelled",
+          petName: "栗子",
+          serviceName: "犬只洗护",
+          staffName: "林夏",
+          startsAt: "2026-07-02T03:00:00.000Z",
+          managerDisplayName: "沈青",
+          reason: "栗子的体重已更新",
+        }),
+      ],
+    );
+    const impactSnapshot = {
+      id: "booking-lizi-cancelled",
+      revision: 2,
+      status: "cancelled",
+      customerName: "陆遥",
+      petName: "栗子",
+      serviceName: "犬只洗护",
+      staff: { id: "linxia", displayName: "林夏" },
+      startsAt: previousSchedule.startsAt,
+      endsAt: previousSchedule.endsAt,
+      turnoverEndsAt: previousSchedule.turnoverEndsAt,
+    };
+    await database.pool.query(
+      `INSERT INTO store_closure_intervals (
+         id, local_date, starts_at, ends_at, status, reason, created_by,
+         target_capacity_minutes, affected_booking_count, impact_snapshot, created_at
+       ) VALUES (
+         $1, '2026-07-01', '10:00', '12:00', 'cancelled', '临时闭店', 'manager',
+         120, 1, $2::jsonb, '2026-06-30T02:00:00.000Z'
+       )`,
+      [capacityChangeId, JSON.stringify([impactSnapshot])],
+    );
+    const capacityResponse = {
+      change: { id: capacityChangeId, kind: "store_closure", status: "active" },
+      progress: { resolved: 1, total: 1 },
+      resolvedBooking: {
+        id: capacityResolutionId,
+        bookingId: "booking-lizi-cancelled",
+        action: "reschedule",
+        operator: { id: "manager", displayName: "沈青" },
+        reason: "陆遥来电确认改期",
+        result: nextSchedule,
+        bookingEventId: historyEventId,
+        resolvedAt: "2026-07-02T02:50:00.000Z",
+      },
+    };
+    await database.pool.query(
+      `INSERT INTO capacity_change_booking_resolutions (
+         id, store_closure_id, booking_id, action, manager_id, reason,
+         original_snapshot, result_summary, booking_event_id, resolved_at,
+         idempotency_key, request_digest, response_body
+       ) VALUES (
+         $1, $2, 'booking-lizi-cancelled', 'reschedule', 'manager', $3,
+         $4::jsonb, $5::jsonb, $6, '2026-07-02T02:50:00.000Z',
+         'customer-data-rights-capacity', 'fixture-digest', $7::jsonb
+       )`,
+      [
+        capacityResolutionId,
+        capacityChangeId,
+        "陆遥来电确认改期",
+        JSON.stringify(impactSnapshot),
+        JSON.stringify(nextSchedule),
+        historyEventId,
+        JSON.stringify(capacityResponse),
+      ],
+    );
+
     const response = await app.inject({
       method: "POST",
       url: "/miniapp/data-deletion",
@@ -292,6 +469,8 @@ describe("顾客数据导出与匿名化删除", () => {
       consent_count: string;
       session_count: string;
       demo_profile_count: string;
+      photo_count: string;
+      photo_deletion_count: string;
     }>(
       `SELECT customer.display_name, customer.phone, customer.anonymized_at,
               pet.name AS pet_name, pet.breed, pet.sex, pet.birth_date::text,
@@ -302,7 +481,11 @@ describe("顾客数据导出与匿名化删除", () => {
               (SELECT count(*)::text FROM customer_sessions WHERE customer_id = customer.id)
                 AS session_count,
               (SELECT count(*)::text FROM demo_customer_profiles WHERE customer_id = customer.id)
-                AS demo_profile_count
+                AS demo_profile_count,
+              (SELECT count(*)::text FROM pet_photos WHERE customer_id = customer.id)
+                AS photo_count,
+              (SELECT count(*)::text FROM pet_photo_deletion_outbox)
+                AS photo_deletion_count
        FROM customers AS customer
        JOIN pets AS pet ON pet.customer_id = customer.id
        WHERE customer.id = 'customer-lu-yao'`,
@@ -325,8 +508,13 @@ describe("顾客数据导出与匿名化删除", () => {
         consent_count: "0",
         session_count: "0",
         demo_profile_count: "0",
+        photo_count: "0",
+        photo_deletion_count: "0",
       }),
     ]);
+    await expect(
+      access(join(getPetUploadDirectory(), uploadedPhotoStorageKey)),
+    ).rejects.toMatchObject({ code: "ENOENT" });
     const retainedBookings = await database.pool.query<{
       id: string;
       status: string;
@@ -350,6 +538,92 @@ describe("顾客数据导出与匿名化删除", () => {
         total_price_cents: 22800,
       },
     ]);
+
+    const retainedEvents = await database.pool.query<{
+      id: string;
+      actor_id: string;
+      payload: Record<string, unknown>;
+    }>(
+      `SELECT id, actor_id, payload
+       FROM booking_events
+       WHERE id = ANY($1::text[])
+       ORDER BY id`,
+      [[historyEventId, correctionEventId]],
+    );
+    expect(retainedEvents.rows).toEqual([
+      {
+        id: correctionEventId,
+        actor_id: "manager",
+        payload: {
+          reason: "[原原因已匿名化]",
+          previous: { ...previousSelection, pet: { ...previousSelection.pet, name: "已匿名宠物" } },
+          next: { ...nextSelection, pet: { ...nextSelection.pet, name: "已匿名宠物" } },
+        },
+      },
+      {
+        id: historyEventId,
+        actor_id: "anonymized-customer",
+        payload: {
+          reason: "[原原因已匿名化]",
+          previous: previousSchedule,
+          next: nextSchedule,
+        },
+      },
+    ]);
+    const retainedNotification = await database.pool.query<{ payload: Record<string, unknown> }>(
+      "SELECT payload FROM notification_outbox WHERE id = $1",
+      [notificationId],
+    );
+    expect(retainedNotification.rows[0]?.payload).toEqual({
+      bookingId: "booking-lizi-cancelled",
+      petName: "已匿名宠物",
+      serviceName: "犬基础洗护",
+      staffName: "林夏",
+      startsAt: "2026-08-01T02:00:00+00:00",
+    });
+    const retainedCapacity = await database.pool.query<{
+      impact_snapshot: Array<Record<string, unknown>>;
+      reason: string;
+      original_snapshot: Record<string, unknown>;
+      result_summary: Record<string, unknown>;
+      response_body: Record<string, unknown>;
+    }>(
+      `SELECT change.impact_snapshot, resolution.reason, resolution.original_snapshot,
+              resolution.result_summary, resolution.response_body
+       FROM capacity_change_booking_resolutions AS resolution
+       JOIN store_closure_intervals AS change ON change.id = resolution.store_closure_id
+       WHERE resolution.id = $1`,
+      [capacityResolutionId],
+    );
+    expect(retainedCapacity.rows[0]).toMatchObject({
+      impact_snapshot: [
+        {
+          ...impactSnapshot,
+          customerName: "已匿名顾客",
+          petName: "已匿名宠物",
+        },
+      ],
+      reason: "[原原因已匿名化]",
+      original_snapshot: {
+        ...impactSnapshot,
+        customerName: "已匿名顾客",
+        petName: "已匿名宠物",
+      },
+      result_summary: nextSchedule,
+      response_body: {
+        ...capacityResponse,
+        resolvedBooking: {
+          ...capacityResponse.resolvedBooking,
+          reason: "[原原因已匿名化]",
+        },
+      },
+    });
+    expect(
+      JSON.stringify(retainedEvents.rows) + JSON.stringify(retainedCapacity.rows),
+    ).not.toContain("陆遥");
+    expect(
+      JSON.stringify(retainedEvents.rows) + JSON.stringify(retainedCapacity.rows),
+    ).not.toContain("栗子");
 
     const managerProfile = await app.inject({
       method: "GET",

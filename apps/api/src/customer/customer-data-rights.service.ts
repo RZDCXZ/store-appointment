@@ -1,7 +1,8 @@
+import { randomUUID } from "node:crypto";
 import { unlink } from "node:fs/promises";
 import { join } from "node:path";
 
-import { HttpException, HttpStatus, Inject, Injectable } from "@nestjs/common";
+import { HttpException, HttpStatus, Inject, Injectable, type OnModuleInit } from "@nestjs/common";
 import type {
   CustomerBooking,
   CustomerDataExport,
@@ -104,6 +105,11 @@ interface FutureBookingRow {
   ends_at: Date;
 }
 
+interface PhotoDeletionRow {
+  id: string;
+  storage_key: string;
+}
+
 export interface CustomerExportFile {
   filename: string;
   body: string;
@@ -199,11 +205,37 @@ function messageValue(row: MessageRow): CustomerMessage {
 }
 
 @Injectable()
-export class CustomerDataRightsService {
+export class CustomerDataRightsService implements OnModuleInit {
   constructor(
     @Inject(DatabaseService) private readonly database: DatabaseService,
     @Inject(AuditService) private readonly audits: AuditService,
   ) {}
+
+  async onModuleInit(): Promise<void> {
+    await this.drainPhotoDeletionOutbox();
+  }
+
+  private async drainPhotoDeletionOutbox(storageKeys?: string[]): Promise<void> {
+    const result = await this.database.pool.query<PhotoDeletionRow>(
+      `SELECT id, storage_key
+       FROM pet_photo_deletion_outbox
+       WHERE $1::text[] IS NULL OR storage_key = ANY($1::text[])
+       ORDER BY created_at, id`,
+      [storageKeys ?? null],
+    );
+    await Promise.all(
+      result.rows.map(async (photo) => {
+        try {
+          await unlink(join(getPetUploadDirectory(), photo.storage_key));
+        } catch (error) {
+          if ((error as NodeJS.ErrnoException).code !== "ENOENT") return;
+        }
+        await this.database.pool.query("DELETE FROM pet_photo_deletion_outbox WHERE id = $1", [
+          photo.id,
+        ]);
+      }),
+    );
+  }
 
   async status(customerId: string): Promise<CustomerDataRightsStatusResponse> {
     const [summaryResult, futureResult] = await Promise.all([
@@ -347,7 +379,35 @@ export class CustomerDataRightsService {
                WHEN event.actor_type = 'customer' THEN 'anonymized-customer'
                ELSE event.actor_id
              END,
-             payload = '{"anonymized":true}'::jsonb
+             payload = jsonb_set(
+               jsonb_set(
+                 jsonb_set(
+                   jsonb_set(
+                     CASE
+                       WHEN event.payload ? 'reason' THEN jsonb_set(
+                         event.payload,
+                         '{reason}',
+                         to_jsonb('[原原因已匿名化]'::text),
+                         false
+                       )
+                       ELSE event.payload
+                     END - 'customerPhone' - 'phone' - 'customer',
+                     '{customerName}',
+                     to_jsonb('已匿名顾客'::text),
+                     false
+                   ),
+                   '{petName}',
+                   to_jsonb('已匿名宠物'::text),
+                   false
+                 ),
+                 '{previous,pet,name}',
+                 to_jsonb('已匿名宠物'::text),
+                 false
+               ),
+               '{next,pet,name}',
+               to_jsonb('已匿名宠物'::text),
+               false
+             )
          FROM bookings AS booking
          WHERE event.booking_id = booking.id AND booking.customer_id = $1`,
         [customerId],
@@ -368,19 +428,65 @@ export class CustomerDataRightsService {
       await client.query(
         `UPDATE capacity_change_booking_resolutions AS resolution
          SET reason = '[原原因已匿名化]',
-             original_snapshot = '{"anonymized":true}'::jsonb,
-             result_summary = CASE
-               WHEN result_summary IS NULL THEN NULL
-               ELSE '{"anonymized":true}'::jsonb
-             END,
+             original_snapshot = jsonb_set(
+               jsonb_set(
+                 original_snapshot,
+                 '{customerName}',
+                 to_jsonb('已匿名顾客'::text),
+                 false
+               ),
+               '{petName}',
+               to_jsonb('已匿名宠物'::text),
+               false
+             ),
              response_body = CASE
                WHEN response_body IS NULL THEN NULL
-               ELSE '{"anonymized":true}'::jsonb
+               ELSE jsonb_set(
+                 response_body,
+                 '{resolvedBooking,reason}',
+                 to_jsonb('[原原因已匿名化]'::text),
+                 false
+               )
              END
          FROM bookings AS booking
          WHERE resolution.booking_id = booking.id AND booking.customer_id = $1`,
         [customerId],
       );
+      for (const tableName of ["staff_time_off_intervals", "store_closure_intervals"]) {
+        await client.query(
+          `UPDATE ${tableName} AS capacity_change
+           SET impact_snapshot = (
+             SELECT jsonb_agg(
+               CASE
+                 WHEN booking.id IS NULL THEN impact.value
+                 ELSE jsonb_set(
+                   jsonb_set(
+                     impact.value,
+                     '{customerName}',
+                     to_jsonb('已匿名顾客'::text),
+                     false
+                   ),
+                   '{petName}',
+                   to_jsonb('已匿名宠物'::text),
+                   false
+                 )
+               END
+               ORDER BY impact.ordinality
+             )
+             FROM jsonb_array_elements(capacity_change.impact_snapshot)
+               WITH ORDINALITY AS impact(value, ordinality)
+             LEFT JOIN bookings AS booking
+               ON booking.id = impact.value ->> 'id' AND booking.customer_id = $1
+           )
+           WHERE EXISTS (
+             SELECT 1
+             FROM jsonb_array_elements(capacity_change.impact_snapshot) AS impacted(value)
+             JOIN bookings AS booking ON booking.id = impacted.value ->> 'id'
+             WHERE booking.customer_id = $1
+           )`,
+          [customerId],
+        );
+      }
       await client.query("DELETE FROM booking_idempotency_keys WHERE customer_id = $1", [
         customerId,
       ]);
@@ -421,15 +527,14 @@ export class CustomerDataRightsService {
         "UPDATE bookings SET pet_name_snapshot = '已匿名宠物' WHERE customer_id = $1",
         [customerId],
       );
-      await Promise.all(
-        deletedPhotoStorageKeys.map((storageKey) =>
-          unlink(join(getPetUploadDirectory(), storageKey)).catch(
-            (error: NodeJS.ErrnoException) => {
-              if (error.code !== "ENOENT") throw error;
-            },
-          ),
-        ),
-      );
+      for (const storageKey of deletedPhotoStorageKeys) {
+        await client.query(
+          `INSERT INTO pet_photo_deletion_outbox (id, storage_key, created_at)
+           VALUES ($1, $2, $3::timestamptz)
+           ON CONFLICT (storage_key) DO NOTHING`,
+          [`photo-deletion-${randomUUID()}`, storageKey, anonymizedAt],
+        );
+      }
       await client.query("DELETE FROM pet_photos WHERE customer_id = $1", [customerId]);
       await client.query("DELETE FROM privacy_consents WHERE customer_id = $1", [customerId]);
       await client.query("DELETE FROM customer_sessions WHERE customer_id = $1", [customerId]);
@@ -457,6 +562,8 @@ export class CustomerDataRightsService {
         client,
       );
       await client.query("COMMIT");
+
+      await this.drainPhotoDeletionOutbox(deletedPhotoStorageKeys);
 
       return { anonymizedAt, retained: retainedFacts, sessionsRevoked: true };
     } catch (error) {
