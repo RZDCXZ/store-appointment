@@ -4,6 +4,7 @@ export * from "./capacity-change.js";
 export * from "./notification.js";
 export * from "./customer-records.js";
 export * from "./customer-data-rights.js";
+export * from "./business.js";
 
 export interface HealthResponse {
   service: "rongguang-api";

@@ -20,7 +20,7 @@
 | MG-12     | 服务目录管理      | Web 后台   | `/manager/services`                                  | `apps/admin/src/pages/manager/services-page.tsx`                   | 已完成 | 目录读取、角色边界、直接路由刷新与恢复状态测试            |
 | MG-13     | 员工账号与技能    | Web 后台   | `/manager/services/staff`                            | `apps/admin/src/pages/manager/staff-page.tsx`                      | 已完成 | 技能矩阵键盘操作、错误提示、角色边界与浏览器刷新测试      |
 | —         | 店长顾客入口      | Web 后台   | `/manager/customers`                                 | `apps/admin/src/pages/manager/customers-page.tsx`                  | 骨架   | Vite history fallback + 独立路由测试                      |
-| —         | 店长经营入口      | Web 后台   | `/manager/business`                                  | `apps/admin/src/pages/manager/business-page.tsx`                   | 骨架   | Vite history fallback + 独立路由测试                      |
+| MG-17     | 经营看板          | Web 后台   | `/manager/business?period=:period`                   | `apps/admin/src/pages/manager/business-page.tsx`                   | 已完成 | 7／30／90 天周期直达刷新、导出与角色边界 Playwright 测试  |
 | MG-15     | 通知任务列表      | Web 后台   | `/manager/system/notifications`                      | `apps/admin/src/pages/manager/notification-list-page.tsx`          | 已完成 | 独立路由、空态／失败态测试 + Playwright 直达刷新          |
 | MG-15     | 通知任务详情      | Web 后台   | `/manager/system/notifications/:notificationId`      | `apps/admin/src/pages/manager/notification-detail-page.tsx`        | 已完成 | 风险入口、尝试详情、人工重试 + Playwright 直达刷新        |
 | MP-01     | 顾客首页          | 微信小程序 | `pages/home/index`                                   | `apps/mini-program/miniprogram/pages/home/`                        | 已完成 | 项目契约测试 + 开发者工具实机加载                         |
