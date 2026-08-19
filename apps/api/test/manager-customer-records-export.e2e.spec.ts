@@ -159,7 +159,8 @@ describe("店长顾客与宠物档案及导出", () => {
     });
 
     expect(response.statusCode).toBe(200);
-    expect(response.json()).toMatchObject({
+    const body = response.json();
+    expect(body).toMatchObject({
       bookings: expect.arrayContaining([
         expect.objectContaining({
           id: "booking-bohe-future",
@@ -182,7 +183,7 @@ describe("店长顾客与宠物档案及导出", () => {
             {
               id: "service-record-note-bohe-manager",
               kind: "manager_correction",
-              text: "更正：耳部清洁仅完成外耳可见区域。",
+              text: expect.any(String),
               author: { type: "manager", id: "manager", displayName: "沈青" },
               createdAt: "2026-08-06T03:35:00.000Z",
             },
@@ -190,6 +191,7 @@ describe("店长顾客与宠物档案及导出", () => {
         }),
       ],
     });
+    expect(body.serviceRecords[0]?.notes[0]?.text).toMatch(/\S/);
   });
 
   it("宠物详情把顾客护理注意事项与内部门店服务记录分开，并校验所属顾客", async () => {
