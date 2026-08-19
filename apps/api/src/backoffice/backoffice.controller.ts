@@ -23,6 +23,10 @@ import {
   type BookingFulfilmentResponse,
   type BookingTerminationResponse,
   type ManagerBookingContentCorrectionResponse,
+  type ManagerCustomerListResponse,
+  type ManagerCustomerHistoryResponse,
+  type ManagerCustomerProfileResponse,
+  type ManagerPetDetailResponse,
   type ManagerBookingCorrectionOptionsResponse,
   type ManagerBookingCorrectionPreviewResponse,
   type ManagerBookingDetailResponse,
@@ -56,6 +60,7 @@ import { NotificationService } from "../notification/notification.service.js";
 import { BookingService } from "../booking/booking.service.js";
 import { BookingFulfilmentService } from "./booking-fulfilment.service.js";
 import { ManagerLiveBookingService } from "./manager-live-booking.service.js";
+import { ManagerCustomerRecordsService } from "./manager-customer-records.service.js";
 import { StaffFulfilmentService } from "./staff-fulfilment.service.js";
 
 function forbidden(): never {
@@ -73,6 +78,8 @@ export class BackofficeController {
     @Inject(SessionService) private readonly sessions: SessionService,
     @Inject(ManagerLiveBookingService)
     private readonly managerBookings: ManagerLiveBookingService,
+    @Inject(ManagerCustomerRecordsService)
+    private readonly managerCustomers: ManagerCustomerRecordsService,
     @Inject(StaffFulfilmentService)
     private readonly staffFulfilment: StaffFulfilmentService,
     @Inject(BookingFulfilmentService)
@@ -157,6 +164,87 @@ export class BackofficeController {
   ): Promise<ManagerBookingListResponse> {
     reply.header("Cache-Control", "no-store");
     return this.managerBookings.bookings({ date, status, staffId, primaryServiceId, query });
+  }
+
+  @Get("manager/customers")
+  @UseGuards(ManagerGuard)
+  @ApiOperation({ summary: "按姓名、脱敏手机号或宠物分页读取顾客档案" })
+  managerCustomerList(
+    @Query("q") query: string | undefined,
+    @Query("page") page: string | undefined,
+    @Res({ passthrough: true }) reply: FastifyReply,
+  ): Promise<ManagerCustomerListResponse> {
+    reply.header("Cache-Control", "no-store");
+    return this.managerCustomers.list({ query, page });
+  }
+
+  @Get("manager/customers/:customerId")
+  @UseGuards(ManagerGuard)
+  @ApiOperation({ summary: "读取顾客本人资料、隐私同意与宠物档案" })
+  managerCustomerProfile(
+    @Param("customerId") customerId: string,
+    @Res({ passthrough: true }) reply: FastifyReply,
+  ): Promise<ManagerCustomerProfileResponse> {
+    reply.header("Cache-Control", "no-store");
+    return this.managerCustomers.profile(customerId);
+  }
+
+  @Get("manager/customers/:customerId/history")
+  @UseGuards(ManagerGuard)
+  @ApiOperation({ summary: "读取顾客预约历史与门店服务记录" })
+  managerCustomerHistory(
+    @Param("customerId") customerId: string,
+    @Res({ passthrough: true }) reply: FastifyReply,
+  ): Promise<ManagerCustomerHistoryResponse> {
+    reply.header("Cache-Control", "no-store");
+    return this.managerCustomers.history(customerId);
+  }
+
+  @Get("manager/customers/:customerId/pets/:petId")
+  @UseGuards(ManagerGuard)
+  @ApiOperation({ summary: "读取宠物档案、预约历史与内部门店服务记录" })
+  managerPetDetail(
+    @Param("customerId") customerId: string,
+    @Param("petId") petId: string,
+    @Res({ passthrough: true }) reply: FastifyReply,
+  ): Promise<ManagerPetDetailResponse> {
+    reply.header("Cache-Control", "no-store");
+    return this.managerCustomers.petDetail(customerId, petId);
+  }
+
+  @Post("manager/exports/bookings.csv")
+  @HttpCode(HttpStatus.OK)
+  @UseGuards(ManagerGuard, RequestOriginGuard)
+  @ApiOperation({ summary: "按当前预约筛选导出领域字段 CSV 并记录审计" })
+  async exportManagerBookingsCsv(
+    @Body() body: unknown,
+    @Req() request: AuthenticatedRequest,
+    @Res() reply: FastifyReply,
+  ): Promise<void> {
+    const file = await this.managerCustomers.exportBookingsCsv(request.backofficeIdentity, body);
+    reply.header("Cache-Control", "no-store");
+    reply.header("Content-Type", file.contentType);
+    reply.header("Content-Disposition", `attachment; filename="${file.filename}"`);
+    reply.send(file.body);
+  }
+
+  @Post("manager/exports/customers-pets.json")
+  @HttpCode(HttpStatus.OK)
+  @UseGuards(ManagerGuard, RequestOriginGuard)
+  @ApiOperation({ summary: "按当前授权范围导出顾客与宠物层级 JSON 并记录审计" })
+  async exportManagerCustomersPetsJson(
+    @Body() body: unknown,
+    @Req() request: AuthenticatedRequest,
+    @Res() reply: FastifyReply,
+  ): Promise<void> {
+    const file = await this.managerCustomers.exportCustomersPetsJson(
+      request.backofficeIdentity,
+      body,
+    );
+    reply.header("Cache-Control", "no-store");
+    reply.header("Content-Type", file.contentType);
+    reply.header("Content-Disposition", `attachment; filename="${file.filename}"`);
+    reply.send(file.body);
   }
 
   @Post("manager/proxy-bookings")

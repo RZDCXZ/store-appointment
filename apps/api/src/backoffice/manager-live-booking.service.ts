@@ -347,7 +347,7 @@ const bookingStatuses = new Set<ManagerBookingStatus>([
   "terminated",
 ]);
 
-function bookingListFilters(input: {
+export function managerBookingListFilters(input: {
   date?: string;
   status?: string;
   staffId?: string;
@@ -407,7 +407,7 @@ export class ManagerLiveBookingService {
     primaryServiceId?: string;
     query?: string;
   }): Promise<ManagerBookingListResponse> {
-    const filters = bookingListFilters(input);
+    const filters = managerBookingListFilters(input);
     const result = await this.database.pool.query<BookingRow>(
       `
         SELECT ${bookingSelect}

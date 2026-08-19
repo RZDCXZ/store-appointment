@@ -39,3 +39,50 @@ export async function readApiError(response: Response): Promise<ApiError> {
     body,
   );
 }
+
+function responseFilename(response: Response, fallback: string): string {
+  const disposition = response.headers.get("Content-Disposition") ?? "";
+  const encoded = disposition.match(/filename\*=UTF-8''([^;]+)/i)?.[1];
+  const plain = disposition.match(/filename="?([^";]+)"?/i)?.[1];
+
+  if (encoded) {
+    try {
+      return decodeURIComponent(encoded);
+    } catch {
+      return fallback;
+    }
+  }
+
+  return plain ?? fallback;
+}
+
+export async function downloadApiFile(
+  path: string,
+  payload: Record<string, string>,
+  fallbackFilename: string,
+): Promise<string> {
+  const response = await apiFetch(path, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  });
+
+  if (!response.ok) throw await readApiError(response);
+
+  const filename = responseFilename(response, fallbackFilename);
+  const objectUrl = URL.createObjectURL(await response.blob());
+  const anchor = document.createElement("a");
+
+  try {
+    anchor.href = objectUrl;
+    anchor.download = filename;
+    anchor.hidden = true;
+    document.body.append(anchor);
+    anchor.click();
+  } finally {
+    anchor.remove();
+    URL.revokeObjectURL(objectUrl);
+  }
+
+  return filename;
+}

@@ -13,6 +13,8 @@ import { ManagerTerminateBookingPage } from "./pages/manager/terminate-booking-p
 import { ManagerBusinessPage } from "./pages/manager/business-page";
 import { ManagerCalendarPage } from "./pages/manager/calendar-page";
 import { ManagerCustomersPage } from "./pages/manager/customers-page";
+import { ManagerCustomerDetailPage } from "./pages/manager/customer-detail-page";
+import { ManagerPetDetailPage } from "./pages/manager/pet-detail-page";
 import { ScheduleIndexRedirect } from "./pages/manager/schedule-index-redirect";
 import { ManagerSchedulePage } from "./pages/manager/schedule-page";
 import { ManagerSchedulePlanningPage } from "./pages/manager/schedule-planning-page";
@@ -99,6 +101,11 @@ export const routes: RouteObject[] = [
           { path: "services", element: <ManagerServicesPage /> },
           { path: "services/staff", element: <ManagerStaffPage /> },
           { path: "customers", element: <ManagerCustomersPage /> },
+          { path: "customers/:customerId", element: <ManagerCustomerDetailPage /> },
+          {
+            path: "customers/:customerId/pets/:petId",
+            element: <ManagerPetDetailPage />,
+          },
           { path: "business", element: <ManagerBusinessPage /> },
           {
             path: "system",

@@ -755,6 +755,26 @@ async function seed(client: PoolClient): Promise<void> {
 
   await client.query(
     `
+      INSERT INTO store_service_record_notes (
+        id, service_record_id, kind, note_text, author_type,
+        author_id, author_display_name, created_at
+      )
+      VALUES (
+        'service-record-note-bohe-manager',
+        'service-record-bohe-completed',
+        'manager_correction',
+        '更正：耳部清洁仅完成外耳可见区域。',
+        'manager',
+        'manager',
+        '沈青',
+        '2026-08-06T03:35:00.000Z'
+      )
+      ON CONFLICT (id) DO NOTHING
+    `,
+  );
+
+  await client.query(
+    `
       INSERT INTO booking_events (
         id, booking_id, event_type, actor_type, actor_id, payload, occurred_at
       )

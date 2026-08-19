@@ -4624,6 +4624,548 @@ img.identity-avatar {
 
 /* MG-06 manager reschedule, cancellation and post-check-in termination */
 
+/* MG-14 customer and pet records */
+
+.manager-customer-page,
+.manager-customer-detail-page,
+.manager-pet-detail-page {
+  width: min(1320px, 100%);
+}
+
+.manager-sensitive-badge {
+  display: inline-flex;
+  min-height: 32px;
+  align-items: center;
+  padding: 0 11px;
+  border: 1px solid var(--sage-200);
+  border-radius: 999px;
+  color: var(--sage-700);
+  background: var(--sage-50);
+  font-size: 11px;
+  font-weight: 800;
+}
+
+.manager-export-button {
+  gap: 7px;
+  cursor: pointer;
+  font: inherit;
+}
+
+.manager-export-button:disabled {
+  cursor: wait;
+  opacity: 0.68;
+}
+
+.manager-customer-search {
+  display: grid;
+  align-items: end;
+  gap: 10px;
+  padding: 16px;
+  border: 1px solid var(--line-200);
+  border-radius: 13px;
+  background: var(--surface);
+  grid-template-columns: minmax(260px, 1fr) auto;
+}
+
+.manager-customer-search label {
+  display: grid;
+  gap: 7px;
+}
+
+.manager-customer-search label > span {
+  color: var(--ink-600);
+  font-size: 11px;
+  font-weight: 800;
+}
+
+.manager-customer-search i {
+  position: relative;
+  display: block;
+  font-style: normal;
+}
+
+.manager-customer-search svg {
+  position: absolute;
+  top: 12px;
+  left: 11px;
+  color: var(--ink-500);
+}
+
+.manager-customer-search input {
+  width: 100%;
+  min-height: 40px;
+  padding: 0 12px 0 34px;
+  border: 1px solid var(--line-200);
+  border-radius: 8px;
+  color: var(--ink-900);
+  background: var(--surface-strong);
+  font: inherit;
+  font-size: 12px;
+}
+
+.manager-customer-search > button {
+  min-height: 40px;
+  padding: 0 18px;
+  border: 1px solid var(--sage-700);
+  border-radius: 8px;
+  color: white;
+  background: var(--sage-700);
+  cursor: pointer;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.manager-export-status {
+  margin: 12px 0 0;
+  padding: 10px 13px;
+  border: 1px solid var(--sage-200);
+  border-radius: 9px;
+  color: var(--sage-700);
+  background: var(--sage-50);
+  font-size: 11px;
+}
+
+.manager-export-status--error {
+  border-color: #e8c0bb;
+  color: var(--danger-700);
+  background: var(--danger-bg);
+}
+
+.manager-customer-loading {
+  min-height: 240px;
+  margin-top: 14px;
+  padding: 24px;
+  border-radius: 13px;
+  color: var(--ink-600);
+  font-size: 12px;
+}
+
+.manager-customer-panel,
+.manager-customer-detail-section,
+.manager-pet-profile-card {
+  margin-top: 14px;
+  overflow: hidden;
+  border: 1px solid var(--line-200);
+  border-radius: 13px;
+  background: var(--surface);
+}
+
+.manager-customer-panel > header,
+.manager-customer-detail-section > header {
+  padding: 17px 19px;
+  border-bottom: 1px solid var(--line-200);
+}
+
+.manager-customer-panel h2,
+.manager-customer-panel p,
+.manager-customer-detail-section h2,
+.manager-customer-detail-section header p {
+  margin: 0;
+}
+
+.manager-customer-panel h2,
+.manager-customer-detail-section h2 {
+  font-size: 16px;
+}
+
+.manager-customer-panel p,
+.manager-customer-detail-section header p {
+  margin-top: 4px;
+  color: var(--ink-500);
+  font-size: 11px;
+  line-height: 1.5;
+}
+
+.manager-customer-head,
+.manager-customer-row {
+  display: grid;
+  align-items: center;
+  gap: 16px;
+  padding: 0 19px;
+  grid-template-columns: minmax(150px, 1fr) minmax(260px, 1.8fr) 90px 90px 80px;
+}
+
+.manager-customer-head {
+  min-height: 38px;
+  color: var(--ink-500);
+  background: var(--sage-50);
+  font-size: 10px;
+  font-weight: 800;
+}
+
+.manager-customer-row {
+  min-height: 88px;
+  border-top: 1px solid var(--line-100);
+  font-size: 12px;
+}
+
+.manager-customer-row > strong {
+  font-size: 17px;
+}
+
+.manager-customer-identity,
+.manager-customer-pets > a > span {
+  display: grid;
+  gap: 4px;
+}
+
+.manager-customer-identity small,
+.manager-customer-pets small {
+  color: var(--ink-500);
+  font-size: 10px;
+}
+
+.manager-customer-pets {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px;
+}
+
+.manager-customer-pets > a {
+  display: flex;
+  min-height: 50px;
+  align-items: center;
+  gap: 9px;
+  padding: 6px 9px;
+  border-radius: 9px;
+  color: var(--ink-900);
+  background: var(--sage-50);
+  text-decoration: none;
+}
+
+.manager-customer-pets img,
+.manager-customer-pets i {
+  display: grid;
+  width: 36px;
+  height: 36px;
+  flex: 0 0 36px;
+  place-items: center;
+  border-radius: 50%;
+  color: var(--sage-700);
+  background: var(--sage-100);
+  font-style: normal;
+  object-fit: cover;
+}
+
+.manager-customer-row-action {
+  color: var(--sage-700);
+  font-weight: 800;
+  text-decoration: none;
+}
+
+.manager-customer-pagination {
+  display: flex;
+  min-height: 56px;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 14px;
+  padding: 0 19px;
+  border-top: 1px solid var(--line-200);
+  color: var(--ink-500);
+  font-size: 11px;
+}
+
+.manager-customer-pagination a,
+.manager-customer-pagination span {
+  display: inline-grid;
+  min-height: 34px;
+  min-width: 62px;
+  place-items: center;
+  border: 1px solid var(--line-200);
+  border-radius: 8px;
+  color: var(--sage-700);
+  background: var(--surface-strong);
+  text-decoration: none;
+}
+
+.manager-customer-pagination span {
+  color: var(--ink-400);
+}
+
+.manager-customer-detail-header {
+  display: grid;
+  gap: 14px;
+  padding-bottom: 22px;
+  border-bottom: 1px solid var(--line-200);
+}
+
+.manager-customer-detail-header > a {
+  color: var(--sage-700);
+  font-size: 12px;
+  font-weight: 800;
+  text-decoration: none;
+}
+
+.manager-customer-detail-header p,
+.manager-customer-detail-header h1,
+.manager-customer-detail-header span {
+  margin: 0;
+}
+
+.manager-customer-detail-header p {
+  color: var(--sage-700);
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+}
+
+.manager-customer-detail-header h1 {
+  margin-top: 7px;
+  font-size: clamp(30px, 4vw, 42px);
+}
+
+.manager-customer-detail-header span {
+  display: block;
+  margin-top: 7px;
+  color: var(--ink-600);
+  font-size: 12px;
+}
+
+.manager-customer-summary-grid {
+  display: grid;
+  gap: 12px;
+  margin-top: 14px;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.manager-customer-summary-grid article {
+  padding: 19px;
+  border: 1px solid var(--line-200);
+  border-radius: 13px;
+  background: var(--surface);
+}
+
+.manager-customer-summary-grid small,
+.manager-customer-summary-grid strong {
+  display: block;
+}
+
+.manager-customer-summary-grid small {
+  color: var(--ink-500);
+  font-size: 10px;
+}
+
+.manager-customer-summary-grid strong {
+  margin-top: 7px;
+  font-size: 16px;
+}
+
+.manager-customer-summary-grid p,
+.manager-customer-summary-grid ul {
+  margin: 8px 0 0;
+  padding: 0;
+  color: var(--ink-500);
+  font-size: 10px;
+  line-height: 1.6;
+  list-style: none;
+}
+
+.manager-pet-card-grid {
+  display: grid;
+  gap: 10px;
+  padding: 17px 19px 19px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.manager-pet-card {
+  display: grid;
+  align-items: center;
+  gap: 12px;
+  padding: 13px;
+  border: 1px solid var(--line-100);
+  border-radius: 11px;
+  color: var(--ink-900);
+  background: var(--sage-50);
+  grid-template-columns: 54px minmax(0, 1fr) auto;
+  text-decoration: none;
+}
+
+.manager-pet-card img,
+.manager-pet-card > i,
+.manager-pet-profile-card > img,
+.manager-pet-profile-card > i {
+  display: grid;
+  width: 54px;
+  height: 54px;
+  place-items: center;
+  border-radius: 50%;
+  color: var(--sage-700);
+  background: var(--sage-100);
+  font-style: normal;
+  object-fit: cover;
+}
+
+.manager-pet-card > span {
+  display: grid;
+  gap: 5px;
+}
+
+.manager-pet-card small,
+.manager-pet-card em {
+  color: var(--ink-500);
+  font-size: 10px;
+  font-style: normal;
+}
+
+.manager-pet-card em {
+  color: var(--sage-700);
+  font-weight: 800;
+}
+
+.manager-customer-history-section > p {
+  margin: 0;
+  padding: 18px;
+  color: var(--ink-500);
+  font-size: 11px;
+}
+
+.manager-customer-history-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.manager-customer-history-grid > article {
+  min-width: 0;
+  padding: 18px;
+}
+
+.manager-customer-history-grid > article + article {
+  border-left: 1px solid var(--line-200);
+}
+
+.manager-customer-history-grid h3 {
+  margin: 0;
+  font-size: 13px;
+}
+
+.manager-customer-history-grid ol,
+.manager-pet-timeline,
+.manager-record-corrections {
+  display: grid;
+  gap: 8px;
+  margin: 12px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.manager-customer-history-grid li,
+.manager-pet-timeline > li {
+  display: grid;
+  gap: 8px;
+  padding: 11px;
+  border-radius: 9px;
+  background: var(--sage-50);
+  font-size: 11px;
+}
+
+.manager-customer-history-grid li > span,
+.manager-pet-timeline li > span,
+.manager-record-heading span {
+  display: grid;
+  gap: 4px;
+}
+
+.manager-customer-history-grid small,
+.manager-customer-history-grid time,
+.manager-pet-timeline small,
+.manager-pet-timeline time {
+  color: var(--ink-500);
+  font-size: 10px;
+}
+
+.manager-correction-note {
+  display: grid;
+  gap: 3px;
+  margin: 0;
+  padding: 8px;
+  border-left: 3px solid var(--sage-400);
+  background: var(--surface-strong);
+}
+
+.manager-pet-profile-card {
+  display: flex;
+  align-items: center;
+  gap: 15px;
+  padding: 18px;
+}
+
+.manager-pet-profile-card > img,
+.manager-pet-profile-card > i {
+  width: 68px;
+  height: 68px;
+}
+
+.manager-pet-profile-card div {
+  display: grid;
+  gap: 5px;
+}
+
+.manager-pet-profile-card small,
+.manager-pet-profile-card p {
+  margin: 0;
+  color: var(--ink-500);
+  font-size: 10px;
+}
+
+.manager-pet-profile-card strong {
+  font-size: 16px;
+}
+
+.manager-care-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px;
+}
+
+.manager-pet-care-section > .manager-care-tags,
+.manager-care-notes,
+.manager-pet-timeline {
+  margin: 16px 19px;
+}
+
+.manager-care-tags span {
+  padding: 5px 9px;
+  border-radius: 999px;
+  color: var(--sage-700);
+  background: var(--sage-100);
+  font-size: 10px;
+  font-weight: 800;
+}
+
+.manager-care-notes {
+  padding: 13px;
+  border-radius: 9px;
+  color: var(--ink-600);
+  background: var(--sage-50);
+  font-size: 11px;
+  line-height: 1.6;
+}
+
+.manager-internal-record-section .manager-pet-timeline > li {
+  padding: 14px;
+}
+
+.manager-internal-record-section .manager-pet-timeline > li > p {
+  margin: 0;
+  color: var(--ink-600);
+  line-height: 1.6;
+}
+
+.manager-record-corrections > li {
+  display: grid;
+  gap: 4px;
+  padding: 10px;
+  border-left: 3px solid var(--sage-400);
+  border-radius: 6px;
+  background: var(--surface-strong);
+}
+
+.manager-record-corrections small {
+  color: var(--ink-500);
+  font-size: 10px;
+}
+
 .manager-change-page {
   width: min(920px, 100%);
 }
@@ -5392,9 +5934,18 @@ img.identity-avatar {
     overflow-x: auto;
   }
 
+  .manager-customer-table {
+    overflow-x: auto;
+  }
+
   .manager-booking-list-head,
   .manager-booking-list-row {
     min-width: 880px;
+  }
+
+  .manager-customer-head,
+  .manager-customer-row {
+    min-width: 850px;
   }
 
   .manager-proxy-grid--profile {
@@ -5406,7 +5957,18 @@ img.identity-avatar {
   .manager-detail-grid,
   .manager-detail-facts,
   .manager-proxy-grid,
-  .manager-proxy-grid--profile {
+  .manager-proxy-grid--profile,
+  .manager-customer-summary-grid,
+  .manager-customer-history-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .manager-customer-history-grid > article + article {
+    border-top: 1px solid var(--line-200);
+    border-left: 0;
+  }
+
+  .manager-pet-card-grid {
     grid-template-columns: 1fr;
   }
 
@@ -5421,6 +5983,10 @@ img.identity-avatar {
 
 @media (max-width: 620px) {
   .manager-booking-filters {
+    grid-template-columns: 1fr;
+  }
+
+  .manager-customer-search {
     grid-template-columns: 1fr;
   }
 

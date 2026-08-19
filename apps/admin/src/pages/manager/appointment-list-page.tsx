@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
-import { MagnifyingGlassIcon, ReloadIcon } from "@radix-ui/react-icons";
+import { DownloadIcon, MagnifyingGlassIcon, ReloadIcon } from "@radix-ui/react-icons";
 import type { ManagerBookingListResponse, ManagerBookingStatus } from "@rongguang/contracts";
 
 import {
@@ -8,6 +8,8 @@ import {
   managerBookingStatusLabels,
 } from "../../manager-booking-presentation";
 import { useManagerResource } from "../../manager-live-resource";
+import { ApiError, downloadApiFile } from "../../api";
+import { useAuth } from "../../auth-context";
 
 const statusOptions = Object.entries(managerBookingStatusLabels) as Array<
   [ManagerBookingStatus, string]
@@ -32,6 +34,7 @@ function formatPrice(cents: number): string {
 }
 
 export function ManagerAppointmentListPage(): React.JSX.Element {
+  const { markExpired } = useAuth();
   const [searchParams, setSearchParams] = useSearchParams();
   const [draft, setDraft] = useState(() => ({
     date: searchParams.get("date") ?? "",
@@ -44,6 +47,11 @@ export function ManagerAppointmentListPage(): React.JSX.Element {
     listResourcePath(searchParams),
     false,
   );
+  const [exportState, setExportState] = useState<{
+    loading: boolean;
+    message: string | null;
+    error: string | null;
+  }>({ loading: false, message: null, error: null });
   const hasFilters = [...searchParams.values()].some(Boolean);
 
   function applyFilters(event: React.FormEvent<HTMLFormElement>): void {
@@ -62,6 +70,40 @@ export function ManagerAppointmentListPage(): React.JSX.Element {
     setSearchParams(new URLSearchParams());
   }
 
+  async function exportCsv(): Promise<void> {
+    const payload: Record<string, string> = {};
+    for (const [urlKey, bodyKey] of [
+      ["date", "date"],
+      ["status", "status"],
+      ["staffId", "staffId"],
+      ["primaryServiceId", "primaryServiceId"],
+      ["q", "query"],
+    ] as const) {
+      const value = searchParams.get(urlKey)?.trim();
+      if (value) payload[bodyKey] = value;
+    }
+
+    setExportState({ loading: true, message: null, error: null });
+    try {
+      const filename = await downloadApiFile(
+        "/backoffice/manager/exports/bookings.csv",
+        payload,
+        "rongguang-bookings.csv",
+      );
+      setExportState({ loading: false, message: `已下载 ${filename}`, error: null });
+    } catch (error) {
+      if (error instanceof ApiError && error.status === 401) {
+        markExpired();
+        return;
+      }
+      setExportState({
+        loading: false,
+        message: null,
+        error: error instanceof Error ? error.message : "预约导出失败，请稍后重试。",
+      });
+    }
+  }
+
   return (
     <main className="page-shell manager-booking-list-page">
       <header className="manager-page-header">
@@ -71,6 +113,15 @@ export function ManagerAppointmentListPage(): React.JSX.Element {
           <span>筛选当前与历史预约，详情由独立路由恢复</span>
         </div>
         <div className="manager-page-actions">
+          <button
+            className="manager-secondary-link manager-export-button"
+            type="button"
+            disabled={exportState.loading}
+            onClick={() => void exportCsv()}
+          >
+            <DownloadIcon aria-hidden="true" />
+            {exportState.loading ? "正在导出…" : "导出当前筛选 CSV"}
+          </button>
           <Link className="manager-secondary-link" to="/manager/appointments/calendar">
             按员工日历
           </Link>
@@ -162,6 +213,17 @@ export function ManagerAppointmentListPage(): React.JSX.Element {
           </button>
         </div>
       </form>
+
+      {exportState.error ? (
+        <p className="manager-export-status manager-export-status--error" role="alert">
+          {exportState.error}
+        </p>
+      ) : null}
+      {exportState.message ? (
+        <p className="manager-export-status" role="status">
+          {exportState.message}
+        </p>
+      ) : null}
 
       {resource.loading && !resource.data ? (
         <section className="manager-booking-list-loading manager-shimmer" role="status">

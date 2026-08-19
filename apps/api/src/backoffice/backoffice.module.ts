@@ -12,6 +12,7 @@ import { ServiceCatalogModule } from "../service-catalog/service-catalog.module.
 import { BackofficeController } from "./backoffice.controller.js";
 import { BookingFulfilmentService } from "./booking-fulfilment.service.js";
 import { ManagerLiveBookingService } from "./manager-live-booking.service.js";
+import { ManagerCustomerRecordsService } from "./manager-customer-records.service.js";
 import { StaffFulfilmentService } from "./staff-fulfilment.service.js";
 
 @Module({
@@ -29,6 +30,7 @@ import { StaffFulfilmentService } from "./staff-fulfilment.service.js";
   providers: [
     ManagerGuard,
     ManagerLiveBookingService,
+    ManagerCustomerRecordsService,
     StaffFulfilmentService,
     BookingFulfilmentService,
   ],
