@@ -380,7 +380,11 @@ export function ManagerCapacityChangeResolutionPage(): React.JSX.Element {
   const [revoking, setRevoking] = useState(false);
   const detail = resource.data;
 
-  async function handleFailure(response: Response, fallback: string): Promise<never> {
+  async function handleFailure(
+    response: Response,
+    fallback: string,
+    onRetryableFactConflict?: () => void,
+  ): Promise<never> {
     const error = await readApiError(response);
     if (error.status === 401) {
       markExpired();
@@ -392,6 +396,9 @@ export function ManagerCapacityChangeResolutionPage(): React.JSX.Element {
       error.code === "CAPACITY_CHANGE_NOT_PENDING" ||
       error.code === "BOOKING_TIME_CONFLICT"
     ) {
+      if (error.code === "BOOKING_FACT_CHANGED") {
+        onRetryableFactConflict?.();
+      }
       resource.refresh();
     }
     throw new Error(error.message || fallback);
@@ -421,7 +428,11 @@ export function ManagerCapacityChangeResolutionPage(): React.JSX.Element {
           }),
         },
       );
-      if (!response.ok) await handleFailure(response, "本笔处理失败，请重试。");
+      if (!response.ok) {
+        await handleFailure(response, "本笔处理失败，请重试。", () =>
+          discardCommandKeys(changeId, booking.id),
+        );
+      }
       const result = (await response.json()) as ResolveCapacityChangeBookingResponse;
       discardCommandKeys(changeId, booking.id);
       setNotice(

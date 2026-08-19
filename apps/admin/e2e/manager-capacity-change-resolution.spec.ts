@@ -40,7 +40,7 @@ async function createBooking(
   accessToken: string,
   idempotencyKey: string,
   startsAt: string,
-): Promise<void> {
+): Promise<string> {
   const response = await request.post(`${apiBaseUrl}/miniapp/bookings`, {
     headers: { authorization: `Bearer ${accessToken}` },
     data: {
@@ -53,6 +53,7 @@ async function createBooking(
     },
   });
   expect(response.status(), await response.text()).toBe(201);
+  return ((await response.json()) as { booking: { id: string } }).booking.id;
 }
 
 test("店长从工作台进入独立路由，刷新恢复进度并逐笔完成停班影响", async ({ page }) => {
@@ -121,4 +122,85 @@ test("店长从工作台进入独立路由，刷新恢复进度并逐笔完成�
 
   await page.goto("/manager/workbench");
   await expect(page.locator(`a[href="${route}"]`)).toHaveCount(0);
+});
+
+test("预约事实再次变化后刷新确认页，并用新命令键重试", async ({ page }) => {
+  await loginAsManager(page);
+  const accessToken = await customerToken(page.request);
+  const bookingId = await createBooking(
+    page.request,
+    accessToken,
+    "playwright-capacity-stale-acknowledgement",
+    "2026-08-25T02:00:00.000Z",
+  );
+  const created = await page.request.post(`${apiBaseUrl}/backoffice/manager/capacity-changes`, {
+    headers: { origin: "http://127.0.0.1:5174" },
+    data: {
+      kind: "time_off",
+      staffId: "linxia",
+      localDate: "2026-08-25",
+      startsAt: "10:00",
+      endsAt: "11:15",
+      reason: "参加护理培训复训",
+    },
+  });
+  expect(created.status()).toBe(201);
+  const changeId = ((await created.json()) as { change: { id: string } }).change.id;
+  const managerOrigin = { origin: "http://127.0.0.1:5174" };
+
+  async function moveBooking(idempotencyKey: string, reason: string): Promise<void> {
+    const options = await page.request.get(
+      `${apiBaseUrl}/backoffice/manager/bookings/${bookingId}/reschedule-options`,
+    );
+    expect(options.status()).toBe(200);
+    const facts = (await options.json()) as {
+      bookingRevision: number;
+      booking: { staff: { id: string }; startsAt: string };
+      availability: {
+        days: Array<{ slots: Array<{ staff: { id: string }; startsAt: string }> }>;
+      } | null;
+    };
+    const target = facts.availability?.days.flatMap((day) => day.slots)[0];
+    expect(target).toBeDefined();
+    const moved = await page.request.post(
+      `${apiBaseUrl}/backoffice/manager/bookings/${bookingId}/reschedule`,
+      {
+        headers: managerOrigin,
+        data: {
+          idempotencyKey,
+          reason,
+          expectedStaffId: facts.booking.staff.id,
+          expectedStartsAt: facts.booking.startsAt,
+          expectedBookingRevision: facts.bookingRevision,
+          staffId: target?.staff.id,
+          startsAt: target?.startsAt,
+        },
+      },
+    );
+    expect(moved.status(), await moved.text()).toBe(201);
+  }
+
+  const route = `/manager/schedule/capacity-changes/time_off/${changeId}`;
+  await page.goto(route);
+  await expect(page.getByRole("heading", { name: "0 / 1 已处理" })).toBeVisible();
+  await moveBooking("playwright-capacity-first-external-move", "首次从预约详情移出停班区间");
+  await page.reload();
+
+  const card = page.locator(".impact-booking-card");
+  await expect(card.getByText("这笔预约已在其他入口解除本次容量影响")).toBeVisible();
+  await card.getByLabel("团子确认现有结果原因").fill("已核对第一次外部改期结果");
+  await moveBooking("playwright-capacity-second-external-move", "处理页打开后预约再次变化");
+
+  const refreshed = page.waitForResponse(
+    (response) =>
+      response.request().method() === "GET" &&
+      response.url() === `${apiBaseUrl}/backoffice/manager/capacity-changes/time_off/${changeId}`,
+  );
+  await card.getByRole("button", { name: "确认现有结果" }).click();
+  await expect(page.getByRole("alert")).toContainText("预约事实已再次变化");
+  await refreshed;
+
+  await card.getByRole("button", { name: "确认现有结果" }).click();
+  await expect(page.getByRole("heading", { name: "1 / 1 已处理" })).toBeVisible();
+  await expect(card.getByText("确认现有结果已成立")).toBeVisible();
 });
