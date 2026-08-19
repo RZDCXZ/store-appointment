@@ -439,9 +439,9 @@ async function seedCompletePortfolio(
   });
   await insertSeedBooking(client, {
     id: "booking-seed-checked-in",
-    customerId: generatedCustomers[1]!.id,
-    petId: generatedPets[1]!.id,
-    petName: generatedPets[1]!.name,
+    customerId: generatedPets[19]!.customerId,
+    petId: generatedPets[19]!.id,
+    petName: generatedPets[19]!.name,
     staffId: "zhouning",
     startsAt: instantOn(scheduleStartsOn, "09:30"),
     status: "checked_in",
@@ -1024,14 +1024,14 @@ export async function seedDemoData(client: PoolClient): Promise<void> {
       VALUES
         (
           'booking-maiya-completed', 'customer-gu-yan', 'pet-maiya', 'zhaohang',
-          '2026-08-02T02:00:00.000Z', '2026-08-02T03:00:00.000Z',
-          '2026-08-02T02:00:00.000Z', '2026-08-02T03:07:00.000Z', 60, 'completed',
+          '2026-08-01T04:00:00.000Z', '2026-08-01T05:00:00.000Z',
+          '2026-08-01T04:00:00.000Z', '2026-08-01T05:07:00.000Z', 60, 'completed',
           '麦芽', 'dog', 7.2, 'small', 'dog-basic-care', '犬基础洗护', 12800, 60,
           '[]'::jsonb, '["dog-basic-care"]'::jsonb, 12800, '赵航', 15,
-          '2026-08-02T02:00:00.000Z', '2026-08-02T03:00:00.000Z',
-          '2026-08-02T02:00:00.000Z', '2026-08-02T03:15:00.000Z',
+          '2026-08-01T04:00:00.000Z', '2026-08-01T05:00:00.000Z',
+          '2026-08-01T04:00:00.000Z', '2026-08-01T05:15:00.000Z',
           $1, 'booking-maiya-completed',
-          '2026-08-02T02:52:00.000Z'
+          '2026-08-01T04:52:00.000Z'
         ),
         (
           'booking-bohe-completed', 'customer-cheng-mo', 'pet-bohe', 'zhouning',
@@ -1104,10 +1104,10 @@ export async function seedDemoData(client: PoolClient): Promise<void> {
           '{"id":"dog-basic-care","name":"犬基础洗护","priceCents":12800,"durationMinutes":60}'::jsonb,
           '[]'::jsonb,
           '{"id":"zhaohang","displayName":"赵航"}'::jsonb,
-          '2026-08-02T02:03:00.000Z', '2026-08-02T02:52:00.000Z',
+          '2026-08-01T04:03:00.000Z', '2026-08-01T04:52:00.000Z',
           '["换毛期"]'::jsonb,
           '换毛期，背部除废毛时间较长；吹风时情绪稳定。',
-          '2026-08-02T02:52:00.000Z'
+          '2026-08-01T04:52:00.000Z'
         ),
         (
           'service-record-bohe-completed', 'booking-bohe-completed',

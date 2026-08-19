@@ -256,13 +256,17 @@ describe("演示时间、完整种子与确定性重置", () => {
     const invalidSeedBookings = await database.pool.query<{ id: string }>(
       `SELECT booking.id
        FROM bookings booking
+       JOIN pets pet ON pet.id = booking.pet_id
+       JOIN service_catalog_items primary_service
+         ON primary_service.id = booking.primary_service_id_snapshot
        JOIN store_business_hours business_hours
          ON business_hours.weekday = extract(
            dow FROM booking.starts_at AT TIME ZONE 'Asia/Shanghai'
          )::integer
-       WHERE booking.id LIKE 'booking-seed-%'
-         AND (
-           business_hours.opens_at IS NULL
+       WHERE (
+           booking.pet_species_snapshot <> pet.species
+           OR NOT booking.pet_species_snapshot = ANY(primary_service.applicable_species)
+           OR business_hours.opens_at IS NULL
            OR (booking.starts_at AT TIME ZONE 'Asia/Shanghai')::time < business_hours.opens_at
            OR (COALESCE(booking.occupancy_ends_at, booking.original_occupancy_ends_at) AT TIME ZONE 'Asia/Shanghai')::time > business_hours.closes_at
            OR EXISTS (

@@ -237,11 +237,11 @@ describe("店长经营看板 API", () => {
       points: expect.arrayContaining([
         expect.objectContaining({
           localDate: "2026-08-02",
-          completedBookingCount: 3,
-          completedServiceMinutes: 180,
+          completedBookingCount: 2,
+          completedServiceMinutes: 120,
           availableStaffMinutes: 900,
-          utilizationRate: 180 / 900,
-          completedListPriceCents: 38_400,
+          utilizationRate: 120 / 900,
+          completedListPriceCents: 25_600,
         }),
         expect.objectContaining({
           localDate: "2026-08-13",
