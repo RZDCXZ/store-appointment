@@ -357,7 +357,7 @@ describe("员工账号与员工技能管理", () => {
     expect(blocked.json()).toMatchObject({
       code: "STAFF_HAS_FUTURE_BOOKINGS",
       message: expect.stringMatching(/未来预约/),
-      affectedBookings: [
+      affectedBookings: expect.arrayContaining([
         {
           id: "booking-bohe-future",
           petName: "薄荷",
@@ -366,7 +366,7 @@ describe("员工账号与员工技能管理", () => {
           startsAt: "2026-08-14T03:00:00.000Z",
           resolutionPath: "/manager/appointments/booking-bohe-future",
         },
-      ],
+      ]),
     });
 
     const current = await app.inject({

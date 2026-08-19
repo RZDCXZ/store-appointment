@@ -29,7 +29,7 @@ test("MG-17 可从独立路由恢复经营周期、刷新精确指标并导出 C
     "aria-pressed",
     "true",
   );
-  await expect(page.getByText("¥13,864.00", { exact: true })).toBeVisible();
+  await expect(page.getByText("¥14,760.00", { exact: true })).toBeVisible();
   await expect(page.getByText("非实收金额", { exact: true })).toBeVisible();
   await expect(page.getByText("分子不含周转、取消、爽约或服务终止")).toBeVisible();
   await expect(page.getByRole("heading", { name: "已完成服务标价", exact: true })).toBeVisible();
@@ -40,7 +40,7 @@ test("MG-17 可从独立路由恢复经营周期、刷新精确指标并导出 C
     "aria-pressed",
     "true",
   );
-  await expect(page.getByText("¥13,864.00", { exact: true })).toBeVisible();
+  await expect(page.getByText("¥14,760.00", { exact: true })).toBeVisible();
 
   await page.getByRole("button", { name: "近 7 天" }).click();
   await expect(page).toHaveURL(/\/manager\/business\?period=7$/);

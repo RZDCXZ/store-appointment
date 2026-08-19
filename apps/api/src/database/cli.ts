@@ -90,8 +90,6 @@ async function seedServiceCatalog(client: PoolClient): Promise<void> {
          '在完整洗护基础上完成犬只造型修剪。', ARRAY['dog'], ARRAY['dog-styling'], 20, true, now()),
         ('cat-care', 'primary_service', '猫咪洗护',
          '为猫咪提供低刺激洗护、梳理与基础清洁。', ARRAY['cat'], ARRAY['cat-care'], 30, true, now()),
-        ('portfolio-claimable-care', 'primary_service', '作品集限定护理',
-         '用于演示唯一可争抢时段的固定服务。', ARRAY['dog'], ARRAY['cat-care', 'oral-care'], 40, true, now()),
         ('nail-care', 'addon', '修甲护理',
          '修整趾甲并检查足部状态。', ARRAY['dog', 'cat'], ARRAY['nail-care'], 10, true, now()),
         ('deshedding-care', 'addon', '除废毛护理',
@@ -124,9 +122,6 @@ async function seedServiceCatalog(client: PoolClient): Promise<void> {
         ('spec-cat-care-small', 'cat-care', 'small', 16800, 90, true, now()),
         ('spec-cat-care-medium', 'cat-care', 'medium', 21800, 120, true, now()),
         ('spec-cat-care-large', 'cat-care', 'large', 28800, 150, true, now()),
-        ('spec-portfolio-claimable-care-small', 'portfolio-claimable-care', 'small', 22800, 120, true, now()),
-        ('spec-portfolio-claimable-care-medium', 'portfolio-claimable-care', 'medium', 32800, 150, true, now()),
-        ('spec-portfolio-claimable-care-large', 'portfolio-claimable-care', 'large', 45800, 180, true, now()),
         ('spec-nail-care-small', 'nail-care', 'small', 3000, 15, true, now()),
         ('spec-nail-care-medium', 'nail-care', 'medium', 3000, 15, true, now()),
         ('spec-nail-care-large', 'nail-care', 'large', 3000, 15, true, now()),
@@ -196,13 +191,59 @@ export async function migrate(client: PoolClient): Promise<void> {
 type SeedBookingStatus =
   "confirmed" | "checked_in" | "completed" | "terminated" | "cancelled" | "no_show";
 
+const seedStaff = [
+  {
+    id: "linxia",
+    displayName: "林夏",
+    employeeNumber: 1,
+    skills: ["dog-basic-care", "dog-styling", "nail-care", "deshedding-care", "oral-care"],
+    weekdays: [2, 3, 4, 5, 6],
+    shift: ["09:30", "18:00"],
+    shiftBreak: ["13:00", "14:00"],
+  },
+  {
+    id: "chenjia",
+    displayName: "陈嘉",
+    employeeNumber: 2,
+    skills: ["dog-basic-care", "cat-care", "nail-care", "deshedding-care"],
+    weekdays: [0, 3, 4, 5, 6],
+    shift: ["10:30", "19:00"],
+    shiftBreak: ["14:00", "15:00"],
+  },
+  {
+    id: "zhouning",
+    displayName: "周宁",
+    employeeNumber: 3,
+    skills: ["cat-care", "nail-care", "oral-care"],
+    weekdays: [0, 2, 4, 5, 6],
+    shift: ["09:30", "18:00"],
+    shiftBreak: ["12:30", "13:30"],
+  },
+  {
+    id: "zhaohang",
+    displayName: "赵航",
+    employeeNumber: 4,
+    skills: ["dog-basic-care", "dog-styling", "nail-care", "oral-care"],
+    weekdays: [2, 3, 4, 5, 6],
+    shift: ["10:30", "19:00"],
+    shiftBreak: ["14:30", "15:30"],
+  },
+] as const;
+
+type SeedStaffId = (typeof seedStaff)[number]["id"];
+
+function getSeedStaff(staffId: SeedStaffId): (typeof seedStaff)[number] {
+  const member = seedStaff.find((candidate) => candidate.id === staffId);
+  if (!member) throw new Error(`未登记的固定员工：${staffId}`);
+  return member;
+}
+
 interface SeedBooking {
   id: string;
   customerId: string;
   petId: string;
   petName: string;
-  staffId: "linxia" | "chenjia" | "zhouning" | "zhaohang";
-  staffName: "林夏" | "陈嘉" | "周宁" | "赵航";
+  staffId: SeedStaffId;
   startsAt: string;
   status: SeedBookingStatus;
   species?: "dog" | "cat";
@@ -237,6 +278,7 @@ async function insertSeedBooking(client: PoolClient, booking: SeedBooking): Prom
   const priceCents = booking.species === "cat" ? 16800 : 12800;
   const createdAt = addMinutes(booking.startsAt, -3 * 24 * 60);
   const completedAt = booking.status === "completed" ? addMinutes(endsAt, -8) : null;
+  const staffName = getSeedStaff(booking.staffId).displayName;
 
   try {
     await client.query(
@@ -280,7 +322,7 @@ async function insertSeedBooking(client: PoolClient, booking: SeedBooking): Prom
         serviceName,
         priceCents,
         JSON.stringify([serviceId]),
-        booking.staffName,
+        staffName,
         originalOccupancyEndsAt,
         seedVerificationCodeDigest(booking.customerId, booking.id, booking.id),
         createdAt,
@@ -321,6 +363,7 @@ async function seedCompletePortfolio(
       id: `pet-seed-${number}`,
       customerId: customer.id,
       name: `茸茸${number}`,
+      species: index >= 19 ? ("cat" as const) : ("dog" as const),
     };
   });
   for (const pet of generatedPets) {
@@ -329,16 +372,41 @@ async function seedCompletePortfolio(
          id, customer_id, name, species, weight_kg, breed, sex,
          birth_date, coat_type, seed_photo_path, care_notes
        )
-       VALUES ($1, $2, $3, 'dog', 8.2, '混种犬', 'female',
-               '2022-06-18', 'double', $4, '使用固定演示护理流程。')`,
-      [pet.id, pet.customerId, pet.name, "/assets/brand/pet-tuanzi-shiba.jpg"],
+       VALUES ($1, $2, $3, $4, $5, $6, 'female',
+               '2022-06-18', $7, $8, '使用固定演示护理流程。')`,
+      [
+        pet.id,
+        pet.customerId,
+        pet.name,
+        pet.species,
+        pet.species === "cat" ? 4.8 : 8.2,
+        pet.species === "cat" ? "中华田园猫" : "混种犬",
+        pet.species === "cat" ? "short" : "double",
+        pet.species === "cat"
+          ? "/assets/brand/pet-bohe-british-shorthair.jpg"
+          : "/assets/brand/pet-tuanzi-shiba.jpg",
+      ],
     );
   }
 
-  for (let index = 0; index < 236; index += 1) {
-    const pet = generatedPets[index % generatedPets.length]!;
-    const cycle = Math.floor(index / 180);
-    const localDate = addLocalDays(scheduleStartsOn, -(index % 180) - 1);
+  const historicalCandidates: Array<{
+    localDate: string;
+    clock: string;
+    staffId: SeedStaffId;
+  }> = [];
+  for (let offset = 1; offset <= 180; offset += 1) {
+    const localDate = addLocalDays(scheduleStartsOn, -offset);
+    const weekday = getLocalWeekday(localDate);
+    if (weekday === 1) continue;
+
+    const staffId: SeedStaffId = weekday === 0 ? "chenjia" : "zhaohang";
+    for (const clock of ["10:30", "15:30"]) {
+      historicalCandidates.push({ localDate, clock, staffId });
+    }
+  }
+
+  for (const [index, candidate] of historicalCandidates.slice(0, 236).entries()) {
+    const pet = generatedPets[index % 19]!;
     const status: SeedBookingStatus =
       index % 12 === 0
         ? "cancelled"
@@ -352,9 +420,8 @@ async function seedCompletePortfolio(
       customerId: pet.customerId,
       petId: pet.id,
       petName: pet.name,
-      staffId: "zhouning",
-      staffName: "周宁",
-      startsAt: instantOn(localDate, cycle === 0 ? "00:30" : "03:00"),
+      staffId: candidate.staffId,
+      startsAt: instantOn(candidate.localDate, candidate.clock),
       status,
     });
   }
@@ -367,7 +434,6 @@ async function seedCompletePortfolio(
     petId: firstPet.id,
     petName: firstPet.name,
     staffId: "zhaohang",
-    staffName: "赵航",
     startsAt: instantOn(scheduleStartsOn, "10:30"),
     status: "confirmed",
   });
@@ -377,7 +443,6 @@ async function seedCompletePortfolio(
     petId: generatedPets[1]!.id,
     petName: generatedPets[1]!.name,
     staffId: "zhouning",
-    staffName: "周宁",
     startsAt: instantOn(scheduleStartsOn, "09:30"),
     status: "checked_in",
     species: "cat",
@@ -387,41 +452,57 @@ async function seedCompletePortfolio(
     customerId: generatedCustomers[2]!.id,
     petId: generatedPets[2]!.id,
     petName: generatedPets[2]!.name,
-    staffId: "zhouning",
-    staffName: "周宁",
-    startsAt: instantOn(scheduleStartsOn, "13:00"),
+    staffId: "linxia",
+    startsAt: instantOn(scheduleStartsOn, "14:00"),
     status: "confirmed",
   });
 
   const futureCandidates: Array<{
     localDate: string;
     clock: string;
+    staffId: SeedStaffId;
   }> = [
     {
-      localDate: addLocalDays(scheduleStartsOn, 13),
-      clock: "10:30",
+      localDate: addLocalDays(scheduleStartsOn, 12),
+      clock: "13:30",
+      staffId: "zhouning",
     },
   ];
-  for (let offset = 1; offset < 13; offset += 1) {
-    const localDate = addLocalDays(scheduleStartsOn, offset);
-    for (const clock of ["04:00", "06:30", "08:00"]) {
-      futureCandidates.push({
-        localDate,
-        clock,
-      });
+  const portfolioDays = [
+    { offset: 2, chenJia: ["15:00", "16:45"], zhouNing: ["09:30", "13:30", "15:15"] },
+    { offset: 3, chenJia: ["15:00", "16:45"], zhouNing: ["09:30", "13:30", "15:15"] },
+    { offset: 5, chenJia: [], zhouNing: ["09:30", "13:30", "15:15"] },
+    { offset: 7, chenJia: ["15:00", "16:45"], zhouNing: ["09:30", "13:30", "15:15"] },
+    { offset: 9, chenJia: ["15:00"], zhouNing: ["09:30", "13:30", "15:15"] },
+    {
+      offset: 10,
+      chenJia: ["10:30", "12:15", "15:00", "16:45"],
+      zhouNing: ["09:30", "13:30", "15:15"],
+    },
+    { offset: 12, chenJia: [], zhouNing: ["09:30", "13:30", "15:15"] },
+    { offset: 14, chenJia: [], zhouNing: ["09:30", "13:30", "15:15"] },
+  ] as const;
+  for (const day of portfolioDays) {
+    const localDate = addLocalDays(scheduleStartsOn, day.offset);
+    for (const clock of day.chenJia) {
+      futureCandidates.push({ localDate, clock, staffId: "chenjia" });
+    }
+    for (const clock of day.zhouNing) {
+      if (day.offset === 12 && clock === "13:30") continue;
+      futureCandidates.push({ localDate, clock, staffId: "zhouning" });
     }
   }
   for (const [index, candidate] of futureCandidates.slice(0, 35).entries()) {
-    const pet = generatedPets[(index + 1) % generatedPets.length]!;
+    const pet = generatedPets[19 + (index % 5)]!;
     await insertSeedBooking(client, {
       id: `booking-seed-future-${String(index + 1).padStart(2, "0")}`,
       customerId: pet.customerId,
       petId: pet.id,
       petName: pet.name,
-      staffId: "zhouning",
-      staffName: "周宁",
+      staffId: candidate.staffId,
       startsAt: instantOn(candidate.localDate, candidate.clock),
       status: "confirmed",
+      species: "cat",
     });
   }
 
@@ -435,8 +516,12 @@ async function seedCompletePortfolio(
      WHERE id IN ('booking-maiya-today', 'booking-bohe-future')`,
   );
 
-  const pendingTimeOffDate = addLocalDays(scheduleStartsOn, 13);
-  const pendingBookingStart = instantOn(pendingTimeOffDate, "10:30");
+  const pendingTimeOffDate = addLocalDays(scheduleStartsOn, 12);
+  const pendingBookingStart = instantOn(pendingTimeOffDate, "13:30");
+  const pendingBookingPet = generatedPets[19]!;
+  const pendingBookingCustomer = generatedCustomers.find(
+    (customer) => customer.id === pendingBookingPet.customerId,
+  )!;
   await client.query(
     `INSERT INTO staff_time_off_intervals (
        id, staff_id, local_date, starts_at, ends_at, status, reason,
@@ -444,8 +529,8 @@ async function seedCompletePortfolio(
        impact_snapshot, created_at
      )
      VALUES (
-       'time-off-seed-pending', 'zhouning', $1, '10:30', '13:00',
-       'pending', '固定演示：逐笔处理受影响预约', 'manager', 150, 1, $2::jsonb, $3
+       'time-off-seed-pending', 'zhouning', $1, '13:30', '15:15',
+       'pending', '固定演示：逐笔处理受影响预约', 'manager', 105, 1, $2::jsonb, $3
      )`,
     [
       pendingTimeOffDate,
@@ -454,13 +539,13 @@ async function seedCompletePortfolio(
           id: "booking-seed-future-01",
           revision: 1,
           status: "confirmed",
-          customerName: "演示顾客02",
-          petName: "茸茸02",
-          serviceName: "犬基础洗护",
+          customerName: pendingBookingCustomer.displayName,
+          petName: pendingBookingPet.name,
+          serviceName: "猫咪洗护",
           staff: { id: "zhouning", displayName: "周宁" },
           startsAt: pendingBookingStart,
-          endsAt: addMinutes(pendingBookingStart, 60),
-          turnoverEndsAt: addMinutes(pendingBookingStart, 75),
+          endsAt: addMinutes(pendingBookingStart, 90),
+          turnoverEndsAt: addMinutes(pendingBookingStart, 105),
         },
       ]),
       demoNow,
@@ -537,42 +622,7 @@ export async function seedDemoData(client: PoolClient): Promise<void> {
   await client.query("DELETE FROM staff_skills");
   await client.query("DELETE FROM store_business_hours");
 
-  const staff = [
-    {
-      id: "linxia",
-      employeeNumber: 1,
-      skills: ["dog-basic-care", "dog-styling", "nail-care", "deshedding-care", "oral-care"],
-      weekdays: [2, 3, 4, 5, 6],
-      shift: ["09:30", "18:00"],
-      shiftBreak: ["13:00", "14:00"],
-    },
-    {
-      id: "chenjia",
-      employeeNumber: 2,
-      skills: ["dog-basic-care", "cat-care", "nail-care", "deshedding-care"],
-      weekdays: [0, 3, 4, 5, 6],
-      shift: ["10:30", "19:00"],
-      shiftBreak: ["14:00", "15:00"],
-    },
-    {
-      id: "zhouning",
-      employeeNumber: 3,
-      skills: ["cat-care", "nail-care", "oral-care"],
-      weekdays: [0, 2, 4, 5, 6],
-      shift: ["09:30", "18:00"],
-      shiftBreak: ["12:30", "13:30"],
-    },
-    {
-      id: "zhaohang",
-      employeeNumber: 4,
-      skills: ["dog-basic-care", "dog-styling", "nail-care", "oral-care"],
-      weekdays: [2, 3, 4, 5, 6],
-      shift: ["10:30", "19:00"],
-      shiftBreak: ["14:30", "15:30"],
-    },
-  ] as const;
-
-  for (const member of staff) {
+  for (const member of seedStaff) {
     await client.query(
       `
         INSERT INTO staff_members (id, employee_number)
@@ -626,7 +676,7 @@ export async function seedDemoData(client: PoolClient): Promise<void> {
   const scheduleStartsOn = getShanghaiLocalDate(demoNow);
   let seededSaturdayException = false;
 
-  for (let offset = 0; offset < 14; offset += 1) {
+  for (let offset = -180; offset < 15; offset += 1) {
     const localDate = addLocalDays(scheduleStartsOn, offset);
     const weekday = getLocalWeekday(localDate);
 
@@ -634,12 +684,13 @@ export async function seedDemoData(client: PoolClient): Promise<void> {
       continue;
     }
 
-    for (const member of staff) {
+    for (const member of seedStaff) {
       if (!(member.weekdays as readonly number[]).includes(weekday)) {
         continue;
       }
 
-      const adjustedSaturday = weekday === 6 && member.id === "linxia" && !seededSaturdayException;
+      const adjustedSaturday =
+        offset >= 0 && weekday === 6 && member.id === "linxia" && !seededSaturdayException;
       const scheduleDayId = `schedule-${localDate}-${member.id}`;
       const shift = adjustedSaturday ? (["11:00", "19:00"] as const) : member.shift;
       const shiftBreak = adjustedSaturday ? (["15:00", "15:30"] as const) : member.shiftBreak;
@@ -683,22 +734,23 @@ export async function seedDemoData(client: PoolClient): Promise<void> {
     }
   }
 
-  const portfolioScheduleDate = addLocalDays(scheduleStartsOn, 13);
+  const daysUntilNextSunday = (7 - getLocalWeekday(scheduleStartsOn)) % 7 || 7;
+  const claimableScheduleDate = addLocalDays(scheduleStartsOn, daysUntilNextSunday + 7);
   await client.query(
     `INSERT INTO staff_schedule_days (
        id, staff_id, local_date, publication_status, source,
        exception_kind, exception_note, published_at
      )
      VALUES (
-       'schedule-portfolio-claimable', 'zhouning', $1,
+       'schedule-seed-claimable', 'zhaohang', $1,
        'published', 'date_exception', 'adjusted_shift',
        '固定演示：唯一可争抢时段', $2
      )`,
-    [portfolioScheduleDate, demoNow],
+    [claimableScheduleDate, demoNow],
   );
   await client.query(
     `INSERT INTO staff_schedule_shifts (id, schedule_day_id, starts_at, ends_at)
-     VALUES ('shift-portfolio-claimable', 'schedule-portfolio-claimable', '15:30', '17:45')`,
+     VALUES ('shift-seed-claimable', 'schedule-seed-claimable', '15:30', '17:45')`,
   );
 
   const demoCustomers = [

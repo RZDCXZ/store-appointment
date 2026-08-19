@@ -4,7 +4,7 @@
 
 ## 页面与恢复
 
-- [设计稿页面 → 实际路由](route-map.md) 已覆盖 MP-01…18、ST-01…09、MG-01…18 共 45 个设计稿编号。
+- [设计稿页面 → 实际路由](route-map.md) 已覆盖 MP-01…18、ST-01…09、MG-01…18 共 45 个设计稿编号，并逐项记录设计核对重点和静态／自动／运行证据。
 - Web 逻辑页均为 React Router 独立入口，并由 `history-fallback.test.ts` 验证首次直达与再次请求。
 - 小程序逻辑页全部登记在 `app.json`；带身份的详情、改期、取消、宠物编辑与数据权利页会按 ID、当前顾客会话和 API 事实恢复。
 - `scripts/product-integration.test.mjs` 会阻止遗漏设计稿编号、遗留“骨架”状态或未登记的小程序页面进入 CI。
@@ -16,7 +16,7 @@
 - 小程序：`product-ui/mini-program/design-reference/mp-01-option-1.png`
 - 管理端：`product-ui/admin/design-reference/mg-01-option-1.png`
 
-本轮在 Chrome 151 中逐页抽查登录、店长工作台、预约日历、受影响预约、通知重试、演示重置，以及 390px 员工今日工作、预约详情和核销页。茸光的暖米白画布、深鼠尾草主操作、克制珊瑚风险色、领域词汇和状态语义在三端保持一致；小程序保留面向顾客的低密度卡片，后台保留任务型高密度信息。
+本轮先按页面模块逐项完成 45 页结构、文案、状态与导航对照，再在 Chrome 151 中运行抽查登录、店长工作台、预约日历、受影响预约、通知重试、演示重置，以及 390px 员工今日工作、预约详情和核销页；小程序黄金流在微信开发者工具运行。茸光的暖米白画布、深鼠尾草主操作、克制珊瑚风险色、领域词汇和状态语义在三端保持一致；小程序保留面向顾客的低密度卡片，后台保留任务型高密度信息。
 
 发现并修复的阻断偏差：员工核销码输入框的字距触发 CSS Grid 最小内容宽度，导致 390px 横向滚动。修复后由 Playwright 对该真实路由持续断言 `scrollWidth <= innerWidth`。
 
@@ -24,13 +24,13 @@
 
 ## 自动化门禁
 
-| 层级            | 命令／证据                                            | 覆盖                                                                 |
-| --------------- | ----------------------------------------------------- | -------------------------------------------------------------------- |
-| 基础门禁        | `corepack pnpm check`                                 | Prettier、ESLint、TypeScript、全部 Vitest/Node 测试、三端生产构建    |
-| 小程序组件      | `apps/mini-program/test/state-panel.simulate.test.ts` | 官方 `miniprogram-simulate` + jsdom 渲染加载、错误、空态和重试组件   |
-| API／PostgreSQL | `corepack pnpm --filter @rongguang/api test`          | 权限、状态机、幂等、排除约束、通知、审计、经营指标与真实 PostgreSQL  |
-| 后台浏览器      | `corepack pnpm --filter @rongguang/admin test:e2e`    | 工作台、日历、列表、受影响预约、履约、通知、审计、演示重置和移动边界 |
-| CI              | `.github/workflows/ci.yml`                            | PostgreSQL 18.4 服务、基础门禁、Chrome 安装与完整 Playwright E2E     |
+| 层级            | 命令／证据                                            | 覆盖                                                                           |
+| --------------- | ----------------------------------------------------- | ------------------------------------------------------------------------------ |
+| 基础门禁        | `corepack pnpm check`                                 | Prettier、ESLint、TypeScript、全部 Vitest/Node 测试、三端生产构建              |
+| 小程序组件      | `apps/mini-program/test/state-panel.simulate.test.ts` | 官方 `miniprogram-simulate` + jsdom 渲染加载、错误、空态和重试组件             |
+| API／PostgreSQL | `corepack pnpm --filter @rongguang/api test`          | 权限、状态机、幂等、排除约束、通知、审计、经营指标与真实 PostgreSQL            |
+| 后台浏览器      | `corepack pnpm --filter @rongguang/admin test:e2e`    | 工作台、日历、列表、受影响预约、履约、通知、审计、演示重置和移动边界           |
+| CI              | `.github/workflows/ci.yml`                            | 已配置 PostgreSQL 18.4、基础门禁、Chrome 与完整 Playwright；推送后确认远端运行 |
 
 确定性与并发证据：
 

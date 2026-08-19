@@ -80,19 +80,6 @@ describe("门店首页与服务目录", () => {
             { petSize: "large", priceCents: 28800, durationMinutes: 150 },
           ],
         },
-        {
-          id: "portfolio-claimable-care",
-          name: "作品集限定护理",
-          description: "用于演示唯一可争抢时段的固定服务。",
-          applicableSpecies: ["dog"],
-          requiredSkillIds: ["cat-care", "oral-care"],
-          availableAddonIds: [],
-          specifications: [
-            { petSize: "small", priceCents: 22800, durationMinutes: 120 },
-            { petSize: "medium", priceCents: 32800, durationMinutes: 150 },
-            { petSize: "large", priceCents: 45800, durationMinutes: 180 },
-          ],
-        },
       ],
       addons: [
         {

@@ -253,25 +253,76 @@ describe("演示时间、完整种子与确定性重置", () => {
     );
     expect(lateScenario.rows[0]?.starts_at.toISOString()).toBe("2026-08-13T02:30:00.000Z");
 
+    const invalidSeedBookings = await database.pool.query<{ id: string }>(
+      `SELECT booking.id
+       FROM bookings booking
+       JOIN store_business_hours business_hours
+         ON business_hours.weekday = extract(
+           dow FROM booking.starts_at AT TIME ZONE 'Asia/Shanghai'
+         )::integer
+       WHERE booking.id LIKE 'booking-seed-%'
+         AND (
+           business_hours.opens_at IS NULL
+           OR (booking.starts_at AT TIME ZONE 'Asia/Shanghai')::time < business_hours.opens_at
+           OR (COALESCE(booking.occupancy_ends_at, booking.original_occupancy_ends_at) AT TIME ZONE 'Asia/Shanghai')::time > business_hours.closes_at
+           OR EXISTS (
+             SELECT 1
+             FROM jsonb_array_elements_text(booking.required_skill_ids_snapshot) required_skill(skill_id)
+             WHERE NOT EXISTS (
+               SELECT 1
+               FROM staff_skills
+               WHERE staff_skills.staff_id = booking.staff_id
+                 AND staff_skills.skill_id = required_skill.skill_id
+             )
+           )
+           OR NOT EXISTS (
+             SELECT 1
+             FROM staff_schedule_days schedule_day
+             JOIN staff_schedule_shifts shift ON shift.schedule_day_id = schedule_day.id
+             WHERE schedule_day.staff_id = booking.staff_id
+               AND schedule_day.local_date = (booking.starts_at AT TIME ZONE 'Asia/Shanghai')::date
+               AND schedule_day.publication_status = 'published'
+               AND (booking.starts_at AT TIME ZONE 'Asia/Shanghai')::time >= shift.starts_at
+               AND (COALESCE(booking.occupancy_ends_at, booking.original_occupancy_ends_at) AT TIME ZONE 'Asia/Shanghai')::time <= shift.ends_at
+               AND NOT EXISTS (
+                 SELECT 1
+                 FROM staff_schedule_breaks shift_break
+                 WHERE shift_break.schedule_shift_id = shift.id
+                   AND tstzrange(
+                     booking.starts_at,
+                     COALESCE(booking.occupancy_ends_at, booking.original_occupancy_ends_at),
+                     '[)'
+                   ) && tstzrange(
+                     schedule_day.local_date + shift_break.starts_at AT TIME ZONE 'Asia/Shanghai',
+                     schedule_day.local_date + shift_break.ends_at AT TIME ZONE 'Asia/Shanghai',
+                     '[)'
+                   )
+               )
+           )
+         )
+       ORDER BY booking.id`,
+    );
+    expect(invalidSeedBookings.rows).toEqual([]);
+
     const freshCustomerAuthorization = await customerAuthorization(app, "xu-lan");
     const claimable = await app.inject({
       method: "GET",
-      url: "/miniapp/available-slots?petId=pet-tuanzi&primaryServiceId=portfolio-claimable-care",
+      url: "/miniapp/available-slots?petId=pet-tuanzi&primaryServiceId=dog-styling",
       headers: { authorization: freshCustomerAuthorization },
     });
     expect(claimable.statusCode).toBe(200);
     const uniqueDay = claimable
       .json<{ days: Array<{ date: string; slots: Array<{ startsAt: string }> }> }>()
-      .days.find((day) => day.date === "2026-08-26");
+      .days.find((day) => day.date === "2026-08-23");
     expect(uniqueDay?.slots).toEqual([
       {
-        startsAt: "2026-08-26T07:30:00.000Z",
-        endsAt: "2026-08-26T09:30:00.000Z",
-        turnoverEndsAt: "2026-08-26T09:45:00.000Z",
+        startsAt: "2026-08-23T07:30:00.000Z",
+        endsAt: "2026-08-23T09:30:00.000Z",
+        turnoverEndsAt: "2026-08-23T09:45:00.000Z",
         staff: {
-          id: "zhouning",
-          displayName: "周宁",
-          employeeNumber: 3,
+          id: "zhaohang",
+          displayName: "赵航",
+          employeeNumber: 4,
         },
       },
     ]);
