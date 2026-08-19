@@ -50,6 +50,15 @@ test("员工在 390px 直达今日工作、恢复本人详情并确认揭示手�
   await page.reload();
   await expect(page.getByRole("heading", { name: "麦芽的预约" })).toBeVisible();
 
+  await page.goto(`/staff/appointments/${bookingId}/check-in`);
+  await expect(page.getByRole("heading", { name: "到店核销" })).toBeVisible();
+  await expect(page.getByLabel("六位核销码")).toBeVisible();
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(
+    true,
+  );
+
+  await page.goto(`/staff/appointments/${bookingId}`);
+
   await page.getByRole("link", { name: "揭示完整号码" }).click();
   await expect(page).toHaveURL(`/staff/appointments/${bookingId}/phone`);
   await expect(page.getByRole("heading", { name: "揭示完整手机号" })).toBeVisible();

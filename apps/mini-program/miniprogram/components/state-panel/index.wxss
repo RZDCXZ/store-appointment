@@ -1,0 +1,67 @@
+.state-panel {
+  display: flex;
+  align-items: flex-start;
+  flex-direction: column;
+  box-sizing: border-box;
+  min-height: 220rpx;
+  padding: 32rpx;
+  border: 1rpx solid #ddd7cb;
+  border-radius: 24rpx;
+  color: #61706a;
+  background: rgba(255, 252, 247, 0.84);
+}
+
+.state-panel--error {
+  border-color: #e5bdb4;
+  background: #fff4f0;
+}
+
+.state-panel__skeleton {
+  width: 100%;
+  margin-bottom: 24rpx;
+}
+
+.state-panel__skeleton-line {
+  width: 100%;
+  height: 24rpx;
+  border-radius: 999rpx;
+  background: #e6e1d8;
+}
+
+.state-panel__skeleton-line + .state-panel__skeleton-line {
+  width: 62%;
+  margin-top: 18rpx;
+}
+
+.state-panel__title,
+.state-panel__message {
+  display: block;
+}
+
+.state-panel__title {
+  color: #24312c;
+  font-size: 32rpx;
+  font-weight: 700;
+}
+
+.state-panel__message {
+  margin-top: 12rpx;
+  font-size: 28rpx;
+  line-height: 1.65;
+}
+
+.state-panel__retry {
+  min-width: 176rpx;
+  min-height: 88rpx;
+  margin: 20rpx 0 0;
+  padding: 0 28rpx;
+  border-radius: 18rpx;
+  color: #fff;
+  background: #3f6253;
+  font-size: 28rpx;
+  line-height: 88rpx;
+}
+
+.state-panel__retry::after {
+  border: 0;
+}

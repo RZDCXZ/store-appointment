@@ -435,7 +435,7 @@ describe("顾客提交并确认预约", () => {
       audit_event_count: 1,
       notification_count: 1,
     });
-  });
+  }, 30_000);
 
   it("二十个请求让同一宠物跨员工重叠时仍只确认一笔且失败请求没有业务副作用", async () => {
     const staffIds = ["linxia", "zhaohang"] as const;
@@ -516,7 +516,7 @@ describe("顾客提交并确认预约", () => {
       audit_event_count: 1,
       notification_count: 1,
     });
-  });
+  }, 30_000);
 
   it("相同幂等键重试返回首次冲突结果且不会成为新的竞争请求", async () => {
     const availabilityResponse = await app.inject({

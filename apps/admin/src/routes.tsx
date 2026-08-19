@@ -24,6 +24,7 @@ import { ManagerServicesPage } from "./pages/manager/services-page";
 import { ManagerStaffPage } from "./pages/manager/staff-page";
 import { ManagerNotificationDetailPage } from "./pages/manager/notification-detail-page";
 import { ManagerNotificationListPage } from "./pages/manager/notification-list-page";
+import { ManagerDemoControlPage } from "./pages/manager/demo-control-page";
 import { ManagerAuditLogPage } from "./pages/manager/audit-log-page";
 import { ManagerWorkbenchPage } from "./pages/manager/workbench-page";
 import { StaffAppointmentsPage } from "./pages/staff/appointments-page";
@@ -111,8 +112,9 @@ export const routes: RouteObject[] = [
           {
             path: "system",
             children: [
-              { index: true, element: <Navigate to="notifications" replace /> },
+              { index: true, element: <Navigate to="demo" replace /> },
               { path: "audit", element: <ManagerAuditLogPage /> },
+              { path: "demo", element: <ManagerDemoControlPage /> },
               { path: "notifications", element: <ManagerNotificationListPage /> },
               {
                 path: "notifications/:notificationId",

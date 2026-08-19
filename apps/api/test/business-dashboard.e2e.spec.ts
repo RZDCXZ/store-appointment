@@ -63,48 +63,52 @@ describe("店长经营看板 API", () => {
       currentWindow: { startsOn: "2026-07-15", endsOn: "2026-08-13" },
       previousWindow: { startsOn: "2026-06-15", endsOn: "2026-07-14" },
       current: {
-        bookingCount: 5,
-        completedBookingCount: 2,
-        completedServiceMinutes: 150,
+        bookingCount: 66,
+        completedBookingCount: 42,
+        completedServiceMinutes: 2550,
         availableStaffMinutes: 1800,
-        utilizationRate: 1 / 12,
-        completedListPriceCents: 29_600,
-        cancellationCount: 1,
-        cancellationDenominator: 5,
-        cancellationRate: 0.2,
-        noShowCount: 1,
-        noShowDenominator: 4,
-        noShowRate: 0.25,
-        terminationCount: 0,
-        terminationDenominator: 5,
-        terminationRate: 0,
+        utilizationRate: 2550 / 1800,
+        completedListPriceCents: 541_600,
+        cancellationCount: 7,
+        cancellationDenominator: 66,
+        cancellationRate: 7 / 66,
+        noShowCount: 7,
+        noShowDenominator: 59,
+        noShowRate: 7 / 59,
+        terminationCount: 6,
+        terminationDenominator: 66,
+        terminationRate: 6 / 66,
       },
       previous: {
-        bookingCount: 0,
-        completedBookingCount: 0,
-        completedServiceMinutes: 0,
+        bookingCount: 57,
+        completedBookingCount: 45,
+        completedServiceMinutes: 2700,
         availableStaffMinutes: 0,
         utilizationRate: null,
-        completedListPriceCents: 0,
-        cancellationCount: 0,
-        cancellationDenominator: 0,
-        cancellationRate: null,
-        noShowCount: 0,
-        noShowDenominator: 0,
-        noShowRate: null,
-        terminationCount: 0,
-        terminationDenominator: 0,
-        terminationRate: null,
+        completedListPriceCents: 576_000,
+        cancellationCount: 4,
+        cancellationDenominator: 57,
+        cancellationRate: 4 / 57,
+        noShowCount: 4,
+        noShowDenominator: 53,
+        noShowRate: 4 / 53,
+        terminationCount: 4,
+        terminationDenominator: 57,
+        terminationRate: 4 / 57,
       },
       revisit90Days: {
         periodDays: 90,
         currentWindow: { startsOn: "2026-05-16", endsOn: "2026-08-13" },
         previousWindow: { startsOn: "2026-02-15", endsOn: "2026-05-15" },
-        current: { completedCustomerCount: 2, revisitCustomerCount: 0, revisitRate: 0 },
+        current: {
+          completedCustomerCount: 15,
+          revisitCustomerCount: 13,
+          revisitRate: 13 / 15,
+        },
         previous: {
-          completedCustomerCount: 0,
-          revisitCustomerCount: 0,
-          revisitRate: null,
+          completedCustomerCount: 13,
+          revisitCustomerCount: 13,
+          revisitRate: 1,
         },
       },
     });
@@ -147,9 +151,9 @@ describe("店长经营看板 API", () => {
       });
       expect(response.statusCode).toBe(200);
       expect(response.json().current).toMatchObject({
-        completedServiceMinutes: 150,
+        completedServiceMinutes: 2550,
         availableStaffMinutes: 1740,
-        utilizationRate: 150 / 1740,
+        utilizationRate: 2550 / 1740,
       });
     } finally {
       await database.pool.query(
@@ -199,12 +203,12 @@ describe("店长经营看板 API", () => {
       });
 
       expect(atMidnight.json()).toMatchObject({
-        current: { bookingCount: 2 },
-        previous: { bookingCount: 3 },
+        current: { bookingCount: 17 },
+        previous: { bookingCount: 17 },
       });
       expect(beforeMidnight.json()).toMatchObject({
-        current: { bookingCount: 1 },
-        previous: { bookingCount: 4 },
+        current: { bookingCount: 16 },
+        previous: { bookingCount: 18 },
       });
     } finally {
       const row = original.rows[0];
@@ -219,7 +223,7 @@ describe("店长经营看板 API", () => {
     }
   });
 
-  it("按当前周期返回含空日的每日精确序列", async () => {
+  it("按当前周期返回每日精确序列", async () => {
     const response = await app.inject({
       method: "GET",
       url: "/backoffice/manager/business/series?period=30",
@@ -233,11 +237,11 @@ describe("店长经营看板 API", () => {
       points: expect.arrayContaining([
         expect.objectContaining({
           localDate: "2026-08-02",
-          completedBookingCount: 1,
-          completedServiceMinutes: 60,
+          completedBookingCount: 3,
+          completedServiceMinutes: 180,
           availableStaffMinutes: 0,
           utilizationRate: null,
-          completedListPriceCents: 12_800,
+          completedListPriceCents: 38_400,
         }),
         expect.objectContaining({
           localDate: "2026-08-13",

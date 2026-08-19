@@ -19,6 +19,7 @@ import { readSessionToken, clearSessionCookie, createSessionCookie } from "./ses
 import { SessionGuard } from "./session.guard.js";
 import { SessionService } from "./session.service.js";
 import type { AuthenticatedRequest } from "./auth.types.js";
+import { getDemoNow, isDemoModeEnabled } from "../config/environment.js";
 
 interface LoginBody {
   username?: unknown;
@@ -63,7 +64,14 @@ export class AuthController {
     reply.header("Set-Cookie", createSessionCookie(token));
     reply.header("Cache-Control", "no-store");
 
-    return { account };
+    return {
+      account,
+      demoStatus: {
+        enabled: isDemoModeEnabled(),
+        now: getDemoNow(),
+        timeZone: "Asia/Shanghai",
+      },
+    };
   }
 
   @Get("session")
@@ -72,9 +80,16 @@ export class AuthController {
   session(
     @Req() request: AuthenticatedRequest,
     @Res({ passthrough: true }) reply: FastifyReply,
-  ): { account: AuthenticatedRequest["backofficeIdentity"] } {
+  ): BackofficeAuthResponse {
     reply.header("Cache-Control", "no-store");
-    return { account: request.backofficeIdentity };
+    return {
+      account: request.backofficeIdentity,
+      demoStatus: {
+        enabled: isDemoModeEnabled(),
+        now: getDemoNow(),
+        timeZone: "Asia/Shanghai",
+      },
+    };
   }
 
   @Post("logout")

@@ -6,6 +6,7 @@ import { BookingAvailabilityModule } from "./booking-availability/booking-availa
 import { BookingModule } from "./booking/booking.module.js";
 import { BusinessModule } from "./business/business.module.js";
 import { CustomerModule } from "./customer/customer.module.js";
+import { DemoControlModule } from "./demo/demo-control.module.js";
 import { HealthModule } from "./health/health.module.js";
 import { PetProfileModule } from "./pet-profile/pet-profile.module.js";
 import { PrivacyConsentModule } from "./privacy-consent/privacy-consent.module.js";
@@ -21,6 +22,7 @@ import { StaffManagementModule } from "./staff-management/staff-management.modul
     BookingModule,
     BusinessModule,
     CustomerModule,
+    DemoControlModule,
     HealthModule,
     PetProfileModule,
     PrivacyConsentModule,

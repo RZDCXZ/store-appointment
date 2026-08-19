@@ -1832,6 +1832,216 @@
   place-items: center;
 }
 
+.demo-system-links {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 16px;
+}
+
+.demo-system-links a,
+.demo-system-links span {
+  padding: 8px 12px;
+  border: 1px solid var(--line-200);
+  border-radius: 999px;
+  color: var(--ink-700);
+  background: var(--surface-strong);
+  font-size: 12px;
+  text-decoration: none;
+}
+
+.demo-system-links span {
+  color: var(--sage-700);
+  background: var(--sage-100);
+  font-weight: 800;
+}
+
+.demo-control-feedback {
+  margin-bottom: 14px;
+  padding: 12px 14px;
+  border: 1px solid var(--sage-200);
+  border-radius: 10px;
+  color: var(--sage-700);
+  background: var(--sage-50);
+  font-size: 12px;
+}
+
+.demo-control-feedback--error {
+  border-color: var(--danger-200);
+  color: var(--danger-700);
+  background: var(--danger-bg);
+}
+
+.demo-boundary-panel,
+.demo-action-panel,
+.demo-danger-panel {
+  margin-top: 14px;
+  padding: 22px;
+  border: 1px solid var(--line-200);
+  border-radius: 15px;
+  background: var(--surface-strong);
+  box-shadow: 0 14px 40px rgb(47 78 65 / 8%);
+}
+
+.demo-boundary-panel header,
+.demo-action-panel,
+.demo-danger-panel {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
+}
+
+.demo-boundary-panel p,
+.demo-boundary-panel h2,
+.demo-action-panel p,
+.demo-action-panel h2,
+.demo-danger-panel p,
+.demo-danger-panel h2 {
+  margin: 0;
+}
+
+.demo-boundary-panel p,
+.demo-action-panel p,
+.demo-danger-panel p {
+  color: var(--sage-700);
+  font-size: 10px;
+  font-weight: 900;
+  letter-spacing: 0.08em;
+}
+
+.demo-boundary-panel h2,
+.demo-action-panel h2,
+.demo-danger-panel h2 {
+  margin-top: 4px;
+  font-size: 20px;
+}
+
+.demo-boundary-panel > ul {
+  display: grid;
+  gap: 10px;
+  padding: 0;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  list-style: none;
+}
+
+.demo-boundary-panel li {
+  padding: 14px;
+  border-radius: 10px;
+  background: var(--sage-50);
+}
+
+.demo-boundary-panel li strong,
+.demo-boundary-panel li span,
+.demo-action-panel span,
+.demo-danger-panel span {
+  display: block;
+}
+
+.demo-boundary-panel li span,
+.demo-action-panel span,
+.demo-danger-panel span {
+  margin-top: 5px;
+  color: var(--ink-600);
+  font-size: 11px;
+  line-height: 1.6;
+}
+
+.demo-advance-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.demo-advance-actions button,
+.demo-danger-panel button,
+.demo-reset-dialog button {
+  min-height: 40px;
+  padding: 0 14px;
+  border: 1px solid var(--line-200);
+  border-radius: 9px;
+  background: var(--surface-strong);
+  cursor: pointer;
+}
+
+.demo-reset-backdrop {
+  position: fixed;
+  z-index: 50;
+  inset: 0;
+  display: grid;
+  padding: 24px;
+  background: rgb(36 49 44 / 48%);
+  place-items: center;
+}
+
+.demo-reset-dialog {
+  width: min(500px, 100%);
+  padding: 24px;
+  border-radius: 16px;
+  background: var(--surface-strong);
+  box-shadow: var(--shadow);
+}
+
+.demo-reset-dialog > p,
+.demo-reset-dialog > h2 {
+  margin: 0;
+}
+
+.demo-reset-dialog > p {
+  color: var(--danger-700);
+  font-size: 10px;
+  font-weight: 900;
+}
+
+.demo-reset-dialog > h2 {
+  margin-top: 5px;
+}
+
+.demo-reset-dialog > span,
+.demo-reset-dialog li,
+.demo-reset-dialog label {
+  color: var(--ink-600);
+  font-size: 12px;
+  line-height: 1.7;
+}
+
+.demo-reset-dialog label,
+.demo-reset-dialog input {
+  display: block;
+}
+
+.demo-reset-dialog input {
+  box-sizing: border-box;
+  width: 100%;
+  min-height: 42px;
+  margin-top: 8px;
+  padding: 0 10px;
+}
+
+.demo-reset-dialog footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 22px;
+}
+
+.demo-danger-panel .danger-button,
+.demo-reset-dialog .danger-button {
+  border-color: var(--danger-700);
+  color: white;
+  background: var(--danger-700);
+}
+
+@media (max-width: 900px) {
+  .demo-boundary-panel > ul {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .demo-action-panel,
+  .demo-danger-panel {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+}
+
 .staff-deactivate-dialog {
   width: min(460px, 100%);
   padding: 24px;
@@ -8868,6 +9078,10 @@ img.identity-avatar {
   margin-top: 20px;
 }
 
+.staff-fulfilment-form-card form > * {
+  min-width: 0;
+}
+
 .staff-fulfilment-form-card form > label,
 .staff-late-reason {
   color: var(--ink-700);
@@ -8876,6 +9090,7 @@ img.identity-avatar {
 }
 
 .staff-fulfilment-form-card input {
+  width: 100%;
   min-height: 62px;
   padding: 0 16px;
   border: 1px solid var(--line-200);

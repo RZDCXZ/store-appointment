@@ -1,17 +1,18 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
+import type { BackofficeAuthResponse, DemoStatusResponse } from "@rongguang/contracts";
 
 import { apiFetch, type BackofficeAccount, readApiError } from "./api";
 
 type AuthState =
   | { kind: "checking" }
   | { kind: "anonymous"; reason?: "expired" }
-  | { kind: "authenticated"; account: BackofficeAccount }
+  | { kind: "authenticated"; account: BackofficeAccount; demoStatus?: DemoStatusResponse }
   | { kind: "error"; message: string };
 
 interface AuthContextValue {
   state: AuthState;
   retry: () => void;
-  setAccount: (account: BackofficeAccount) => void;
+  setAccount: (account: BackofficeAccount, demoStatus?: DemoStatusResponse) => void;
   markExpired: () => void;
   signOut: () => Promise<void>;
 }
@@ -30,8 +31,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }): React
         const response = await apiFetch("/auth/session", { signal: abortController.signal });
 
         if (response.ok) {
-          const body = (await response.json()) as { account: BackofficeAccount };
-          setState({ kind: "authenticated", account: body.account });
+          const body = (await response.json()) as Partial<BackofficeAuthResponse> & {
+            account: BackofficeAccount;
+          };
+          setState({
+            kind: "authenticated",
+            account: body.account,
+            ...(body.demoStatus ? { demoStatus: body.demoStatus } : {}),
+          });
           return;
         }
 
@@ -64,8 +71,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }): React
     setState({ kind: "checking" });
     setAttempt((current) => current + 1);
   }, []);
-  const setAccount = useCallback((account: BackofficeAccount) => {
-    setState({ kind: "authenticated", account });
+  const setAccount = useCallback((account: BackofficeAccount, demoStatus?: DemoStatusResponse) => {
+    setState({ kind: "authenticated", account, ...(demoStatus ? { demoStatus } : {}) });
   }, []);
   const markExpired = useCallback(() => {
     setState({ kind: "anonymous", reason: "expired" });

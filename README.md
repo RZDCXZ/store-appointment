@@ -2,7 +2,7 @@
 
 “茸光宠物洗护”是一个公开源码、仅承诺本地运行的单门店作品集案例。正式应用由三部分组成：原生 TypeScript 微信小程序、React/Vite 响应式后台，以及 NestJS/Fastify REST API。PostgreSQL 是唯一的 Docker 服务，Node 应用在宿主机保留热更新。
 
-当前已完成 ticket 01–08：三端骨架、后台演示身份、顾客 Bearer 会话、门店服务目录、宠物档案与版本化隐私同意、已发布排班、真实可约时段，以及立即确认且可幂等重试的预约创建。真实微信登录、订阅消息、支付和生产运维不在本地演示能力内。
+当前本地产品已实现顾客预约全流程、员工到店与服务履约、店长预约／排班／顾客／服务／通知／审计／经营管理，以及确定性演示时钟和数据重置。45 个设计稿页面与实际入口见 [`docs/route-map.md`](docs/route-map.md)，最终集成、视觉、自动化和设备验收记录见 [`docs/product-verification.md`](docs/product-verification.md)。真实微信登录、订阅消息、支付和生产运维不在本地演示能力内。
 
 ## 环境要求
 
@@ -41,6 +41,8 @@ corepack pnpm demo:up
 - 后台登录：<http://localhost:5173/login>
 - API 健康检查：<http://localhost:3000/health>
 - OpenAPI：<http://localhost:3000/docs>
+
+`demo:up` 固定上海演示时间为 2026-08-13 10:50，并在三端持续显示演示边界。店长可从 `/manager/system/demo` 推进 15 分钟或在输入确认短语后重置；重置会恢复固定种子、撤销旧会话并清理本地宠物上传。
 
 ### 后台演示账号
 
@@ -120,6 +122,14 @@ corepack pnpm check        # 与 CI 一致的完整基础门禁
 
 普通 Linux CI 不运行微信开发者工具；它会验证小程序 TypeScript、真实页面登记和项目结构。开发者工具黄金流程与真机检查留在本地执行。
 
+管理端 Playwright 是独立的真实浏览器门禁：
+
+```bash
+corepack pnpm --filter @rongguang/admin test:e2e
+```
+
+GitHub Actions 会在 PostgreSQL 18.4 上先运行 `check`，再安装 Chrome 并运行完整 Playwright 套件。`check` 内的小程序测试包含 `miniprogram-simulate` + jsdom 组件渲染；API 测试包含空库连续三次重置和 20 请求并发争抢。
+
 ## 目录
 
 ```text
@@ -142,3 +152,15 @@ product-ui/      设计稿与交互原型，只作为实现依据
 - Docker Compose 只运行 PostgreSQL；API 与后台始终在宿主机运行。
 - `DEMO_NOW` 是确定性演示时钟入口；`demo:up` 会把它安全传给后台，并在上海业务时区持续标识当前演示时间。
 - 所有真实环境、私有 AppID、AppSecret、数据库数据和上传文件都必须留在被忽略的本地配置中。
+- 模拟通知不会调用微信、短信或邮件；CSV／JSON 导出只生成本地响应，不上传第三方。
+- 宠物照片只保存在 `.data/uploads/pets/`；没有对象存储、CDN、病毒扫描或生产备份。
+- 仓库内品牌宠物与员工照片来自产品原型阶段的生成式栅格素材；原型设备边框和键盘素材不随小程序发布。公开发布前仍需重新核验素材与模板许可。
+
+## 文档索引
+
+- 产品与领域事实：[`CONTEXT.md`](CONTEXT.md)
+- 页面、状态与视觉语义：[`DESIGN_PRD.md`](DESIGN_PRD.md)
+- 设计稿页面到真实入口：[`docs/route-map.md`](docs/route-map.md)
+- 集成、设计、测试与设备验收：[`docs/product-verification.md`](docs/product-verification.md)
+- 架构决策：[`docs/adr/`](docs/adr/)
+- 运行时 HTTP 契约：启动 API 后打开 `/docs`；共享 TypeScript 契约位于 `packages/contracts`

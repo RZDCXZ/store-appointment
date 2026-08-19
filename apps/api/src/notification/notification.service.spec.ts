@@ -11,6 +11,7 @@ describe("NotificationService worker lifecycle", () => {
     const query = vi
       .fn()
       .mockResolvedValueOnce({ rows: [] })
+      .mockResolvedValueOnce({ rows: [{ count: 0 }] })
       .mockImplementationOnce(
         () =>
           new Promise<{ rows: never[] }>((resolve) => {

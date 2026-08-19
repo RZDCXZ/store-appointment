@@ -1,0 +1,14 @@
+<view class="state-panel state-panel--{{state}}" role="{{state === 'error' ? 'alert' : 'status'}}">
+  <view wx:if="{{state === 'loading'}}" class="state-panel__skeleton" aria-hidden="true">
+    <view class="state-panel__skeleton-line"></view>
+    <view class="state-panel__skeleton-line"></view>
+  </view>
+  <text class="state-panel__title">{{title}}</text>
+  <text class="state-panel__message">{{message}}</text>
+  <button
+    wx:if="{{state === 'error' || state === 'empty'}}"
+    id="state-panel-retry"
+    class="state-panel__retry"
+    bindtap="retry"
+  >{{retryLabel}}</button>
+</view>

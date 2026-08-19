@@ -1,3 +1,6 @@
 {
-  "navigationBarTitleText": "茸光"
+  "navigationBarTitleText": "茸光",
+  "usingComponents": {
+    "state-panel": "/components/state-panel/index"
+  }
 }

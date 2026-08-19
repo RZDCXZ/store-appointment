@@ -22,6 +22,7 @@ export default defineConfig({
       env: {
         ADMIN_ORIGIN: "http://127.0.0.1:5174",
         API_PORT: "4100",
+        DEMO_NOW: "2026-08-13T02:50:00.000Z",
         NO_PROXY: "127.0.0.1,localhost",
       },
       reuseExistingServer: true,

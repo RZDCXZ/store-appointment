@@ -37,4 +37,22 @@ describe("demo:up 环境解析", () => {
 
     assert.equal(config.apiHealthUrl, "http://127.0.0.1:4200/health");
   });
+
+  it("连续三次启动都由 DEMO_NOW 单向同步同一业务时间到管理端", () => {
+    const snapshots = Array.from({ length: 3 }, () => {
+      const environment = {
+        DEMO_NOW: "2026-09-01T01:02:03.000Z",
+        VITE_DEMO_NOW: "2099-01-01T00:00:00.000Z",
+      };
+      const config = resolveDemoEnvironment(environment);
+      return { environment, config };
+    });
+
+    for (const snapshot of snapshots) {
+      assert.equal(snapshot.environment.DEMO_NOW, "2026-09-01T01:02:03.000Z");
+      assert.equal(snapshot.environment.VITE_DEMO_NOW, snapshot.environment.DEMO_NOW);
+    }
+    assert.deepEqual(snapshots[1], snapshots[0]);
+    assert.deepEqual(snapshots[2], snapshots[0]);
+  });
 });

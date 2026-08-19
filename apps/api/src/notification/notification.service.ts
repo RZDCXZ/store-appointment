@@ -124,6 +124,7 @@ export class NotificationService implements OnModuleInit, OnModuleDestroy {
   private readonly logger = new Logger(NotificationService.name);
   private timer: ReturnType<typeof setInterval> | null = null;
   private activeWorkerCycle: Promise<void> | null = null;
+  private readonly retryNotBefore = new Map<string, number>();
   private stopping = false;
 
   constructor(
@@ -140,16 +141,26 @@ export class NotificationService implements OnModuleInit, OnModuleDestroy {
        WHERE status = 'processing'`,
       [this.clock.now()],
     );
-    this.stopping = false;
-    this.timer = setInterval(() => void this.runWorkerCycle(), 100);
-    void this.runWorkerCycle();
+    await this.createDueRemindersAt(this.clock.now().toISOString());
+    this.resumeWorker();
   }
 
   async onModuleDestroy(): Promise<void> {
+    await this.pauseWorker();
+  }
+
+  async pauseWorker(): Promise<void> {
     this.stopping = true;
     if (this.timer) clearInterval(this.timer);
     this.timer = null;
     await this.activeWorkerCycle;
+  }
+
+  resumeWorker(): void {
+    if (this.timer) return;
+    this.stopping = false;
+    this.timer = setInterval(() => void this.runWorkerCycle(), 100);
+    void this.runWorkerCycle();
   }
 
   async list(): Promise<ManagerNotificationListResponse> {
@@ -285,7 +296,6 @@ export class NotificationService implements OnModuleInit, OnModuleDestroy {
 
   private async processWorkerCycle(): Promise<void> {
     try {
-      await this.createDueReminders();
       const task = await this.claimNextTask();
       if (task) await this.deliver(task);
     } catch (error) {
@@ -296,9 +306,8 @@ export class NotificationService implements OnModuleInit, OnModuleDestroy {
     }
   }
 
-  private async createDueReminders(): Promise<void> {
-    const demoNow = this.clock.now().toISOString();
-    await this.database.pool.query(
+  async createDueRemindersAt(demoNow: string): Promise<number> {
+    const result = await this.database.pool.query(
       `INSERT INTO notification_outbox (
          id, booking_id, customer_id, notification_type, payload,
          status, available_at, created_at
@@ -323,18 +332,27 @@ export class NotificationService implements OnModuleInit, OnModuleDestroy {
          AND booking.starts_at - interval '24 hours' <= $1::timestamptz
          AND booking.created_at <= booking.starts_at - interval '24 hours'
        ON CONFLICT (booking_id) WHERE notification_type = 'booking_reminder'
-       DO NOTHING`,
+       DO NOTHING
+       RETURNING id`,
       [demoNow],
     );
+    return result.rowCount ?? 0;
   }
 
   private async claimNextTask(): Promise<{ id: string } | null> {
+    const wallNow = Date.now();
+    const blockedRetryIds: string[] = [];
+    for (const [notificationId, readyAt] of this.retryNotBefore) {
+      if (readyAt > wallNow) blockedRetryIds.push(notificationId);
+      else this.retryNotBefore.delete(notificationId);
+    }
     const result = await this.database.pool.query<{ id: string }>(
       `WITH next_task AS (
          SELECT id
          FROM notification_outbox
          WHERE status IN ('pending', 'retry')
            AND available_at <= $1
+           AND NOT (status = 'retry' AND id = ANY($2::text[]))
          ORDER BY available_at, sequence
          FOR UPDATE SKIP LOCKED
          LIMIT 1
@@ -344,7 +362,7 @@ export class NotificationService implements OnModuleInit, OnModuleDestroy {
        FROM next_task
        WHERE notification.id = next_task.id
        RETURNING notification.id`,
-      [this.clock.now()],
+      [this.clock.now(), blockedRetryIds],
     );
     return result.rows[0] ?? null;
   }
@@ -385,6 +403,7 @@ export class NotificationService implements OnModuleInit, OnModuleDestroy {
       );
 
       if (!failed) {
+        this.retryNotBefore.delete(task.id);
         await client.query(
           `UPDATE notification_outbox
            SET status = 'sent', attempt_count = $2, available_at = $3
@@ -393,9 +412,11 @@ export class NotificationService implements OnModuleInit, OnModuleDestroy {
         );
       } else {
         const automaticRetry = mode === "automatic" && attemptNumber < 3;
-        const availableAt = new Date(
-          attemptedAt.getTime() + getNotificationRetryBackoffMilliseconds(),
-        );
+        if (automaticRetry) {
+          this.retryNotBefore.set(task.id, Date.now() + getNotificationRetryBackoffMilliseconds());
+        } else {
+          this.retryNotBefore.delete(task.id);
+        }
         await client.query(
           `UPDATE notification_outbox
            SET status = $2,
@@ -403,7 +424,7 @@ export class NotificationService implements OnModuleInit, OnModuleDestroy {
                available_at = $4,
                simulated_failures_remaining = simulated_failures_remaining - 1
            WHERE id = $1`,
-          [task.id, automaticRetry ? "retry" : "failed", attemptNumber, availableAt],
+          [task.id, automaticRetry ? "retry" : "failed", attemptNumber, attemptedAt],
         );
       }
       await client.query("COMMIT");

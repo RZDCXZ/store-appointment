@@ -93,21 +93,30 @@
       </button>
     </view>
 
-    <view wx:elif="{{catalogState === 'loading'}}" class="home-service-state">
-      <view class="home-service-skeleton" wx:for="{{[1, 2]}}" wx:key="*this"></view>
-    </view>
+    <state-panel
+      wx:elif="{{catalogState === 'loading'}}"
+      state="loading"
+      title="正在读取服务"
+      message="价格、时长与可预约状态来自门店当前目录。"
+    />
 
-    <view wx:elif="{{catalogState === 'empty'}}" class="home-service-empty">
-      <text class="home-service-empty__title">当前没有可浏览的主要服务</text>
-      <text class="home-service-empty__body">目录为空时不会展示虚构价格。</text>
-      <button class="home-service-empty__action" bindtap="retryCatalog">刷新目录</button>
-    </view>
+    <state-panel
+      wx:elif="{{catalogState === 'empty'}}"
+      state="empty"
+      title="当前没有可浏览的主要服务"
+      message="目录为空时不会展示虚构价格。"
+      retry-label="刷新目录"
+      bindretry="retryCatalog"
+    />
 
-    <view wx:else class="home-service-empty home-service-empty--error">
-      <text class="home-service-empty__title">服务暂时没有加载出来</text>
-      <text class="home-service-empty__body">{{catalogError}}</text>
-      <button class="home-service-empty__action" bindtap="retryCatalog">重新加载</button>
-    </view>
+    <state-panel
+      wx:else
+      state="error"
+      title="服务暂时没有加载出来"
+      message="{{catalogError}}"
+      retry-label="重新加载"
+      bindretry="retryCatalog"
+    />
     <text wx:if="{{refreshingCatalog}}" class="services-preview__refreshing">正在更新服务…</text>
   </view>
 

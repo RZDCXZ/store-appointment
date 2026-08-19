@@ -8,7 +8,7 @@ on:
 jobs:
   check:
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 30
     services:
       postgres:
         image: postgres:18.4-bookworm
@@ -54,3 +54,9 @@ jobs:
 
       - name: 运行格式、Lint、类型、测试和生产构建
         run: corepack pnpm check
+
+      - name: 安装后台 E2E 浏览器
+        run: corepack pnpm --filter @rongguang/admin exec playwright install --with-deps chrome
+
+      - name: 运行后台完整 Playwright E2E
+        run: corepack pnpm --filter @rongguang/admin test:e2e

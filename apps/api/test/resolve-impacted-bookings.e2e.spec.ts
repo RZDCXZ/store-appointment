@@ -78,6 +78,9 @@ describe("逐笔处理受影响预约", () => {
       closureIds,
     ]);
     await database.pool.query("DELETE FROM bookings WHERE id = ANY($1::text[])", [bookingIds]);
+    await database.pool.query(
+      "DELETE FROM privacy_consents WHERE customer_id = 'customer-xu-lan' AND source = 'miniapp_booking'",
+    );
     await app.close();
     vi.unstubAllEnvs();
   });

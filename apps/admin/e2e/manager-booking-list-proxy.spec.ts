@@ -56,7 +56,7 @@ test("店长可从独立路由筛选、查详情并代录新旧档案，冲突�
   await page.getByLabel("已有宠物").selectOption("pet-tuanzi");
   await page.getByLabel("主要服务").selectOption("dog-basic-care");
   await page.getByLabel("执行员工").selectOption("zhaohang");
-  await page.getByLabel("开始时间").fill("2026-08-13T11:00");
+  await page.getByLabel("开始时间").fill("2026-08-13T12:00");
   await confirmOfflineConsent(page, "phone");
   await page.getByRole("button", { name: "建立代客预约" }).click();
   await expect(page.getByRole("heading", { name: "代客预约已建立" })).toBeVisible();

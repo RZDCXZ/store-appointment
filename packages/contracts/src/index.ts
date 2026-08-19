@@ -14,6 +14,26 @@ export interface HealthResponse {
   timestamp: string;
 }
 
+export interface DemoStatusResponse {
+  enabled: boolean;
+  now: string;
+  timeZone: "Asia/Shanghai";
+}
+
+export interface DemoAdvanceResponse {
+  previousNow: string;
+  now: string;
+  timeZone: "Asia/Shanghai";
+  remindersCreated: number;
+}
+
+export interface DemoResetResponse {
+  now: string;
+  timeZone: "Asia/Shanghai";
+  invalidatedSessions: "all";
+  uploadsRestored: true;
+}
+
 export const backofficeNavigation = {
   manager: [
     { key: "workbench", label: "工作台" },
@@ -68,9 +88,11 @@ export interface BackofficeAccount {
 
 export interface BackofficeAuthResponse {
   account: BackofficeAccount;
+  demoStatus: DemoStatusResponse;
 }
 
-export interface BackofficeLandingResponse extends BackofficeAuthResponse {
+export interface BackofficeLandingResponse {
+  account: BackofficeAccount;
   navigation: string[];
 }
 

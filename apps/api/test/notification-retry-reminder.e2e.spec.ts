@@ -5,6 +5,7 @@ import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 
 import { createApplication } from "../src/bootstrap.js";
 import { DatabaseService } from "../src/database/database.service.js";
+import { NotificationService } from "../src/notification/notification.service.js";
 
 const adminOrigin = "http://localhost:5173";
 
@@ -366,6 +367,7 @@ describe("通知失败、重试与预约提醒", () => {
              created_at = '2026-08-13T02:50:00.000Z'
          WHERE id = 'booking-maiya-today'`,
       );
+      await app.get(NotificationService).createDueRemindersAt("2026-08-13T02:50:00.000Z");
 
       const deadline = Date.now() + 2_000;
       let reminders: Array<{ booking_id: string; notification_type: string }> = [];

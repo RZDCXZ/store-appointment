@@ -5,6 +5,7 @@ import {
   backofficeRoles,
   type BackofficeNavigationKey,
   type BackofficeRole,
+  type DemoStatusResponse,
 } from "@rongguang/contracts";
 
 import type { BackofficeAccount } from "./api";
@@ -78,19 +79,32 @@ function NavigationIcon({ name }: { name: BackofficeNavigationKey }): React.JSX.
 
 export interface BackofficeOutletContext {
   account: BackofficeAccount;
+  demoStatus: DemoStatusResponse | null;
+  setDemoStatus: (status: DemoStatusResponse) => void;
 }
 
-export function BackofficeLayout({ account }: { account: BackofficeAccount }): React.JSX.Element {
+export function BackofficeLayout({
+  account,
+  initialDemoStatus,
+}: {
+  account: BackofficeAccount;
+  initialDemoStatus?: DemoStatusResponse;
+}): React.JSX.Element {
   const auth = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
   const [logoutError, setLogoutError] = useState("");
+  const [demoStatus, setDemoStatus] = useState<DemoStatusResponse | null>(() => {
+    if (initialDemoStatus) return initialDemoStatus;
+    const configuredNow = import.meta.env.VITE_DEMO_NOW;
+    return configuredNow ? { enabled: true, now: configuredNow, timeZone: "Asia/Shanghai" } : null;
+  });
   const navigation = backofficeNavigation[account.role].map((item) => ({
     ...item,
     to: navigationPath(account.role, item.key),
   }));
   const roleMetadata = backofficeRoles[account.role];
-  const demoTime = formatShanghaiDemoTime(import.meta.env.VITE_DEMO_NOW);
+  const demoTime = formatShanghaiDemoTime(demoStatus?.now);
 
   async function logout(): Promise<void> {
     setLogoutError("");
@@ -156,12 +170,20 @@ export function BackofficeLayout({ account }: { account: BackofficeAccount }): R
 
       <div className="workspace">
         <header className="demo-banner">
-          <strong>本地演示模式</strong>
+          <strong>{demoStatus?.enabled ? "本地演示模式" : "系统时间模式"}</strong>
           <span>{demoTime ?? "演示时间跟随当前系统时间"}</span>
           <span>身份由服务端会话确认</span>
           <span className="demo-banner__route">{location.pathname}</span>
         </header>
-        <Outlet context={{ account } satisfies BackofficeOutletContext} />
+        <Outlet
+          context={
+            {
+              account,
+              demoStatus,
+              setDemoStatus,
+            } satisfies BackofficeOutletContext
+          }
+        />
       </div>
     </div>
   );

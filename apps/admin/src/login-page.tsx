@@ -2,6 +2,8 @@ import { useRef, useState } from "react";
 import { Navigate, useNavigate, useSearchParams } from "react-router-dom";
 import { backofficeRoles } from "@rongguang/contracts";
 
+import type { BackofficeAuthResponse } from "@rongguang/contracts";
+
 import { apiFetch, type BackofficeAccount, readApiError } from "./api";
 import { useAuth } from "./auth-context";
 
@@ -106,8 +108,8 @@ export function LoginPage(): React.JSX.Element {
         return;
       }
 
-      const body = (await response.json()) as { account: BackofficeAccount };
-      auth.setAccount(body.account);
+      const body = (await response.json()) as BackofficeAuthResponse;
+      auth.setAccount(body.account, body.demoStatus);
       navigate(safeTarget(searchParams.get("returnTo"), body.account), { replace: true });
     } catch (error) {
       setRequestError(error instanceof Error ? error.message : "登录请求失败，请稍后重试。");

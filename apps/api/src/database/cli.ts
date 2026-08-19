@@ -1,5 +1,6 @@
 import { createHash, createHmac } from "node:crypto";
 import { mkdir, readdir, readFile, rm } from "node:fs/promises";
+import { pathToFileURL } from "node:url";
 
 import { Pool, type PoolClient } from "pg";
 
@@ -9,6 +10,7 @@ import {
   getDemoNow,
   getPetUploadDirectory,
   redactDatabaseUrl,
+  resetRuntimeDemoNow,
 } from "../config/environment.js";
 import { hashPassword } from "../auth/password.js";
 import { addLocalDays, getLocalWeekday, getShanghaiLocalDate } from "../schedule/schedule-date.js";
@@ -88,6 +90,8 @@ async function seedServiceCatalog(client: PoolClient): Promise<void> {
          '在完整洗护基础上完成犬只造型修剪。', ARRAY['dog'], ARRAY['dog-styling'], 20, true, now()),
         ('cat-care', 'primary_service', '猫咪洗护',
          '为猫咪提供低刺激洗护、梳理与基础清洁。', ARRAY['cat'], ARRAY['cat-care'], 30, true, now()),
+        ('portfolio-claimable-care', 'primary_service', '作品集限定护理',
+         '用于演示唯一可争抢时段的固定服务。', ARRAY['dog'], ARRAY['cat-care', 'oral-care'], 40, true, now()),
         ('nail-care', 'addon', '修甲护理',
          '修整趾甲并检查足部状态。', ARRAY['dog', 'cat'], ARRAY['nail-care'], 10, true, now()),
         ('deshedding-care', 'addon', '除废毛护理',
@@ -120,6 +124,9 @@ async function seedServiceCatalog(client: PoolClient): Promise<void> {
         ('spec-cat-care-small', 'cat-care', 'small', 16800, 90, true, now()),
         ('spec-cat-care-medium', 'cat-care', 'medium', 21800, 120, true, now()),
         ('spec-cat-care-large', 'cat-care', 'large', 28800, 150, true, now()),
+        ('spec-portfolio-claimable-care-small', 'portfolio-claimable-care', 'small', 22800, 120, true, now()),
+        ('spec-portfolio-claimable-care-medium', 'portfolio-claimable-care', 'medium', 32800, 150, true, now()),
+        ('spec-portfolio-claimable-care-large', 'portfolio-claimable-care', 'large', 45800, 180, true, now()),
         ('spec-nail-care-small', 'nail-care', 'small', 3000, 15, true, now()),
         ('spec-nail-care-medium', 'nail-care', 'medium', 3000, 15, true, now()),
         ('spec-nail-care-large', 'nail-care', 'large', 3000, 15, true, now()),
@@ -151,7 +158,7 @@ async function seedServiceCatalog(client: PoolClient): Promise<void> {
   );
 }
 
-async function migrate(client: PoolClient): Promise<void> {
+export async function migrate(client: PoolClient): Promise<void> {
   await ensureMigrationTable(client);
 
   const files = (await readdir(migrationsDirectory))
@@ -186,10 +193,303 @@ async function migrate(client: PoolClient): Promise<void> {
   }
 }
 
-async function seed(client: PoolClient): Promise<void> {
+type SeedBookingStatus =
+  "confirmed" | "checked_in" | "completed" | "terminated" | "cancelled" | "no_show";
+
+interface SeedBooking {
+  id: string;
+  customerId: string;
+  petId: string;
+  petName: string;
+  staffId: "linxia" | "chenjia" | "zhouning" | "zhaohang";
+  staffName: "林夏" | "陈嘉" | "周宁" | "赵航";
+  startsAt: string;
+  status: SeedBookingStatus;
+  species?: "dog" | "cat";
+}
+
+function instantOn(localDate: string, clock: string): string {
+  return new Date(`${localDate}T${clock}:00+08:00`).toISOString();
+}
+
+function addMinutes(instant: string, minutes: number): string {
+  return new Date(Date.parse(instant) + minutes * 60_000).toISOString();
+}
+
+async function insertSeedBooking(client: PoolClient, booking: SeedBooking): Promise<void> {
+  const durationMinutes = booking.species === "cat" ? 90 : 60;
+  const endsAt = addMinutes(booking.startsAt, durationMinutes);
+  const originalOccupancyEndsAt = addMinutes(endsAt, 15);
+  const released = booking.status === "cancelled";
+  const occupancyStartsAt = released ? null : booking.startsAt;
+  const occupancyEndsAt =
+    booking.status === "no_show"
+      ? addMinutes(booking.startsAt, 15)
+      : booking.status === "terminated"
+        ? addMinutes(booking.startsAt, 15)
+        : booking.status === "completed"
+          ? addMinutes(endsAt, 7)
+          : released
+            ? null
+            : originalOccupancyEndsAt;
+  const serviceId = booking.species === "cat" ? "cat-care" : "dog-basic-care";
+  const serviceName = booking.species === "cat" ? "猫咪洗护" : "犬基础洗护";
+  const priceCents = booking.species === "cat" ? 16800 : 12800;
+  const createdAt = addMinutes(booking.startsAt, -3 * 24 * 60);
+  const completedAt = booking.status === "completed" ? addMinutes(endsAt, -8) : null;
+
+  try {
+    await client.query(
+      `INSERT INTO bookings (
+       id, customer_id, pet_id, staff_id, starts_at, ends_at,
+       occupancy_starts_at, occupancy_ends_at, service_duration_minutes, status,
+       pet_name_snapshot, pet_species_snapshot, pet_weight_kg_snapshot, pet_size_snapshot,
+       primary_service_id_snapshot, primary_service_name_snapshot,
+       primary_service_price_cents, primary_service_duration_minutes,
+       addon_snapshots, required_skill_ids_snapshot, total_price_cents,
+       staff_display_name_snapshot, turnover_minutes,
+       original_starts_at, original_ends_at,
+       original_occupancy_starts_at, original_occupancy_ends_at,
+       verification_code_digest, verification_code_seed, created_at, completed_at
+     )
+     VALUES (
+       $1, $2, $3, $4, $5, $6,
+       $7, $8, $9, $10,
+       $11, $12, $13, 'small',
+       $14, $15, $16, $9,
+       '[]'::jsonb, $17::jsonb, $16,
+       $18, 15,
+       $5, $6, $5, $19,
+       $20, $1, $21, $22
+     )`,
+      [
+        booking.id,
+        booking.customerId,
+        booking.petId,
+        booking.staffId,
+        booking.startsAt,
+        endsAt,
+        occupancyStartsAt,
+        occupancyEndsAt,
+        durationMinutes,
+        booking.status,
+        booking.petName,
+        booking.species ?? "dog",
+        booking.species === "cat" ? 4.8 : 8.2,
+        serviceId,
+        serviceName,
+        priceCents,
+        JSON.stringify([serviceId]),
+        booking.staffName,
+        originalOccupancyEndsAt,
+        seedVerificationCodeDigest(booking.customerId, booking.id, booking.id),
+        createdAt,
+        completedAt,
+      ],
+    );
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    throw new Error(`固定预约 ${booking.id} 写入失败：${message}`, { cause: error });
+  }
+}
+
+async function seedCompletePortfolio(
+  client: PoolClient,
+  scheduleStartsOn: string,
+  demoNow: string,
+): Promise<void> {
+  const generatedCustomers = Array.from({ length: 16 }, (_, index) => {
+    const number = String(index + 1).padStart(2, "0");
+    return {
+      id: `customer-seed-${number}`,
+      displayName: `演示顾客${number}`,
+      phone: `1350000${String(index + 1).padStart(4, "0")}`,
+    };
+  });
+  for (const customer of generatedCustomers) {
+    await client.query(
+      `INSERT INTO customers (id, display_name, phone, created_at)
+       VALUES ($1, $2, $3, $4)`,
+      [customer.id, customer.displayName, customer.phone, addMinutes(demoNow, -180 * 24 * 60)],
+    );
+  }
+
+  const generatedPets = Array.from({ length: 24 }, (_, index) => {
+    const number = String(index + 1).padStart(2, "0");
+    const customer = generatedCustomers[index % generatedCustomers.length]!;
+    return {
+      id: `pet-seed-${number}`,
+      customerId: customer.id,
+      name: `茸茸${number}`,
+    };
+  });
+  for (const pet of generatedPets) {
+    await client.query(
+      `INSERT INTO pets (
+         id, customer_id, name, species, weight_kg, breed, sex,
+         birth_date, coat_type, seed_photo_path, care_notes
+       )
+       VALUES ($1, $2, $3, 'dog', 8.2, '混种犬', 'female',
+               '2022-06-18', 'double', $4, '使用固定演示护理流程。')`,
+      [pet.id, pet.customerId, pet.name, "/assets/brand/pet-tuanzi-shiba.jpg"],
+    );
+  }
+
+  for (let index = 0; index < 236; index += 1) {
+    const pet = generatedPets[index % generatedPets.length]!;
+    const cycle = Math.floor(index / 180);
+    const localDate = addLocalDays(scheduleStartsOn, -(index % 180) - 1);
+    const status: SeedBookingStatus =
+      index % 12 === 0
+        ? "cancelled"
+        : index % 12 === 1
+          ? "no_show"
+          : index % 12 === 2
+            ? "terminated"
+            : "completed";
+    await insertSeedBooking(client, {
+      id: `booking-seed-history-${String(index + 1).padStart(3, "0")}`,
+      customerId: pet.customerId,
+      petId: pet.id,
+      petName: pet.name,
+      staffId: "zhouning",
+      staffName: "周宁",
+      startsAt: instantOn(localDate, cycle === 0 ? "00:30" : "03:00"),
+      status,
+    });
+  }
+
+  const firstCustomer = generatedCustomers[0]!;
+  const firstPet = generatedPets[0]!;
+  await insertSeedBooking(client, {
+    id: "booking-seed-late",
+    customerId: firstCustomer.id,
+    petId: firstPet.id,
+    petName: firstPet.name,
+    staffId: "zhaohang",
+    staffName: "赵航",
+    startsAt: instantOn(scheduleStartsOn, "10:30"),
+    status: "confirmed",
+  });
+  await insertSeedBooking(client, {
+    id: "booking-seed-checked-in",
+    customerId: generatedCustomers[1]!.id,
+    petId: generatedPets[1]!.id,
+    petName: generatedPets[1]!.name,
+    staffId: "zhouning",
+    staffName: "周宁",
+    startsAt: instantOn(scheduleStartsOn, "09:30"),
+    status: "checked_in",
+    species: "cat",
+  });
+  await insertSeedBooking(client, {
+    id: "booking-seed-awaiting-check-in",
+    customerId: generatedCustomers[2]!.id,
+    petId: generatedPets[2]!.id,
+    petName: generatedPets[2]!.name,
+    staffId: "zhouning",
+    staffName: "周宁",
+    startsAt: instantOn(scheduleStartsOn, "13:00"),
+    status: "confirmed",
+  });
+
+  const futureCandidates: Array<{
+    localDate: string;
+    clock: string;
+  }> = [
+    {
+      localDate: addLocalDays(scheduleStartsOn, 13),
+      clock: "10:30",
+    },
+  ];
+  for (let offset = 1; offset < 13; offset += 1) {
+    const localDate = addLocalDays(scheduleStartsOn, offset);
+    for (const clock of ["04:00", "06:30", "08:00"]) {
+      futureCandidates.push({
+        localDate,
+        clock,
+      });
+    }
+  }
+  for (const [index, candidate] of futureCandidates.slice(0, 35).entries()) {
+    const pet = generatedPets[(index + 1) % generatedPets.length]!;
+    await insertSeedBooking(client, {
+      id: `booking-seed-future-${String(index + 1).padStart(2, "0")}`,
+      customerId: pet.customerId,
+      petId: pet.id,
+      petName: pet.name,
+      staffId: "zhouning",
+      staffName: "周宁",
+      startsAt: instantOn(candidate.localDate, candidate.clock),
+      status: "confirmed",
+    });
+  }
+
+  await client.query(
+    `UPDATE bookings
+     SET created_at = CASE id
+       WHEN 'booking-maiya-today' THEN '2026-08-12T06:15:00.000Z'::timestamptz
+       WHEN 'booking-bohe-future' THEN '2026-08-13T02:42:00.000Z'::timestamptz
+       ELSE created_at
+     END
+     WHERE id IN ('booking-maiya-today', 'booking-bohe-future')`,
+  );
+
+  const pendingTimeOffDate = addLocalDays(scheduleStartsOn, 13);
+  const pendingBookingStart = instantOn(pendingTimeOffDate, "10:30");
+  await client.query(
+    `INSERT INTO staff_time_off_intervals (
+       id, staff_id, local_date, starts_at, ends_at, status, reason,
+       created_by, target_capacity_minutes, affected_booking_count,
+       impact_snapshot, created_at
+     )
+     VALUES (
+       'time-off-seed-pending', 'zhouning', $1, '10:30', '13:00',
+       'pending', '固定演示：逐笔处理受影响预约', 'manager', 150, 1, $2::jsonb, $3
+     )`,
+    [
+      pendingTimeOffDate,
+      JSON.stringify([
+        {
+          id: "booking-seed-future-01",
+          revision: 1,
+          status: "confirmed",
+          customerName: "演示顾客02",
+          petName: "茸茸02",
+          serviceName: "犬基础洗护",
+          staff: { id: "zhouning", displayName: "周宁" },
+          startsAt: pendingBookingStart,
+          endsAt: addMinutes(pendingBookingStart, 60),
+          turnoverEndsAt: addMinutes(pendingBookingStart, 75),
+        },
+      ]),
+      demoNow,
+    ],
+  );
+}
+
+export async function seedDemoData(client: PoolClient): Promise<void> {
+  const demoNow = getDemoNow();
   const entries = [
     ["brand", { name: "茸光宠物洗护" }],
-    ["seed", { version: 1 }],
+    ["seed", { version: 2 }],
+    ["demo_clock", { now: demoNow }],
+    [
+      "seed_manifest",
+      {
+        customers: 20,
+        pets: 28,
+        terminalBookings: 240,
+        activeBookings: 40,
+        scenarioIds: {
+          pendingTimeOff: "time-off-seed-pending",
+          failedNotification: "notification-seed-final-failed",
+          lateBooking: "booking-seed-late",
+          awaitingCheckIn: "booking-seed-awaiting-check-in",
+          checkedIn: "booking-seed-checked-in",
+        },
+      },
+    ],
   ] as const;
 
   for (const [key, value] of entries) {
@@ -323,7 +623,6 @@ async function seed(client: PoolClient): Promise<void> {
     );
   }
 
-  const demoNow = getDemoNow();
   const scheduleStartsOn = getShanghaiLocalDate(demoNow);
   let seededSaturdayException = false;
 
@@ -383,6 +682,24 @@ async function seed(client: PoolClient): Promise<void> {
       }
     }
   }
+
+  const portfolioScheduleDate = addLocalDays(scheduleStartsOn, 13);
+  await client.query(
+    `INSERT INTO staff_schedule_days (
+       id, staff_id, local_date, publication_status, source,
+       exception_kind, exception_note, published_at
+     )
+     VALUES (
+       'schedule-portfolio-claimable', 'zhouning', $1,
+       'published', 'date_exception', 'adjusted_shift',
+       '固定演示：唯一可争抢时段', $2
+     )`,
+    [portfolioScheduleDate, demoNow],
+  );
+  await client.query(
+    `INSERT INTO staff_schedule_shifts (id, schedule_day_id, starts_at, ends_at)
+     VALUES ('shift-portfolio-claimable', 'schedule-portfolio-claimable', '15:30', '17:45')`,
+  );
 
   const demoCustomers = [
     {
@@ -897,15 +1214,68 @@ async function seed(client: PoolClient): Promise<void> {
     `,
   );
 
+  await seedCompletePortfolio(client, scheduleStartsOn, demoNow);
+
+  await client.query(
+    `INSERT INTO notification_outbox (
+       id, booking_id, customer_id, notification_type, payload,
+       status, attempt_count, available_at, created_at
+     )
+     SELECT
+       'reminder-' || id,
+       id,
+       customer_id,
+       'booking_reminder',
+       jsonb_build_object(
+         'bookingId', id,
+         'petName', pet_name_snapshot,
+         'serviceName', primary_service_name_snapshot,
+         'staffName', staff_display_name_snapshot,
+         'startsAt', starts_at
+       ),
+       'sent',
+       1,
+       $1::timestamptz,
+       $1::timestamptz
+     FROM bookings
+     WHERE status = 'confirmed'
+       AND starts_at > $1::timestamptz
+       AND starts_at - interval '24 hours' <= $1::timestamptz
+       AND created_at <= starts_at - interval '24 hours'
+     ON CONFLICT (id) DO NOTHING`,
+    [demoNow],
+  );
+  await client.query(
+    `INSERT INTO notification_delivery_attempts (
+       id, notification_id, attempt_number, mode, result, detail, attempted_at
+     )
+     SELECT
+       'attempt-' || id || '-1',
+       'reminder-' || id,
+       1,
+       'automatic',
+       'sent',
+       '模拟微信通道发送成功',
+       $1::timestamptz
+     FROM bookings
+     WHERE status = 'confirmed'
+       AND starts_at > $1::timestamptz
+       AND starts_at - interval '24 hours' <= $1::timestamptz
+       AND created_at <= starts_at - interval '24 hours'
+     ON CONFLICT (id) DO NOTHING`,
+    [demoNow],
+  );
+
   console.info("种子已写入：茸光本地演示元数据、排班、顾客、宠物、预约与消息");
 }
 
-async function reset(client: PoolClient): Promise<void> {
+export async function resetDemoData(client: PoolClient): Promise<void> {
+  resetRuntimeDemoNow();
   await withTransaction(client, async () => {
     await client.query(
       "TRUNCATE TABLE app_metadata, pet_photo_deletion_outbox, audit_event_redactions, notification_delivery_attempts, notification_outbox, audit_events, capacity_change_booking_resolutions, booking_events, booking_idempotency_keys, booking_fulfilment_idempotency_keys, manager_booking_change_idempotency_keys, manager_proxy_booking_idempotency_keys, manager_proxy_booking_records, store_service_record_notes, store_service_records, staff_time_off_intervals, store_closure_intervals, staff_schedule_breaks, staff_schedule_shifts, staff_schedule_days, weekly_shift_template_breaks, weekly_shift_templates, store_business_hours, staff_skills, staff_members, privacy_consents, privacy_notices, bookings, pet_care_tags, pets, pet_photos, customer_sessions, demo_customer_profiles, customers, backoffice_sessions, backoffice_accounts, service_catalog_primary_addons, service_catalog_specifications, service_catalog_items, service_catalog_state",
     );
-    await seed(client);
+    await seedDemoData(client);
   });
   const petUploadDirectory = getPetUploadDirectory();
   await rm(petUploadDirectory, { force: true, recursive: true });
@@ -928,9 +1298,9 @@ async function run(): Promise<void> {
     if (command === "migrate") {
       await migrate(client);
     } else if (command === "seed") {
-      await seed(client);
+      await seedDemoData(client);
     } else {
-      await reset(client);
+      await resetDemoData(client);
     }
   } finally {
     client.release();
@@ -938,12 +1308,14 @@ async function run(): Promise<void> {
   }
 }
 
-run().catch((error: unknown) => {
-  const message = error instanceof Error ? error.message : String(error);
+if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
+  run().catch((error: unknown) => {
+    const message = error instanceof Error ? error.message : String(error);
 
-  console.error(`数据库命令失败：${message}`);
-  console.error(
-    `请确认 PostgreSQL 已健康，并检查 DATABASE_URL=${redactDatabaseUrl(getDatabaseUrl())}`,
-  );
-  process.exitCode = 1;
-});
+    console.error(`数据库命令失败：${message}`);
+    console.error(
+      `请确认 PostgreSQL 已健康，并检查 DATABASE_URL=${redactDatabaseUrl(getDatabaseUrl())}`,
+    );
+    process.exitCode = 1;
+  });
+}

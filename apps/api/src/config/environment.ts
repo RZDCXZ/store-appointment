@@ -2,6 +2,7 @@ import { fileURLToPath } from "node:url";
 
 const DEFAULT_DATABASE_URL = "postgresql://rongguang:rongguang_local@127.0.0.1:5432/rongguang";
 const DEFAULT_DEMO_NOW = "2026-08-13T02:50:00.000Z";
+let runtimeDemoNow: string | null = null;
 
 export function getDatabaseUrl(): string {
   return process.env.DATABASE_URL ?? DEFAULT_DATABASE_URL;
@@ -26,7 +27,7 @@ export function getAdminOrigin(): string {
 }
 
 export function getDemoNow(): string {
-  const value = process.env.DEMO_NOW ?? DEFAULT_DEMO_NOW;
+  const value = runtimeDemoNow ?? process.env.DEMO_NOW ?? DEFAULT_DEMO_NOW;
   const timestamp = new Date(value);
 
   if (Number.isNaN(timestamp.getTime())) {
@@ -34,6 +35,24 @@ export function getDemoNow(): string {
   }
 
   return timestamp.toISOString();
+}
+
+export function setRuntimeDemoNow(value: string): void {
+  const timestamp = new Date(value);
+
+  if (Number.isNaN(timestamp.getTime())) {
+    throw new Error(`演示时间必须是有效的 ISO 8601 时间，当前值为“${value}”。`);
+  }
+
+  runtimeDemoNow = timestamp.toISOString();
+}
+
+export function resetRuntimeDemoNow(): void {
+  runtimeDemoNow = null;
+}
+
+export function isDemoModeEnabled(): boolean {
+  return runtimeDemoNow !== null || process.env.DEMO_NOW !== undefined;
 }
 
 export function getSessionTtlSeconds(): number {

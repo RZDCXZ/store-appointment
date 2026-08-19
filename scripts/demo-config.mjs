@@ -25,7 +25,7 @@ export function resolveDemoEnvironment(environment) {
   const apiUrl = parseHttpUrl(apiBaseUrl, "VITE_API_BASE_URL");
 
   environment.DEMO_NOW = demoNow;
-  environment.VITE_DEMO_NOW = environment.VITE_DEMO_NOW ?? demoNow;
+  environment.VITE_DEMO_NOW = demoNow;
   environment.VITE_API_BASE_URL = apiBaseUrl;
 
   return {

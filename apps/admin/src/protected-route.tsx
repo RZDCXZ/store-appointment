@@ -47,7 +47,9 @@ export function RoleBoundary({ role }: { role: BackofficeRole }): React.JSX.Elem
     );
   }
 
-  return <BackofficeLayout account={auth.state.account} />;
+  return (
+    <BackofficeLayout account={auth.state.account} initialDemoStatus={auth.state.demoStatus} />
+  );
 }
 
 export function RootRedirect(): React.JSX.Element {

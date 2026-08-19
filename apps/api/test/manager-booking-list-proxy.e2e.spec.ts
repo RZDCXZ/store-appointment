@@ -239,7 +239,7 @@ describe("店长预约列表与代客预约", () => {
       primaryServiceId: "dog-basic-care",
       addonIds: [],
       staffId: "zhaohang",
-      startsAt: "2026-08-13T03:00:00.000Z",
+      startsAt: "2026-08-13T04:00:00.000Z",
       offlineConsentSource: "phone",
     };
     const create = () =>
@@ -259,7 +259,7 @@ describe("店长预约列表与代客预约", () => {
         status: "confirmed",
         pet: { id: "pet-tuanzi", name: "团子" },
         staff: { id: "zhaohang", displayName: "赵航" },
-        startsAt: "2026-08-13T03:00:00.000Z",
+        startsAt: "2026-08-13T04:00:00.000Z",
       },
       verificationCode: expect.stringMatching(/^\d{6}$/),
       proxyRecord: {
@@ -403,7 +403,7 @@ describe("店长预约列表与代客预约", () => {
       primaryServiceId: "dog-basic-care",
       addonIds: [],
       staffId: "zhaohang",
-      startsAt: "2026-08-13T05:00:00.000Z",
+      startsAt: "2026-08-13T07:30:00.000Z",
       offlineConsentSource: "in_store",
     };
     const requests = [
@@ -462,8 +462,8 @@ describe("店长预约列表与代客预约", () => {
           AND status NOT IN ('cancelled', 'no_show')
           AND tstzrange(occupancy_starts_at, occupancy_ends_at, '[)')
               && tstzrange(
-                '2026-08-13T05:00:00.000Z'::timestamptz,
-                '2026-08-13T06:15:00.000Z'::timestamptz,
+                '2026-08-13T07:30:00.000Z'::timestamptz,
+                '2026-08-13T08:45:00.000Z'::timestamptz,
                 '[)'
               )
       `,

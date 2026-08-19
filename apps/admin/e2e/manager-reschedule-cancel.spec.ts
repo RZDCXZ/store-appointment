@@ -47,6 +47,6 @@ test("店长改期与取消使用可刷新独立路由，并在详情中留下�
   await expect(page.getByRole("heading", { name: "薄荷的预约" })).toBeVisible();
   await expect(page.getByText("顾客电话确认调整到建议时段")).toBeVisible();
   await expect(page.getByText("顾客确认本次不再到店")).toBeVisible();
-  await expect(page.getByText("booking_rescheduled", { exact: true })).toBeVisible();
-  await expect(page.getByText("booking_cancelled", { exact: true })).toBeVisible();
+  await expect(page.getByText("booking_rescheduled", { exact: true }).first()).toBeVisible();
+  await expect(page.getByText("booking_cancelled", { exact: true }).first()).toBeVisible();
 });

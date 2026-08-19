@@ -10,10 +10,7 @@ export interface NotificationClock {
 
 @Injectable()
 export class DemoNotificationClock implements NotificationClock {
-  private readonly demoStartedAt = Date.parse(getDemoNow());
-  private readonly monotonicStartedAt = performance.now();
-
   now(): Date {
-    return new Date(this.demoStartedAt + performance.now() - this.monotonicStartedAt);
+    return new Date(getDemoNow());
   }
 }
