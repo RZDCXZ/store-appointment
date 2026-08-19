@@ -90,4 +90,7 @@ Page({
   openPrivacyConsent() {
     wx.navigateTo({ url: "/pages/privacy-consent/index" });
   },
+  openDataRights() {
+    wx.navigateTo({ url: "/pages/data-rights/index" });
+  },
 });

@@ -26,6 +26,7 @@ const recoverablePagePaths = new Set([
   "/pages/pets/index",
   "/pages/pet-form/index",
   "/pages/privacy-consent/index",
+  "/pages/data-rights/index",
   "/pages/booking-pet/index",
   "/pages/booking-service/index",
   "/pages/booking-staff/index",
@@ -272,4 +273,14 @@ export function takeRecoveryPath(): string | null {
 
 export function isCustomerTabPath(pagePath: string): boolean {
   return tabPaths.has(pagePath.split("?", 1)[0] ?? "");
+}
+
+export function clearCustomerSessionAfterDeletion(): void {
+  wx.removeStorageSync(SESSION_STORAGE_KEY);
+  wx.removeStorageSync(RECOVERY_PATH_STORAGE_KEY);
+  clearBookingDraft();
+  clearBookingConflict();
+  const state = appState();
+  state.customerSession = null;
+  state.customerSessionStatus = "missing";
 }

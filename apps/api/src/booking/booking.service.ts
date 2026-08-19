@@ -3700,9 +3700,13 @@ export class BookingService {
   ): Promise<PetRow> {
     const result = await client.query<PetRow>(
       `
-        SELECT id, name, species, weight_kg::text, archived_at
-        FROM pets
-        WHERE id = $1 AND customer_id = $2
+        SELECT pet.id, pet.name, pet.species, pet.weight_kg::text, pet.archived_at
+        FROM pets AS pet
+        JOIN customers AS customer ON customer.id = pet.customer_id
+        WHERE pet.id = $1
+          AND pet.customer_id = $2
+          AND customer.anonymized_at IS NULL
+        FOR KEY SHARE OF pet, customer
       `,
       [petId, customerId],
     );

@@ -2,6 +2,7 @@ import {
   Body,
   Controller,
   Get,
+  HttpCode,
   HttpException,
   HttpStatus,
   Inject,
@@ -13,12 +14,15 @@ import {
 import { ApiOperation, ApiTags } from "@nestjs/swagger";
 import type {
   DemoCustomerChoicesResponse,
+  CustomerDataRightsStatusResponse,
+  CustomerDataDeletionResponse,
   MiniappProfileResponse,
   MiniappSessionResponse,
 } from "@rongguang/contracts";
 import type { FastifyReply } from "fastify";
 
 import { CustomerSessionGuard } from "./customer-session.guard.js";
+import { CustomerDataRightsService } from "./customer-data-rights.service.js";
 import { CustomerSessionService } from "./customer-session.service.js";
 import type { AuthenticatedCustomerRequest } from "./customer-session.types.js";
 
@@ -29,7 +33,10 @@ interface DemoSessionBody {
 @ApiTags("mini-program customer")
 @Controller("miniapp")
 export class CustomerController {
-  constructor(@Inject(CustomerSessionService) private readonly sessions: CustomerSessionService) {}
+  constructor(
+    @Inject(CustomerSessionService) private readonly sessions: CustomerSessionService,
+    @Inject(CustomerDataRightsService) private readonly dataRights: CustomerDataRightsService,
+  ) {}
 
   @Get("demo-customers")
   @ApiOperation({ summary: "列出三个预置演示顾客及其故事语义" })
@@ -83,5 +90,41 @@ export class CustomerController {
 
     reply.header("Cache-Control", "no-store");
     return { customer };
+  }
+
+  @Get("data-rights")
+  @UseGuards(CustomerSessionGuard)
+  @ApiOperation({ summary: "查看当前顾客资料范围、匿名保留规则与删除阻断预约" })
+  dataRightsStatus(
+    @Req() request: AuthenticatedCustomerRequest,
+    @Res({ passthrough: true }) reply: FastifyReply,
+  ): Promise<CustomerDataRightsStatusResponse> {
+    reply.header("Cache-Control", "no-store");
+    return this.dataRights.status(request.customerIdentity.id);
+  }
+
+  @Post("data-deletion")
+  @HttpCode(HttpStatus.OK)
+  @UseGuards(CustomerSessionGuard)
+  @ApiOperation({ summary: "在处理未结束预约后匿名化当前顾客资料并撤销全部会话" })
+  deleteData(
+    @Req() request: AuthenticatedCustomerRequest,
+    @Body() body: unknown,
+  ): Promise<CustomerDataDeletionResponse> {
+    return this.dataRights.delete(request.customerIdentity.id, body);
+  }
+
+  @Get("data-export")
+  @UseGuards(CustomerSessionGuard)
+  @ApiOperation({ summary: "导出当前顾客本人的结构化可识别资料并记录审计" })
+  async exportData(
+    @Req() request: AuthenticatedCustomerRequest,
+    @Res() reply: FastifyReply,
+  ): Promise<void> {
+    const file = await this.dataRights.export(request.customerIdentity.id);
+    reply.header("Cache-Control", "no-store");
+    reply.header("Content-Type", "application/json; charset=utf-8");
+    reply.header("Content-Disposition", `attachment; filename="${file.filename}"`);
+    reply.send(file.body);
   }
 }

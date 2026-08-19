@@ -183,4 +183,18 @@ describe("原生小程序项目契约", () => {
       ),
     );
   });
+
+  it("MP-18 数据权利是可直接打开并从当前会话刷新恢复的独立原生页面", async () => {
+    const appConfig = JSON.parse(
+      await readFile(new URL("../miniprogram/app.json", import.meta.url), "utf8"),
+    ) as { pages: string[] };
+    const dataRightsPage = "pages/data-rights/index";
+
+    expect(appConfig.pages).toContain(dataRightsPage);
+    await Promise.all(
+      ["ts", "json", "wxml", "wxss"].map((extension) =>
+        access(new URL(`../miniprogram/${dataRightsPage}.${extension}`, import.meta.url)),
+      ),
+    );
+  });
 });

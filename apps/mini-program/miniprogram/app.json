@@ -9,6 +9,7 @@
     "pages/pets/index",
     "pages/pet-form/index",
     "pages/privacy-consent/index",
+    "pages/data-rights/index",
     "pages/booking-pet/index",
     "pages/booking-service/index",
     "pages/booking-staff/index",

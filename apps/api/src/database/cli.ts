@@ -418,7 +418,8 @@ async function seed(client: PoolClient): Promise<void> {
         VALUES ($1, $2, $3)
         ON CONFLICT (id) DO UPDATE
         SET display_name = excluded.display_name,
-            phone = excluded.phone
+            phone = excluded.phone,
+            anonymized_at = NULL
       `,
       [customer.id, customer.displayName, customer.phone],
     );
@@ -441,7 +442,8 @@ async function seed(client: PoolClient): Promise<void> {
       VALUES ('customer-gu-yan', '顾言', '13712345678')
       ON CONFLICT (id) DO UPDATE
       SET display_name = excluded.display_name,
-          phone = excluded.phone
+          phone = excluded.phone,
+          anonymized_at = NULL
     `,
   );
 

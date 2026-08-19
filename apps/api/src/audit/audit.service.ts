@@ -23,9 +23,10 @@ export interface AppendAuditFact {
     | "capacity_change_status_changed"
     | "capacity_change_booking_resolved"
     | "capacity_change_revoked"
-    | "data_exported";
+    | "data_exported"
+    | "customer_data_anonymized";
   actor: {
-    type: "staff" | "manager";
+    type: "customer" | "staff" | "manager";
     id: string;
   };
   subject: {
@@ -39,7 +40,8 @@ export interface AppendAuditFact {
       | "published_schedule"
       | "staff_time_off"
       | "store_closure"
-      | "store";
+      | "store"
+      | "customer";
     id: string;
   };
   payload: Record<string, unknown>;

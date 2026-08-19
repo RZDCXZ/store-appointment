@@ -469,6 +469,7 @@ export class ManagerLiveBookingService {
           LEFT JOIN pets AS pet
             ON pet.customer_id = customer.id
            AND pet.archived_at IS NULL
+          WHERE customer.anonymized_at IS NULL
           ORDER BY customer.display_name, customer.id, pet.created_at, pet.id
         `,
       ),

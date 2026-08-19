@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import {
+  clearCustomerSessionAfterDeletion,
   rememberRecoveryPath,
   restoreCustomerSession,
   switchDemoCustomer,
@@ -76,5 +77,30 @@ describe("小程序启动会话恢复", () => {
 
     expect(storage.has("rongguang.booking-draft.v1")).toBe(false);
     expect(globalData.customerSession?.customerKey).toBe("cheng-mo");
+  });
+
+  it("匿名化成功后同步清除本地会话、恢复路径与预约上下文", () => {
+    const storage = new Map<string, unknown>([
+      ["rongguang.customer-session", { accessToken: "old-token" }],
+      ["rongguang.customer-recovery-path", "/pages/data-rights/index"],
+      ["rongguang.booking-draft.v1", { petId: "pet-lizi" }],
+      ["rongguang.booking-conflict.v1", { bookingId: "booking-old" }],
+    ]);
+    const globalData = {
+      apiBaseUrl: "http://api.local",
+      customerSession: { accessToken: "old-token" },
+      customerSessionStatus: "active",
+    } as RongguangApp["globalData"];
+    vi.stubGlobal("getApp", () => ({ globalData }));
+    vi.stubGlobal("wx", {
+      getStorageSync: (key: string) => storage.get(key),
+      setStorageSync: (key: string, value: unknown) => storage.set(key, value),
+      removeStorageSync: (key: string) => storage.delete(key),
+    });
+
+    clearCustomerSessionAfterDeletion();
+
+    expect([...storage.keys()]).toEqual([]);
+    expect(globalData).toMatchObject({ customerSession: null, customerSessionStatus: "missing" });
   });
 });

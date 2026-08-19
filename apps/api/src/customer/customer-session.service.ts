@@ -67,6 +67,7 @@ export class CustomerSessionService {
                profile.story
         FROM demo_customer_profiles AS profile
         JOIN customers AS customer ON customer.id = profile.customer_id
+        WHERE customer.anonymized_at IS NULL
         ORDER BY profile.sort_order
       `,
     );
@@ -84,7 +85,7 @@ export class CustomerSessionService {
                profile.story
         FROM demo_customer_profiles AS profile
         JOIN customers AS customer ON customer.id = profile.customer_id
-        WHERE profile.demo_key = $1
+        WHERE profile.demo_key = $1 AND customer.anonymized_at IS NULL
       `,
       [demoKey],
     );
@@ -138,7 +139,7 @@ export class CustomerSessionService {
         FROM customer_sessions AS session
         JOIN customers AS customer ON customer.id = session.customer_id
         JOIN demo_customer_profiles AS profile ON customer.id = profile.customer_id
-        WHERE session.token_hash = $1
+        WHERE session.token_hash = $1 AND customer.anonymized_at IS NULL
       `,
       [hash],
     );

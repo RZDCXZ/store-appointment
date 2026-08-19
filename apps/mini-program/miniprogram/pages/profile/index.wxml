@@ -36,7 +36,7 @@
     <view class="selector-heading">
       <view>
         <text class="selector-heading__title">选择一个故事</text>
-        <text class="selector-heading__body">三位顾客分别预留不同预约场景</text>
+        <text class="selector-heading__body">预置顾客分别保留不同预约场景</text>
       </view>
       <button wx:if="{{currentCustomer}}" class="text-button" bindtap="closeSelector">收起</button>
     </view>
@@ -85,7 +85,10 @@
       <text>隐私同意</text>
       <text class="profile-menu__detail">版本与同意事实 ›</text>
     </button>
-    <view class="profile-menu__row"><text>数据边界</text><text class="profile-menu__detail">仅本人资料</text></view>
+    <button class="profile-menu__row profile-menu__button" bindtap="openDataRights">
+      <text>数据与隐私</text>
+      <text class="profile-menu__detail">导出或删除本人资料 ›</text>
+    </button>
   </view>
 
   <view class="store-card">
