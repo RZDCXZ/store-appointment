@@ -821,4 +821,129 @@ describe("逐笔处理受影响预约", () => {
       ]),
     });
   });
+
+  it("确认现有结果拒绝覆盖页面读取后再次变化的预约事实", async () => {
+    const bookingId = await createBooking(
+      "impact-existing-fact-stale-booking",
+      "2026-08-26T02:00:00.000Z",
+    );
+    const timeOffId = await createTimeOff("2026-08-26", "10:00", "11:15");
+
+    const firstOptions = await app.inject({
+      method: "GET",
+      url: `/backoffice/manager/bookings/${bookingId}/reschedule-options`,
+      headers: { cookie: managerCookie },
+    });
+    const firstOptionBody = firstOptions.json<{
+      bookingRevision: number;
+      booking: { staff: { id: string }; startsAt: string };
+      availability: {
+        days: Array<{ slots: Array<{ staff: { id: string }; startsAt: string }> }>;
+      } | null;
+    }>();
+    const firstTarget = firstOptionBody.availability?.days.flatMap((day) => day.slots)[0];
+    expect(firstTarget).toBeDefined();
+    const firstMove = await app.inject({
+      method: "POST",
+      url: `/backoffice/manager/bookings/${bookingId}/reschedule`,
+      headers: { cookie: managerCookie, origin: adminOrigin },
+      payload: {
+        idempotencyKey: `impact-existing-fact-first-move:${runId}`,
+        reason: "先从预约详情调整到容量变化区间外",
+        expectedStaffId: firstOptionBody.booking.staff.id,
+        expectedStartsAt: firstOptionBody.booking.startsAt,
+        expectedBookingRevision: firstOptionBody.bookingRevision,
+        staffId: firstTarget?.staff.id,
+        startsAt: firstTarget?.startsAt,
+      },
+    });
+    expect(firstMove.statusCode).toBe(201);
+
+    const afterFirstMove = await app.inject({
+      method: "GET",
+      url: `/backoffice/manager/capacity-changes/time_off/${timeOffId}`,
+      headers: { cookie: managerCookie },
+    });
+    const firstChangedFact = afterFirstMove.json<{
+      impactedBookings: Array<{
+        bookingRevision: number;
+        requiresAcknowledgement: boolean;
+      }>;
+    }>().impactedBookings[0];
+    expect(firstChangedFact?.requiresAcknowledgement).toBe(true);
+
+    const secondOptions = await app.inject({
+      method: "GET",
+      url: `/backoffice/manager/bookings/${bookingId}/reschedule-options`,
+      headers: { cookie: managerCookie },
+    });
+    const secondOptionBody = secondOptions.json<{
+      bookingRevision: number;
+      booking: { staff: { id: string }; startsAt: string };
+      availability: {
+        days: Array<{ slots: Array<{ staff: { id: string }; startsAt: string }> }>;
+      } | null;
+    }>();
+    const secondTarget = secondOptionBody.availability?.days.flatMap((day) => day.slots)[0];
+    expect(secondTarget).toBeDefined();
+    const secondMove = await app.inject({
+      method: "POST",
+      url: `/backoffice/manager/bookings/${bookingId}/reschedule`,
+      headers: { cookie: managerCookie, origin: adminOrigin },
+      payload: {
+        idempotencyKey: `impact-existing-fact-second-move:${runId}`,
+        reason: "再次调整后要求处理页重新核对",
+        expectedStaffId: secondOptionBody.booking.staff.id,
+        expectedStartsAt: secondOptionBody.booking.startsAt,
+        expectedBookingRevision: secondOptionBody.bookingRevision,
+        staffId: secondTarget?.staff.id,
+        startsAt: secondTarget?.startsAt,
+      },
+    });
+    expect(secondMove.statusCode).toBe(201);
+
+    const staleAcknowledgement = await app.inject({
+      method: "POST",
+      url: `/backoffice/manager/capacity-changes/time_off/${timeOffId}/bookings/${bookingId}/resolve`,
+      headers: { cookie: managerCookie, origin: adminOrigin },
+      payload: {
+        action: "acknowledge_existing",
+        reason: "旧页面不能确认已经再次变化的预约事实",
+        idempotencyKey: `impact-existing-fact-stale-ack:${runId}`,
+        expectedBookingRevision: firstChangedFact?.bookingRevision,
+      },
+    });
+    expect(staleAcknowledgement.statusCode).toBe(409);
+    expect(staleAcknowledgement.json()).toMatchObject({ code: "BOOKING_FACT_CHANGED" });
+
+    const latest = await app.inject({
+      method: "GET",
+      url: `/backoffice/manager/capacity-changes/time_off/${timeOffId}`,
+      headers: { cookie: managerCookie },
+    });
+    const latestImpact = latest.json<{
+      progress: { resolved: number; total: number };
+      impactedBookings: Array<{ bookingRevision: number; requiresAcknowledgement: boolean }>;
+    }>();
+    expect(latestImpact.progress).toEqual({ resolved: 0, total: 1 });
+    expect(latestImpact.impactedBookings[0]?.requiresAcknowledgement).toBe(true);
+
+    const acknowledged = await app.inject({
+      method: "POST",
+      url: `/backoffice/manager/capacity-changes/time_off/${timeOffId}/bookings/${bookingId}/resolve`,
+      headers: { cookie: managerCookie, origin: adminOrigin },
+      payload: {
+        action: "acknowledge_existing",
+        reason: "刷新后已核对最新预约事实",
+        idempotencyKey: `impact-existing-fact-current-ack:${runId}`,
+        expectedBookingRevision: latestImpact.impactedBookings[0]?.bookingRevision,
+      },
+    });
+    expect(acknowledged.statusCode).toBe(201);
+    expect(acknowledged.json()).toMatchObject({
+      change: { status: "active" },
+      progress: { resolved: 1, total: 1 },
+      resolvedBooking: { action: "acknowledge_existing", bookingId },
+    });
+  });
 });

@@ -1759,6 +1759,13 @@ export class BookingService {
       let result: CustomerBookingSchedule | null | undefined;
       const resolutionAction: CapacityChangeResolution["action"] = input.action;
       if (input.action === "acknowledge_existing") {
+        if (input.expectedBookingRevision !== row.verification_code_version) {
+          businessError(
+            "BOOKING_FACT_CHANGED",
+            "预约事实已再次变化，请刷新并核对最新结果后再确认。",
+            HttpStatus.CONFLICT,
+          );
+        }
         if (!factChanged || stillAffected) {
           businessError(
             "BOOKING_STILL_IMPACTED",
