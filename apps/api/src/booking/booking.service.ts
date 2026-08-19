@@ -822,6 +822,30 @@ function currentSelection(row: BookingRow): BookingSelectionQuote {
   };
 }
 
+function auditSelection(selection: BookingSelectionQuote): Record<string, unknown> {
+  return {
+    pet: {
+      id: selection.pet.id,
+      species: selection.pet.species,
+      weightKg: selection.pet.weightKg,
+      petSize: selection.pet.petSize,
+    },
+    primaryService: {
+      id: selection.primaryService.id,
+      priceCents: selection.primaryService.priceCents,
+      durationMinutes: selection.primaryService.durationMinutes,
+    },
+    addons: selection.addons.map((addon) => ({
+      id: addon.id,
+      priceCents: addon.priceCents,
+      durationMinutes: addon.durationMinutes,
+    })),
+    totalPriceCents: selection.totalPriceCents,
+    serviceDurationMinutes: selection.serviceDurationMinutes,
+    requiredSkillIds: selection.requiredSkillIds,
+  };
+}
+
 function customerActions(row: BookingRow): CustomerBookingActions {
   const cutoffAt = new Date(row.starts_at.getTime() - 12 * 60 * 60_000).toISOString();
   const beforeOrAtCutoff = Date.parse(getDemoNow()) <= Date.parse(cutoffAt);
@@ -1886,7 +1910,7 @@ export class BookingService {
           JSON.stringify({
             bookingId,
             action: resolutionAction,
-            reason: input.reason,
+            reasonRecorded: true,
             bookingEventId,
           }),
           occurredAt,
@@ -2903,7 +2927,7 @@ export class BookingService {
         context.actorType,
         context.actorId,
         row.id,
-        JSON.stringify(payload),
+        JSON.stringify({ reasonRecorded: true, previous, next: null }),
         occurredAt,
       ],
     );
@@ -3036,7 +3060,7 @@ export class BookingService {
         context.actorType,
         context.actorId,
         row.id,
-        JSON.stringify(payload),
+        JSON.stringify({ reasonRecorded: true, previous, next }),
         occurredAt,
       ],
     );
@@ -3130,7 +3154,17 @@ export class BookingService {
           'booking', $3, $4::jsonb, $5
         )
       `,
-      [randomUUID(), manager.id, row.id, JSON.stringify(payload), occurredAt],
+      [
+        randomUUID(),
+        manager.id,
+        row.id,
+        JSON.stringify({
+          reasonRecorded: true,
+          previous: auditSelection(previous),
+          next: auditSelection(next),
+        }),
+        occurredAt,
+      ],
     );
     await client.query(
       `

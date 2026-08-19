@@ -76,4 +76,68 @@ export class AuditService {
       ],
     );
   }
+
+  async redactCustomer(
+    customerId: string,
+    redactedAt: string,
+    connection: Pool | PoolClient = this.database.pool,
+  ): Promise<void> {
+    await connection.query(
+      `INSERT INTO audit_event_redactions (
+         audit_event_id, actor_id, payload, redacted_at, reason
+       )
+       SELECT audit.id,
+              CASE
+                WHEN audit.actor_type = 'customer' THEN 'anonymized-customer'
+                ELSE audit.actor_id
+              END,
+              jsonb_set(
+                jsonb_set(
+                  jsonb_set(
+                    jsonb_set(
+                      CASE
+                        WHEN audit.payload ? 'reason' THEN jsonb_set(
+                          audit.payload,
+                          '{reason}',
+                          to_jsonb('[原原因已匿名化]'::text),
+                          false
+                        )
+                        ELSE audit.payload
+                      END - 'customerPhone' - 'phone' - 'customer' - 'serviceRecord',
+                      '{customerName}',
+                      to_jsonb('已匿名顾客'::text),
+                      false
+                    ),
+                    '{petName}',
+                    to_jsonb('已匿名宠物'::text),
+                    false
+                  ),
+                  '{previous,pet,name}',
+                  to_jsonb('已匿名宠物'::text),
+                  false
+                ),
+                '{next,pet,name}',
+                to_jsonb('已匿名宠物'::text),
+                false
+              ),
+              $2::timestamptz,
+              'customer_data_anonymized'
+       FROM audit_events AS audit
+       WHERE (
+         audit.actor_id = $1
+         OR (audit.subject_type = 'customer' AND audit.subject_id = $1)
+         OR EXISTS (
+           SELECT 1
+           FROM bookings AS booking
+           WHERE booking.customer_id = $1
+             AND (
+               (audit.subject_type = 'booking' AND audit.subject_id = booking.id)
+               OR audit.payload ->> 'bookingId' = booking.id
+             )
+         )
+       )
+       ON CONFLICT (audit_event_id) DO NOTHING`,
+      [customerId, redactedAt],
+    );
+  }
 }

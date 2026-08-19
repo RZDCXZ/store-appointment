@@ -14,6 +14,11 @@ const correctionEventId = "event-lu-data-rights-correction";
 const notificationId = "notification-lu-data-rights";
 const capacityChangeId = "store-closure-lu-data-rights";
 const capacityResolutionId = "capacity-resolution-lu-data-rights";
+const serviceRecordId = "service-record-lu-data-rights";
+const serviceRecordNoteId = "service-record-note-lu-data-rights";
+const auditHistoryId = "audit-lu-data-rights-history";
+const auditCorrectionId = "audit-lu-data-rights-correction";
+const auditCapacityId = "audit-lu-data-rights-capacity";
 
 async function customerAuthorization(
   app: NestFastifyApplication,
@@ -56,6 +61,24 @@ describe("顾客数据导出与匿名化删除", () => {
   let luAuthorization: string;
   let uploadedPhotoStorageKey = "";
 
+  async function cleanupServiceRecordFixture(): Promise<void> {
+    const connection = await database.pool.connect();
+    try {
+      await connection.query("BEGIN");
+      await connection.query("SET LOCAL session_replication_role = replica");
+      await connection.query("DELETE FROM store_service_record_notes WHERE id = $1", [
+        serviceRecordNoteId,
+      ]);
+      await connection.query("DELETE FROM store_service_records WHERE id = $1", [serviceRecordId]);
+      await connection.query("COMMIT");
+    } catch (error) {
+      await connection.query("ROLLBACK");
+      throw error;
+    } finally {
+      connection.release();
+    }
+  }
+
   beforeAll(async () => {
     vi.stubEnv("DEMO_NOW", "2026-08-13T02:50:00.000Z");
     app = await createApplication();
@@ -66,6 +89,7 @@ describe("顾客数据导出与匿名化删除", () => {
   });
 
   afterAll(async () => {
+    await cleanupServiceRecordFixture();
     await database.pool.query("DELETE FROM store_closure_intervals WHERE id = $1", [
       capacityChangeId,
     ]);
@@ -283,6 +307,7 @@ describe("顾客数据导出与匿名化删除", () => {
     expect(missingConfirmation.json()).toMatchObject({
       code: "ANONYMIZATION_CONFIRMATION_REQUIRED",
     });
+    await cleanupServiceRecordFixture();
 
     const pngBytes = Buffer.from([
       0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0x00, 0x00, 0x00, 0x0d,
@@ -361,6 +386,32 @@ describe("顾客数据导出与匿名化删除", () => {
       ],
     );
     await database.pool.query(
+      `INSERT INTO store_service_records (
+         id, booking_id, pet_snapshot, primary_service_snapshot, addon_snapshots,
+         staff_snapshot, actual_starts_at, actual_ends_at, care_tags, internal_text, created_at
+       ) VALUES (
+         $1, 'booking-lizi-no-show', $2::jsonb, $3::jsonb, '[]'::jsonb, $4::jsonb,
+         '2026-07-18T03:02:00.000Z', '2026-07-18T04:20:00.000Z',
+         '["耳部需轻柔"]'::jsonb, '栗子需要轻柔清洁耳部。', '2026-07-18T04:20:00.000Z'
+       )`,
+      [
+        serviceRecordId,
+        JSON.stringify(previousSelection.pet),
+        JSON.stringify(previousSelection.primaryService),
+        JSON.stringify({ id: "zhaohang", displayName: "赵航" }),
+      ],
+    );
+    await database.pool.query(
+      `INSERT INTO store_service_record_notes (
+         id, service_record_id, kind, note_text, author_type,
+         author_id, author_display_name, created_at
+       ) VALUES (
+         $1, $2, 'manager_correction', '陆遥补充：栗子对吹风敏感。',
+         'manager', 'manager', '沈青', '2026-07-18T04:30:00.000Z'
+       )`,
+      [serviceRecordNoteId, serviceRecordId],
+    );
+    await database.pool.query(
       `INSERT INTO notification_outbox (
          id, booking_id, customer_id, notification_type, payload,
          status, available_at, created_at
@@ -435,6 +486,40 @@ describe("顾客数据导出与匿名化删除", () => {
         JSON.stringify(nextSchedule),
         historyEventId,
         JSON.stringify(capacityResponse),
+      ],
+    );
+    await database.pool.query(
+      `INSERT INTO audit_events (
+         id, event_type, actor_type, actor_id, subject_type, subject_id, payload, occurred_at
+       ) VALUES
+         ($1, 'customer_booking_rescheduled', 'customer', 'customer-lu-yao',
+          'booking', 'booking-lizi-cancelled', $2::jsonb, '2026-07-02T02:50:00.000Z'),
+         ($3, 'manager_booking_content_corrected', 'manager', 'manager',
+          'booking', 'booking-lizi-cancelled', $4::jsonb, '2026-07-02T02:55:00.000Z'),
+         ($5, 'capacity_change_booking_resolved', 'manager', 'manager',
+          'store_closure', $6, $7::jsonb, '2026-07-02T03:00:00.000Z')
+       ON CONFLICT (id) DO NOTHING`,
+      [
+        auditHistoryId,
+        JSON.stringify({
+          reason: "陆遥来电要求改期",
+          previous: previousSchedule,
+          next: nextSchedule,
+        }),
+        auditCorrectionId,
+        JSON.stringify({
+          reason: "栗子的体重已更新",
+          previous: previousSelection,
+          next: nextSelection,
+        }),
+        auditCapacityId,
+        capacityChangeId,
+        JSON.stringify({
+          bookingId: "booking-lizi-cancelled",
+          action: "reschedule",
+          reason: "陆遥来电确认改期",
+          bookingEventId: historyEventId,
+        }),
       ],
     );
 
@@ -624,6 +709,57 @@ describe("顾客数据导出与匿名化删除", () => {
     expect(
       JSON.stringify(retainedEvents.rows) + JSON.stringify(retainedCapacity.rows),
     ).not.toContain("栗子");
+
+    const retainedServiceRecord = await database.pool.query<{
+      pet_snapshot: Record<string, unknown>;
+      care_tags: unknown[];
+      internal_text: string | null;
+      note_text: string;
+    }>(
+      `SELECT record.pet_snapshot, record.care_tags, record.internal_text, note.note_text
+       FROM store_service_records AS record
+       JOIN store_service_record_notes AS note ON note.service_record_id = record.id
+       WHERE record.id = $1`,
+      [serviceRecordId],
+    );
+    expect(retainedServiceRecord.rows).toEqual([
+      {
+        pet_snapshot: {
+          ...previousSelection.pet,
+          id: `anonymized-${serviceRecordId}`,
+          name: "已匿名宠物",
+        },
+        care_tags: [],
+        internal_text: null,
+        note_text: "[原说明已匿名化]",
+      },
+    ]);
+
+    const rawAudits = await database.pool.query<{ payload: Record<string, unknown> }>(
+      `SELECT payload FROM audit_events
+       WHERE id = ANY($1::text[])
+       ORDER BY id`,
+      [[auditHistoryId, auditCorrectionId, auditCapacityId]],
+    );
+    const effectiveAudits = await database.pool.query<{
+      id: string;
+      actor_id: string;
+      payload: Record<string, unknown>;
+    }>(
+      `SELECT id, actor_id, payload FROM effective_audit_events
+       WHERE id = ANY($1::text[])
+       ORDER BY id`,
+      [[auditHistoryId, auditCorrectionId, auditCapacityId]],
+    );
+    expect(JSON.stringify(rawAudits.rows)).toContain("陆遥");
+    expect(JSON.stringify(rawAudits.rows)).toContain("栗子");
+    expect(JSON.stringify(effectiveAudits.rows)).not.toContain("陆遥");
+    expect(JSON.stringify(effectiveAudits.rows)).not.toContain("栗子");
+    expect(effectiveAudits.rows).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ id: auditHistoryId, actor_id: "anonymized-customer" }),
+      ]),
+    );
 
     const managerProfile = await app.inject({
       method: "GET",

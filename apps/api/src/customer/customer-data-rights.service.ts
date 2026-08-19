@@ -216,25 +216,29 @@ export class CustomerDataRightsService implements OnModuleInit {
   }
 
   private async drainPhotoDeletionOutbox(storageKeys?: string[]): Promise<void> {
-    const result = await this.database.pool.query<PhotoDeletionRow>(
-      `SELECT id, storage_key
-       FROM pet_photo_deletion_outbox
-       WHERE $1::text[] IS NULL OR storage_key = ANY($1::text[])
-       ORDER BY created_at, id`,
-      [storageKeys ?? null],
-    );
-    await Promise.all(
-      result.rows.map(async (photo) => {
-        try {
-          await unlink(join(getPetUploadDirectory(), photo.storage_key));
-        } catch (error) {
-          if ((error as NodeJS.ErrnoException).code !== "ENOENT") return;
-        }
-        await this.database.pool.query("DELETE FROM pet_photo_deletion_outbox WHERE id = $1", [
-          photo.id,
-        ]);
-      }),
-    );
+    try {
+      const result = await this.database.pool.query<PhotoDeletionRow>(
+        `SELECT id, storage_key
+         FROM pet_photo_deletion_outbox
+         WHERE $1::text[] IS NULL OR storage_key = ANY($1::text[])
+         ORDER BY created_at, id`,
+        [storageKeys ?? null],
+      );
+      await Promise.all(
+        result.rows.map(async (photo) => {
+          try {
+            await unlink(join(getPetUploadDirectory(), photo.storage_key));
+          } catch (error) {
+            if ((error as NodeJS.ErrnoException).code !== "ENOENT") return;
+          }
+          await this.database.pool
+            .query("DELETE FROM pet_photo_deletion_outbox WHERE id = $1", [photo.id])
+            .catch(() => undefined);
+        }),
+      );
+    } catch {
+      // 匿名化已提交；保留无身份关联的任务供下次启动重试，不能把成功响应改写为 500。
+    }
   }
 
   async status(customerId: string): Promise<CustomerDataRightsStatusResponse> {
@@ -561,9 +565,10 @@ export class CustomerDataRightsService implements OnModuleInit {
         },
         client,
       );
+      await this.audits.redactCustomer(customerId, anonymizedAt, client);
       await client.query("COMMIT");
 
-      await this.drainPhotoDeletionOutbox(deletedPhotoStorageKeys);
+      await this.drainPhotoDeletionOutbox(deletedPhotoStorageKeys).catch(() => undefined);
 
       return { anonymizedAt, retained: retainedFacts, sessionsRevoked: true };
     } catch (error) {
