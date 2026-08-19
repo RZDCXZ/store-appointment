@@ -1,10 +1,14 @@
-import { Body, Controller, Get, Inject, Post, Req, UseGuards } from "@nestjs/common";
+import { Body, Controller, Get, Inject, Param, Post, Req, Res, UseGuards } from "@nestjs/common";
 import { ApiOperation, ApiTags } from "@nestjs/swagger";
 import type {
   CapacityChangeCreateResponse,
+  CapacityChangeDetailResponse,
   CapacityChangePreviewResponse,
   ManagerCapacityChangeOptionsResponse,
+  RevokeCapacityChangeResponse,
+  ResolveCapacityChangeBookingResponse,
 } from "@rongguang/contracts";
+import type { FastifyReply } from "fastify";
 
 import type { AuthenticatedRequest } from "../auth/auth.types.js";
 import { ManagerGuard } from "../auth/manager.guard.js";
@@ -38,5 +42,45 @@ export class CapacityChangeController {
     @Body() body: unknown,
   ): Promise<CapacityChangeCreateResponse> {
     return this.capacityChanges.create(request.backofficeIdentity, body);
+  }
+
+  @Get(":kind/:changeId")
+  @ApiOperation({ summary: "读取可刷新恢复的受影响预约处理进度与可用方案" })
+  detail(
+    @Param("kind") kind: string,
+    @Param("changeId") changeId: string,
+    @Res({ passthrough: true }) reply: FastifyReply,
+  ): Promise<CapacityChangeDetailResponse> {
+    reply.header("Cache-Control", "no-store");
+    return this.capacityChanges.detail(kind, changeId);
+  }
+
+  @Post(":kind/:changeId/bookings/:bookingId/resolve")
+  @ApiOperation({ summary: "逐笔原子换员工、改期或取消受影响预约" })
+  resolve(
+    @Param("kind") kind: string,
+    @Param("changeId") changeId: string,
+    @Param("bookingId") bookingId: string,
+    @Req() request: AuthenticatedRequest,
+    @Body() body: unknown,
+  ): Promise<ResolveCapacityChangeBookingResponse> {
+    return this.capacityChanges.resolve(
+      request.backofficeIdentity,
+      kind,
+      changeId,
+      bookingId,
+      body,
+    );
+  }
+
+  @Post(":kind/:changeId/revoke")
+  @ApiOperation({ summary: "撤销尚未处理完成的员工停班并保留已成立处理结果" })
+  revoke(
+    @Param("kind") kind: string,
+    @Param("changeId") changeId: string,
+    @Req() request: AuthenticatedRequest,
+    @Body() body: unknown,
+  ): Promise<RevokeCapacityChangeResponse> {
+    return this.capacityChanges.revoke(request.backofficeIdentity, kind, changeId, body);
   }
 }

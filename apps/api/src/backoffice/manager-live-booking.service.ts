@@ -661,7 +661,7 @@ export class ManagerLiveBookingService {
         kind: isTimeOff ? "pending_time_off" : "pending_store_closure",
         title: isTimeOff ? "待处理停班" : "待处理临时闭店",
         detail: `${change.local_date} ${isTimeOff ? `${change.staff_display_name ?? "员工"} ` : ""}${change.starts_at}–${change.ends_at}，影响 ${change.affected_booking_count} 笔预约`,
-        href: `/manager/appointments/calendar?date=${change.local_date}`,
+        href: `/manager/schedule/capacity-changes/${change.kind}/${change.id}`,
       });
     }
 

@@ -20,7 +20,9 @@ export interface AppendAuditFact {
     | "schedule_published"
     | "schedule_exception_updated"
     | "capacity_change_created"
-    | "capacity_change_status_changed";
+    | "capacity_change_status_changed"
+    | "capacity_change_booking_resolved"
+    | "capacity_change_revoked";
   actor: {
     type: "staff" | "manager";
     id: string;

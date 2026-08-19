@@ -1,8 +1,13 @@
 import type { ManagerBookingStatus } from "./manager-live-booking.js";
-import type { ScheduleWindowDay } from "./index.js";
+import type {
+  BookingConflictSuggestion,
+  CustomerBookingSchedule,
+  ScheduleWindowDay,
+} from "./index.js";
 
 export type CapacityChangeKind = "time_off" | "store_closure";
-export type CapacityChangeStatus = "pending" | "active";
+export type CapacityChangeStatus = "pending" | "active" | "cancelled";
+export type CapacityChangeResolutionAction = "change_staff" | "reschedule" | "cancel";
 
 export interface CapacityChangeInput {
   kind: CapacityChangeKind;
@@ -44,7 +49,7 @@ export interface CapacityChangePreviewResponse {
   targetCapacityMinutes: number;
   affectedBookingCount: number;
   affectedBookings: CapacityChangeAffectedBooking[];
-  outcome: CapacityChangeStatus;
+  outcome: Exclude<CapacityChangeStatus, "cancelled">;
   consequence: string;
 }
 
@@ -76,4 +81,57 @@ export interface ManagerCapacityChangeOptionsResponse {
     displayName: string;
     employeeNumber: number;
   }>;
+}
+
+export interface CapacityChangeResolution {
+  id: string;
+  action: CapacityChangeResolutionAction;
+  operator: { id: string; displayName: string };
+  reason: string;
+  result: CustomerBookingSchedule | null;
+  bookingEventId: string;
+  resolvedAt: string;
+}
+
+export interface CapacityChangeImpactedBooking extends CapacityChangeAffectedBooking {
+  bookingRevision: number;
+  sameTimeStaffCandidates: Array<{ id: string; displayName: string }>;
+  rescheduleSuggestions: BookingConflictSuggestion[];
+  cancelNotificationPreview: {
+    kind: "booking_cancelled";
+    recipient: string;
+    message: string;
+  };
+  resolution: CapacityChangeResolution | null;
+}
+
+export interface CapacityChangeDetailResponse {
+  change: CapacityChangeFact;
+  progress: { resolved: number; total: number };
+  impactedBookings: CapacityChangeImpactedBooking[];
+  canRevoke: boolean;
+}
+
+export interface ResolveCapacityChangeBookingInput {
+  action: CapacityChangeResolutionAction;
+  staffId?: string;
+  startsAt?: string;
+  reason: string;
+  idempotencyKey: string;
+  expectedBookingRevision: number;
+}
+
+export interface ResolveCapacityChangeBookingResponse {
+  change: CapacityChangeFact;
+  progress: { resolved: number; total: number };
+  resolvedBooking: CapacityChangeResolution & { bookingId: string };
+}
+
+export interface RevokeCapacityChangeInput {
+  reason: string;
+}
+
+export interface RevokeCapacityChangeResponse {
+  change: CapacityChangeFact & { status: "cancelled" };
+  retainedResolutions: Array<CapacityChangeResolution & { bookingId: string }>;
 }

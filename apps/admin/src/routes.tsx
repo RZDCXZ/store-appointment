@@ -17,6 +17,7 @@ import { ScheduleIndexRedirect } from "./pages/manager/schedule-index-redirect";
 import { ManagerSchedulePage } from "./pages/manager/schedule-page";
 import { ManagerSchedulePlanningPage } from "./pages/manager/schedule-planning-page";
 import { ManagerCapacityChangePage } from "./pages/manager/capacity-change-page";
+import { ManagerCapacityChangeResolutionPage } from "./pages/manager/capacity-change-resolution-page";
 import { ManagerServicesPage } from "./pages/manager/services-page";
 import { ManagerStaffPage } from "./pages/manager/staff-page";
 import { ManagerSystemPage } from "./pages/manager/system-page";
@@ -88,6 +89,10 @@ export const routes: RouteObject[] = [
               { path: "planning", element: <ManagerSchedulePlanningPage /> },
               { path: "published", element: <ManagerSchedulePage /> },
               { path: "capacity-changes/new", element: <ManagerCapacityChangePage /> },
+              {
+                path: "capacity-changes/:kind/:changeId",
+                element: <ManagerCapacityChangeResolutionPage />,
+              },
             ],
           },
           { path: "services", element: <ManagerServicesPage /> },

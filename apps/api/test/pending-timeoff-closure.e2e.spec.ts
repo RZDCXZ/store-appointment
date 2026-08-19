@@ -223,6 +223,8 @@ describe("停班与临时闭店进入待处理", () => {
   });
 
   it("工作台与按员工日历显示未来待处理临时闭店的风险、遮罩和影响数", async () => {
+    const pendingClosure = createdChanges.find((change) => change.kind === "store_closure");
+    expect(pendingClosure).toBeDefined();
     const workbench = await app.inject({
       method: "GET",
       url: "/backoffice/manager/workbench",
@@ -241,7 +243,7 @@ describe("停班与临时闭店进入待处理", () => {
           kind: "pending_store_closure",
           title: "待处理临时闭店",
           detail: expect.stringContaining("影响 1 笔预约"),
-          href: "/manager/appointments/calendar?date=2026-08-14",
+          href: `/manager/schedule/capacity-changes/store_closure/${pendingClosure?.id}`,
         }),
       ]),
     );

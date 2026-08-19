@@ -4,14 +4,22 @@ import { HttpException, HttpStatus, Inject, Injectable } from "@nestjs/common";
 import type {
   CapacityChangeAffectedBooking,
   CapacityChangeCreateResponse,
+  CapacityChangeDetailResponse,
+  CapacityChangeFact,
   CapacityChangeInput,
+  CapacityChangeKind,
   CapacityChangePreviewResponse,
+  CapacityChangeResolution,
+  CapacityChangeStatus,
   ManagerCapacityChangeOptionsResponse,
+  RevokeCapacityChangeResponse,
+  ResolveCapacityChangeBookingResponse,
 } from "@rongguang/contracts";
 import type { Pool, PoolClient } from "pg";
 
 import { AuditService } from "../audit/audit.service.js";
 import type { BackofficeIdentity } from "../auth/auth.types.js";
+import { BookingService } from "../booking/booking.service.js";
 import { getDemoNow } from "../config/environment.js";
 import { DatabaseService } from "../database/database.service.js";
 import {
@@ -69,6 +77,33 @@ interface ShiftBuilder {
 interface ParsedCapacityChange extends CapacityChangeInput {
   kind: "time_off" | "store_closure";
   staffId?: string;
+}
+
+interface CapacityChangeDetailRow {
+  id: string;
+  staff_id: string | null;
+  staff_display_name: string | null;
+  local_date: string;
+  starts_at: string;
+  ends_at: string;
+  status: CapacityChangeStatus;
+  reason: string;
+  target_capacity_minutes: number;
+  affected_booking_count: number;
+  impact_snapshot: CapacityChangeAffectedBooking[];
+  created_at: Date;
+}
+
+interface CapacityChangeResolutionRow {
+  id: string;
+  booking_id: string;
+  action: CapacityChangeResolution["action"];
+  manager_id: string;
+  manager_display_name: string;
+  reason: string;
+  result_summary: CapacityChangeResolution["result"];
+  booking_event_id: string;
+  resolved_at: Date;
 }
 
 const timePattern = /^([01]\d|2[0-3]):[0-5]\d$/;
@@ -143,6 +178,20 @@ function parseInput(body: unknown): ParsedCapacityChange {
   };
 }
 
+function parseRevocationReason(body: unknown): string {
+  if (typeof body !== "object" || body === null || Array.isArray(body)) {
+    validationError({ form: "请求内容必须是撤销信息对象。" });
+  }
+  const reason =
+    typeof (body as Record<string, unknown>).reason === "string"
+      ? ((body as Record<string, unknown>).reason as string).trim()
+      : "";
+  if (reason.length < 2 || reason.length > 120) {
+    validationError({ reason: "撤销原因须填写 2–120 个字符。" });
+  }
+  return reason;
+}
+
 function overlapMinutes(
   leftStartsAt: number,
   leftEndsAt: number,
@@ -158,6 +207,7 @@ export class CapacityChangeService {
     @Inject(DatabaseService) private readonly database: DatabaseService,
     @Inject(AuditService) private readonly audits: AuditService,
     @Inject(ScheduleService) private readonly schedules: ScheduleService,
+    @Inject(BookingService) private readonly bookings: BookingService,
   ) {}
 
   async options(): Promise<ManagerCapacityChangeOptionsResponse> {
@@ -277,8 +327,11 @@ export class CapacityChangeService {
       return {
         change: { id, kind: input.kind, ...preview, status, createdAt },
         nextStep: {
-          label: status === "pending" ? "查看待处理区间" : "查看按员工日历",
-          href: `/manager/appointments/calendar?date=${input.localDate}`,
+          label: status === "pending" ? "处理受影响预约" : "查看按员工日历",
+          href:
+            status === "pending"
+              ? `/manager/schedule/capacity-changes/${input.kind}/${id}`
+              : `/manager/appointments/calendar?date=${input.localDate}`,
         },
       };
     } catch (error) {
@@ -287,6 +340,318 @@ export class CapacityChangeService {
     } finally {
       client.release();
     }
+  }
+
+  async detail(kind: string, id: string): Promise<CapacityChangeDetailResponse> {
+    const normalizedKind = this.requireKind(kind);
+    const change = await this.findChange(normalizedKind, id);
+    const resolutionResult = await this.database.pool.query<CapacityChangeResolutionRow>(
+      `SELECT resolution.id,
+              resolution.booking_id,
+              resolution.action,
+              resolution.manager_id,
+              account.display_name AS manager_display_name,
+              resolution.reason,
+              resolution.result_summary,
+              resolution.booking_event_id,
+              resolution.resolved_at
+       FROM capacity_change_booking_resolutions AS resolution
+       JOIN backoffice_accounts AS account ON account.id = resolution.manager_id
+       WHERE ($1::text = 'time_off' AND resolution.staff_time_off_id = $2
+         OR $1::text = 'store_closure' AND resolution.store_closure_id = $2)
+       ORDER BY resolution.resolved_at, resolution.id`,
+      [normalizedKind, id],
+    );
+    const resolutions = new Map(
+      resolutionResult.rows.map((row) => [
+        row.booking_id,
+        {
+          id: row.id,
+          action: row.action,
+          operator: { id: row.manager_id, displayName: row.manager_display_name },
+          reason: row.reason,
+          result: row.result_summary,
+          bookingEventId: row.booking_event_id,
+          resolvedAt: row.resolved_at.toISOString(),
+        } satisfies CapacityChangeResolution,
+      ]),
+    );
+
+    const impactedBookings = await Promise.all(
+      change.impact_snapshot.map(async (impact) => {
+        const resolution = resolutions.get(impact.id) ?? null;
+        if (resolution || change.status !== "pending") {
+          return {
+            ...impact,
+            bookingRevision: impact.revision,
+            sameTimeStaffCandidates: [],
+            rescheduleSuggestions: [],
+            cancelNotificationPreview: {
+              kind: "booking_cancelled" as const,
+              recipient: impact.customerName,
+              message: `将向${impact.customerName}生成${impact.petName}的预约取消通知。`,
+            },
+            resolution,
+          };
+        }
+
+        const options = await this.bookings.managerRescheduleOptions(impact.id);
+        const slots =
+          options.availability?.days.flatMap((day) =>
+            day.slots.map((slot) => ({
+              date: day.date,
+              startsAt: slot.startsAt,
+              endsAt: slot.endsAt,
+              staff: { id: slot.staff.id, displayName: slot.staff.displayName },
+            })),
+          ) ?? [];
+        const candidateOptions = await Promise.all(
+          (options.availability?.staffOptions ?? [])
+            .filter((staff) => staff.id !== impact.staff.id)
+            .map((staff) => this.bookings.managerRescheduleOptions(impact.id, staff.id)),
+        );
+        const sameTimeStaffCandidates = [
+          ...new Map(
+            candidateOptions.flatMap(
+              (candidate) =>
+                candidate.availability?.days.flatMap((day) =>
+                  day.slots
+                    .filter((slot) => slot.startsAt === impact.startsAt)
+                    .map(
+                      (slot) =>
+                        [
+                          slot.staff.id,
+                          { id: slot.staff.id, displayName: slot.staff.displayName },
+                        ] as const,
+                    ),
+                ) ?? [],
+            ),
+          ).values(),
+        ];
+
+        return {
+          ...impact,
+          bookingRevision: impact.revision,
+          sameTimeStaffCandidates,
+          rescheduleSuggestions: slots.slice(0, 5),
+          cancelNotificationPreview: {
+            kind: "booking_cancelled" as const,
+            recipient: impact.customerName,
+            message: `将向${impact.customerName}生成${impact.petName}的预约取消通知。`,
+          },
+          resolution,
+        };
+      }),
+    );
+
+    return {
+      change: this.changeFact(normalizedKind, change),
+      progress: { resolved: resolutions.size, total: change.affected_booking_count },
+      impactedBookings,
+      canRevoke: normalizedKind === "time_off" && change.status === "pending",
+    };
+  }
+
+  async resolve(
+    manager: BackofficeIdentity,
+    kind: string,
+    id: string,
+    bookingId: string,
+    body: unknown,
+  ): Promise<ResolveCapacityChangeBookingResponse> {
+    const normalizedKind = this.requireKind(kind);
+    const applied = await this.bookings.resolveCapacityChangeImpact(
+      manager,
+      normalizedKind,
+      id,
+      bookingId,
+      body,
+    );
+    const detail = await this.detail(normalizedKind, id);
+    return {
+      change: detail.change,
+      progress: detail.progress,
+      resolvedBooking: applied.resolution,
+    };
+  }
+
+  async revoke(
+    manager: BackofficeIdentity,
+    kind: string,
+    id: string,
+    body: unknown,
+  ): Promise<RevokeCapacityChangeResponse> {
+    const normalizedKind = this.requireKind(kind);
+    if (normalizedKind !== "time_off") {
+      throw new HttpException(
+        {
+          code: "CAPACITY_CHANGE_REVOCATION_NOT_ALLOWED",
+          message: "临时闭店不能在此撤销，请处理完全部受影响预约。",
+        },
+        HttpStatus.CONFLICT,
+      );
+    }
+    const reason = parseRevocationReason(body);
+    const client = await this.database.pool.connect();
+
+    try {
+      await client.query("BEGIN");
+      const locked = await client.query<{ status: CapacityChangeStatus }>(
+        `SELECT status
+         FROM staff_time_off_intervals
+         WHERE id = $1
+         FOR UPDATE`,
+        [id],
+      );
+      const current = locked.rows[0];
+      if (!current) {
+        throw new HttpException(
+          { code: "CAPACITY_CHANGE_NOT_FOUND", message: "找不到这项容量变化。" },
+          HttpStatus.NOT_FOUND,
+        );
+      }
+      if (current.status !== "pending") {
+        throw new HttpException(
+          {
+            code: "CAPACITY_CHANGE_REVOCATION_NOT_ALLOWED",
+            message: "只有尚未处理完成的员工停班可以撤销。",
+          },
+          HttpStatus.CONFLICT,
+        );
+      }
+
+      const revokedAt = getDemoNow();
+      await client.query(
+        `UPDATE staff_time_off_intervals
+         SET status = 'cancelled',
+             cancelled_at = $2,
+             cancelled_by = $3,
+             cancellation_reason = $4
+         WHERE id = $1`,
+        [id, revokedAt, manager.id, reason],
+      );
+      await this.audits.append(
+        {
+          eventType: "capacity_change_revoked",
+          actor: { type: "manager", id: manager.id },
+          subject: { type: "staff_time_off", id },
+          payload: { previousStatus: current.status, reason },
+          occurredAt: revokedAt,
+        },
+        client,
+      );
+      await this.audits.append(
+        {
+          eventType: "capacity_change_status_changed",
+          actor: { type: "manager", id: manager.id },
+          subject: { type: "staff_time_off", id },
+          payload: { previousStatus: current.status, status: "cancelled" },
+          occurredAt: new Date(Date.parse(revokedAt) + 1).toISOString(),
+        },
+        client,
+      );
+      await client.query("COMMIT");
+    } catch (error) {
+      await client.query("ROLLBACK");
+      throw error;
+    } finally {
+      client.release();
+    }
+
+    const detail = await this.detail(normalizedKind, id);
+    return {
+      change: { ...detail.change, status: "cancelled" },
+      retainedResolutions: detail.impactedBookings.flatMap((booking) =>
+        booking.resolution ? [{ ...booking.resolution, bookingId: booking.id }] : [],
+      ),
+    };
+  }
+
+  private requireKind(kind: string): CapacityChangeKind {
+    if (kind !== "time_off" && kind !== "store_closure") {
+      throw new HttpException(
+        { code: "CAPACITY_CHANGE_NOT_FOUND", message: "找不到这项容量变化。" },
+        HttpStatus.NOT_FOUND,
+      );
+    }
+    return kind;
+  }
+
+  private async findChange(kind: CapacityChangeKind, id: string): Promise<CapacityChangeDetailRow> {
+    const result = await this.database.pool.query<CapacityChangeDetailRow>(
+      kind === "time_off"
+        ? `SELECT time_off.id,
+                  time_off.staff_id,
+                  account.display_name AS staff_display_name,
+                  to_char(time_off.local_date, 'YYYY-MM-DD') AS local_date,
+                  to_char(time_off.starts_at, 'HH24:MI') AS starts_at,
+                  to_char(time_off.ends_at, 'HH24:MI') AS ends_at,
+                  time_off.status,
+                  time_off.reason,
+                  time_off.target_capacity_minutes,
+                  time_off.affected_booking_count,
+                  time_off.impact_snapshot,
+                  time_off.created_at
+           FROM staff_time_off_intervals AS time_off
+           JOIN backoffice_accounts AS account ON account.id = time_off.staff_id
+           WHERE time_off.id = $1`
+        : `SELECT closure.id,
+                  NULL::text AS staff_id,
+                  NULL::text AS staff_display_name,
+                  to_char(closure.local_date, 'YYYY-MM-DD') AS local_date,
+                  to_char(closure.starts_at, 'HH24:MI') AS starts_at,
+                  to_char(closure.ends_at, 'HH24:MI') AS ends_at,
+                  closure.status,
+                  closure.reason,
+                  closure.target_capacity_minutes,
+                  closure.affected_booking_count,
+                  closure.impact_snapshot,
+                  closure.created_at
+           FROM store_closure_intervals AS closure
+           WHERE closure.id = $1`,
+      [id],
+    );
+    const change = result.rows[0];
+    if (!change) {
+      throw new HttpException(
+        { code: "CAPACITY_CHANGE_NOT_FOUND", message: "找不到这项容量变化。" },
+        HttpStatus.NOT_FOUND,
+      );
+    }
+    return change;
+  }
+
+  private changeFact(kind: CapacityChangeKind, row: CapacityChangeDetailRow): CapacityChangeFact {
+    return {
+      id: row.id,
+      kind,
+      status: row.status,
+      createdAt: row.created_at.toISOString(),
+      target: {
+        kind,
+        label: kind === "time_off" ? `${row.staff_display_name ?? "所选员工"}停班` : "门店临时闭店",
+        staff:
+          row.staff_id && row.staff_display_name
+            ? { id: row.staff_id, displayName: row.staff_display_name }
+            : null,
+      },
+      interval: {
+        localDate: row.local_date,
+        startsAt: row.starts_at,
+        endsAt: row.ends_at,
+      },
+      reason: row.reason,
+      targetCapacityMinutes: row.target_capacity_minutes,
+      affectedBookingCount: row.affected_booking_count,
+      affectedBookings: row.impact_snapshot,
+      outcome: row.affected_booking_count > 0 ? "pending" : "active",
+      consequence:
+        row.status === "cancelled"
+          ? "待处理停班已撤销；已经成立的预约处理结果保持不变。"
+          : row.status === "active"
+            ? "全部受影响预约已经处理，容量变化已正式生效。"
+            : "该区间已停止接受新预约；全部受影响预约处理完成后才会正式生效。",
+    };
   }
 
   private async analyze(
