@@ -787,26 +787,76 @@ async function seed(client: PoolClient): Promise<void> {
     `
       INSERT INTO notification_outbox (
         id, booking_id, customer_id, notification_type, payload,
-        status, available_at, created_at
+        status, attempt_count, available_at, created_at
       )
       VALUES
         (
           'notification-maiya-today-confirmed', 'booking-maiya-today',
           'customer-gu-yan', 'booking_confirmed',
           '{"bookingId":"booking-maiya-today","petName":"麦芽","serviceName":"犬基础洗护","staffName":"林夏","startsAt":"2026-08-13T03:00:00.000Z"}'::jsonb,
-          'sent', '2026-08-12T06:15:00.000Z', '2026-08-12T06:15:00.000Z'
+          'sent', 1, '2026-08-12T06:15:00.000Z', '2026-08-12T06:15:00.000Z'
         ),
         (
           'notification-bohe-future-confirmed', 'booking-bohe-future',
           'customer-cheng-mo', 'booking_confirmed',
           '{"bookingId":"booking-bohe-future","petName":"薄荷","serviceName":"猫咪洗护","staffName":"陈嘉","startsAt":"2026-08-14T03:00:00.000Z"}'::jsonb,
-          'sent', '2026-08-13T02:42:00.000Z', '2026-08-13T02:42:00.000Z'
+          'sent', 1, '2026-08-13T02:42:00.000Z', '2026-08-13T02:42:00.000Z'
         ),
         (
           'notification-bohe-completed-confirmed', 'booking-bohe-completed',
           'customer-cheng-mo', 'booking_confirmed',
           '{"bookingId":"booking-bohe-completed","petName":"薄荷","serviceName":"猫咪洗护","staffName":"周宁","startsAt":"2026-08-06T02:00:00.000Z"}'::jsonb,
-          'sent', '2026-08-01T01:20:00.000Z', '2026-08-01T01:20:00.000Z'
+          'sent', 1, '2026-08-01T01:20:00.000Z', '2026-08-01T01:20:00.000Z'
+        )
+      ON CONFLICT (id) DO NOTHING
+    `,
+  );
+
+  await client.query(
+    `
+      INSERT INTO notification_outbox (
+        id, booking_id, customer_id, notification_type, payload,
+        status, attempt_count, available_at, created_at
+      )
+      VALUES (
+        'notification-seed-final-failed', 'booking-bohe-future',
+        'customer-cheng-mo', 'booking_rescheduled',
+        '{"bookingId":"booking-bohe-future","petName":"薄荷","serviceName":"猫咪洗护","staffName":"陈嘉","startsAt":"2026-08-14T03:00:00.000Z"}'::jsonb,
+        'failed', 3, '2026-08-13T02:48:00.000Z', '2026-08-13T02:44:00.000Z'
+      )
+      ON CONFLICT (id) DO NOTHING
+    `,
+  );
+
+  await client.query(
+    `
+      INSERT INTO notification_delivery_attempts (
+        id, notification_id, attempt_number, mode, result, detail, attempted_at
+      )
+      VALUES
+        (
+          'attempt-maiya-today-confirmed-1', 'notification-maiya-today-confirmed', 1,
+          'automatic', 'sent', '模拟微信通道发送成功', '2026-08-12T06:15:00.000Z'
+        ),
+        (
+          'attempt-bohe-future-confirmed-1', 'notification-bohe-future-confirmed', 1,
+          'automatic', 'sent', '模拟微信通道发送成功', '2026-08-13T02:42:00.000Z'
+        ),
+        (
+          'attempt-bohe-completed-confirmed-1', 'notification-bohe-completed-confirmed', 1,
+          'automatic', 'sent', '模拟微信通道发送成功', '2026-08-01T01:20:00.000Z'
+        ),
+        (
+          'attempt-seed-final-failed-1', 'notification-seed-final-failed', 1,
+          'automatic', 'failed', '模拟微信通道超时', '2026-08-13T02:44:00.000Z'
+        ),
+        (
+          'attempt-seed-final-failed-2', 'notification-seed-final-failed', 2,
+          'automatic', 'failed', '模拟微信通道超时', '2026-08-13T02:45:00.000Z'
+        ),
+        (
+          'attempt-seed-final-failed-3', 'notification-seed-final-failed', 3,
+          'automatic', 'failed', '自动重试已用尽，等待人工重试', '2026-08-13T02:48:00.000Z'
         )
       ON CONFLICT (id) DO NOTHING
     `,
@@ -831,7 +881,7 @@ async function seed(client: PoolClient): Promise<void> {
 async function reset(client: PoolClient): Promise<void> {
   await withTransaction(client, async () => {
     await client.query(
-      "TRUNCATE TABLE app_metadata, notification_outbox, audit_events, capacity_change_booking_resolutions, booking_events, booking_idempotency_keys, booking_fulfilment_idempotency_keys, manager_booking_change_idempotency_keys, manager_proxy_booking_idempotency_keys, manager_proxy_booking_records, store_service_record_notes, store_service_records, staff_time_off_intervals, store_closure_intervals, staff_schedule_breaks, staff_schedule_shifts, staff_schedule_days, weekly_shift_template_breaks, weekly_shift_templates, store_business_hours, staff_skills, staff_members, privacy_consents, privacy_notices, bookings, pet_care_tags, pets, pet_photos, customer_sessions, demo_customer_profiles, customers, backoffice_sessions, backoffice_accounts, service_catalog_primary_addons, service_catalog_specifications, service_catalog_items, service_catalog_state",
+      "TRUNCATE TABLE app_metadata, notification_delivery_attempts, notification_outbox, audit_events, capacity_change_booking_resolutions, booking_events, booking_idempotency_keys, booking_fulfilment_idempotency_keys, manager_booking_change_idempotency_keys, manager_proxy_booking_idempotency_keys, manager_proxy_booking_records, store_service_record_notes, store_service_records, staff_time_off_intervals, store_closure_intervals, staff_schedule_breaks, staff_schedule_shifts, staff_schedule_days, weekly_shift_template_breaks, weekly_shift_templates, store_business_hours, staff_skills, staff_members, privacy_consents, privacy_notices, bookings, pet_care_tags, pets, pet_photos, customer_sessions, demo_customer_profiles, customers, backoffice_sessions, backoffice_accounts, service_catalog_primary_addons, service_catalog_specifications, service_catalog_items, service_catalog_state",
     );
     await seed(client);
   });

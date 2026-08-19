@@ -1,6 +1,7 @@
 export * from "./manager-live-booking.js";
 export * from "./staff-fulfilment.js";
 export * from "./capacity-change.js";
+export * from "./notification.js";
 
 export interface HealthResponse {
   service: "rongguang-api";

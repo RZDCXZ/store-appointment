@@ -48,6 +48,18 @@ export function getSessionTtlSeconds(): number {
   return value;
 }
 
+export function getNotificationRetryBackoffMilliseconds(): number {
+  const value = Number(process.env.NOTIFICATION_RETRY_BACKOFF_MS ?? "250");
+
+  if (!Number.isInteger(value) || value < 1 || value > 10_000) {
+    throw new Error(
+      `NOTIFICATION_RETRY_BACKOFF_MS 必须是 1 到 10000 之间的整数，当前值为“${process.env.NOTIFICATION_RETRY_BACKOFF_MS}”。`,
+    );
+  }
+
+  return value;
+}
+
 export function getMiniappSessionTtlSeconds(): number {
   const value = Number(process.env.MINIAPP_SESSION_TTL_SECONDS ?? "1800");
 

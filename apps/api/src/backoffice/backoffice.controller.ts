@@ -32,6 +32,10 @@ import {
   type ManagerBookingChangeResponse,
   type ManagerRescheduleBookingOptionsResponse,
   type ManagerCalendarResponse,
+  type ManagerNotificationDetailResponse,
+  type ManagerNotificationFailureInjectionResponse,
+  type ManagerNotificationListResponse,
+  type ManagerNotificationManualRetryResponse,
   type ManagerWorkbenchResponse,
   type StaffBookingDetailResponse,
   type StaffBookingListResponse,
@@ -48,6 +52,7 @@ import { RequestOriginGuard } from "../auth/request-origin.guard.js";
 import { SessionGuard } from "../auth/session.guard.js";
 import { SessionService } from "../auth/session.service.js";
 import { LiveRefreshService } from "../live-refresh/live-refresh.service.js";
+import { NotificationService } from "../notification/notification.service.js";
 import { BookingService } from "../booking/booking.service.js";
 import { BookingFulfilmentService } from "./booking-fulfilment.service.js";
 import { ManagerLiveBookingService } from "./manager-live-booking.service.js";
@@ -74,7 +79,49 @@ export class BackofficeController {
     private readonly bookingFulfilment: BookingFulfilmentService,
     @Inject(LiveRefreshService) private readonly liveRefresh: LiveRefreshService,
     @Inject(BookingService) private readonly bookings: BookingService,
+    @Inject(NotificationService) private readonly notifications: NotificationService,
   ) {}
+
+  @Get("manager/notifications")
+  @UseGuards(ManagerGuard)
+  @ApiOperation({ summary: "读取模拟微信通知任务列表" })
+  managerNotifications(
+    @Res({ passthrough: true }) reply: FastifyReply,
+  ): Promise<ManagerNotificationListResponse> {
+    reply.header("Cache-Control", "no-store");
+    return this.notifications.list();
+  }
+
+  @Get("manager/notifications/:notificationId")
+  @UseGuards(ManagerGuard)
+  @ApiOperation({ summary: "读取模拟微信通知任务与每次发送尝试" })
+  managerNotificationDetail(
+    @Param("notificationId") notificationId: string,
+    @Res({ passthrough: true }) reply: FastifyReply,
+  ): Promise<ManagerNotificationDetailResponse> {
+    reply.header("Cache-Control", "no-store");
+    return this.notifications.detail(notificationId);
+  }
+
+  @Post("manager/notifications/:notificationId/simulated-failures")
+  @UseGuards(ManagerGuard, RequestOriginGuard)
+  @ApiOperation({ summary: "为指定模拟微信通知注入可预测失败次数" })
+  injectNotificationFailures(
+    @Param("notificationId") notificationId: string,
+    @Body() body: unknown,
+  ): Promise<ManagerNotificationFailureInjectionResponse> {
+    return this.notifications.injectFailures(notificationId, body);
+  }
+
+  @Post("manager/notifications/:notificationId/manual-retry")
+  @UseGuards(ManagerGuard, RequestOriginGuard)
+  @ApiOperation({ summary: "人工重试最终失败通知并记录审计事实" })
+  manualRetryNotification(
+    @Param("notificationId") notificationId: string,
+    @Req() request: AuthenticatedRequest,
+  ): Promise<ManagerNotificationManualRetryResponse> {
+    return this.notifications.manualRetry(notificationId, request.backofficeIdentity);
+  }
 
   @Get("manager/workbench")
   @UseGuards(ManagerGuard)

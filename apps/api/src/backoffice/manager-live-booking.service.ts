@@ -671,7 +671,7 @@ export class ManagerLiveBookingService {
         kind: "failed_notification",
         title: "通知最终失败",
         detail: `${notification.pet_name_snapshot}的预约通知，自动发送 ${notification.attempt_count} 次失败`,
-        href: `/manager/appointments/${notification.booking_id}`,
+        href: `/manager/system/notifications/${notification.id}`,
       });
     }
 

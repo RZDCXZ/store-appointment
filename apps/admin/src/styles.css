@@ -29,6 +29,446 @@
   --shadow: 0 22px 64px rgb(47 78 65 / 14%);
 }
 
+/* MG-15 notification retry and reminder */
+
+.notification-page {
+  width: min(1120px, 100%);
+}
+
+.notification-business-notice {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  margin-top: 20px;
+  padding: 15px 18px;
+  border: 1px solid #e7c990;
+  border-radius: 13px;
+  color: #754818;
+  background: var(--warning-bg);
+}
+
+.notification-business-notice > span {
+  display: grid;
+  width: 30px;
+  height: 30px;
+  flex: 0 0 auto;
+  place-items: center;
+  border: 1px solid #d5ac65;
+  border-radius: 50%;
+  font-weight: 900;
+}
+
+.notification-business-notice strong,
+.notification-business-notice p {
+  margin: 0;
+}
+
+.notification-business-notice strong {
+  font-size: 13px;
+}
+
+.notification-business-notice p {
+  margin-top: 3px;
+  color: #876238;
+  font-size: 12px;
+}
+
+.notification-state,
+.notification-empty {
+  margin-top: 20px;
+  padding: 40px 24px;
+  border: 1px solid var(--line-200);
+  border-radius: 14px;
+  background: var(--surface);
+  text-align: center;
+}
+
+.notification-state p,
+.notification-state h2,
+.notification-empty p {
+  margin: 0;
+}
+
+.notification-state p {
+  color: var(--coral-600);
+  font-family: ui-monospace, "SFMono-Regular", Consolas, monospace;
+  font-size: 12px;
+}
+
+.notification-state h2 {
+  margin-top: 8px;
+  font-size: 18px;
+}
+
+.notification-state > span,
+.notification-empty > span {
+  display: block;
+  margin-top: 8px;
+  color: var(--ink-600);
+  font-size: 13px;
+}
+
+.notification-state .primary-button {
+  margin-top: 18px;
+}
+
+.notification-list-panel,
+.notification-attempt-panel {
+  margin-top: 20px;
+  overflow: hidden;
+  border: 1px solid var(--line-200);
+  border-radius: 16px;
+  background: var(--surface);
+}
+
+.notification-list-panel > header,
+.notification-attempt-panel > header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 20px 22px;
+  border-bottom: 1px solid var(--line-light);
+}
+
+.notification-list-panel header p,
+.notification-list-panel header h2,
+.notification-attempt-panel header p,
+.notification-attempt-panel header h2 {
+  margin: 0;
+}
+
+.notification-list-panel header p,
+.notification-attempt-panel header p {
+  color: var(--sage-700);
+  font-size: 11px;
+  font-weight: 800;
+}
+
+.notification-list-panel header h2,
+.notification-attempt-panel header h2 {
+  margin-top: 4px;
+  font-size: 18px;
+}
+
+.notification-list-panel > header > span,
+.notification-attempt-panel > header > span {
+  color: var(--ink-500);
+  font-size: 12px;
+}
+
+.notification-table-scroll {
+  overflow-x: auto;
+}
+
+.notification-table {
+  width: 100%;
+  border-collapse: collapse;
+  text-align: left;
+}
+
+.notification-table th,
+.notification-table td {
+  min-width: 110px;
+  padding: 16px 18px;
+  border-bottom: 1px solid var(--line-light);
+  vertical-align: middle;
+}
+
+.notification-table thead th {
+  color: var(--ink-500);
+  background: #fbf8f2;
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.notification-table tbody tr:last-child th,
+.notification-table tbody tr:last-child td {
+  border-bottom: 0;
+}
+
+.notification-table tbody strong,
+.notification-table tbody small {
+  display: block;
+}
+
+.notification-table tbody strong {
+  font-size: 13px;
+}
+
+.notification-table tbody small {
+  margin-top: 4px;
+  color: var(--ink-600);
+  font-size: 11px;
+  font-weight: 500;
+}
+
+.notification-table tbody td {
+  color: var(--ink-600);
+  font-size: 12px;
+}
+
+.notification-table a,
+.notification-back-link,
+.notification-detail-summary a {
+  color: var(--sage-700);
+  font-size: 12px;
+  font-weight: 800;
+  text-underline-offset: 4px;
+}
+
+.notification-status {
+  display: inline-flex;
+  min-height: 27px;
+  align-items: center;
+  padding: 0 10px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 800;
+}
+
+.notification-status--pending {
+  color: #765b22;
+  background: var(--warning-bg);
+}
+
+.notification-status--sent {
+  color: var(--sage-700);
+  background: var(--sage-100);
+}
+
+.notification-status--failed,
+.notification-status--manual_retry_required {
+  color: var(--danger-700);
+  background: var(--danger-bg);
+}
+
+.notification-inline-error,
+.notification-action-error,
+.notification-action-message {
+  margin: 16px 0 0;
+  padding: 12px 14px;
+  border: 1px solid #e8c0bb;
+  border-radius: 10px;
+  color: var(--danger-700);
+  background: var(--danger-bg);
+  font-size: 12px;
+}
+
+.notification-inline-error {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.notification-inline-error button {
+  border: 0;
+  color: inherit;
+  background: transparent;
+  cursor: pointer;
+  font-weight: 800;
+  text-decoration: underline;
+}
+
+.notification-action-message {
+  border-color: var(--sage-200);
+  color: var(--sage-700);
+  background: var(--sage-50);
+}
+
+.notification-back-link {
+  display: inline-flex;
+  min-height: 42px;
+  align-items: center;
+  text-decoration: none;
+}
+
+.notification-detail-page .page-heading {
+  margin-top: 2px;
+}
+
+.notification-detail-summary {
+  display: grid;
+  margin-top: 20px;
+  border: 1px solid var(--line-200);
+  border-radius: 16px;
+  background: var(--surface);
+  grid-template-columns: 0.7fr 1.35fr 1fr;
+}
+
+.notification-detail-summary > div {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  align-items: flex-start;
+  padding: 20px;
+}
+
+.notification-detail-summary > div + div {
+  border-left: 1px solid var(--line-light);
+}
+
+.notification-detail-summary p,
+.notification-detail-summary strong,
+.notification-detail-summary small {
+  margin: 0;
+}
+
+.notification-detail-summary p {
+  margin-bottom: 10px;
+  color: var(--ink-500);
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.notification-detail-summary strong {
+  font-size: 13px;
+}
+
+.notification-detail-summary small {
+  margin-top: 7px;
+  color: var(--ink-600);
+  font-size: 11px;
+  line-height: 1.5;
+}
+
+.notification-detail-summary a {
+  margin-top: 11px;
+}
+
+.notification-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 20px;
+  padding: 16px 18px;
+  border: 1px solid var(--line-200);
+  border-radius: 14px;
+  background: #fbf8f2;
+}
+
+.notification-actions > div {
+  min-width: 0;
+  margin-right: auto;
+}
+
+.notification-actions p,
+.notification-actions span {
+  margin: 0;
+}
+
+.notification-actions p {
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.notification-actions span {
+  display: block;
+  margin-top: 4px;
+  color: var(--ink-600);
+  font-size: 11px;
+}
+
+.notification-actions > button:not(.primary-button) {
+  min-height: 42px;
+  padding: 0 14px;
+  border: 1px solid var(--line-200);
+  border-radius: 10px;
+  color: var(--sage-700);
+  background: var(--surface);
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.notification-actions .primary-button {
+  min-height: 42px;
+  padding-inline: 16px;
+  font-size: 12px;
+}
+
+.notification-attempt-panel ol {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.notification-attempt-panel li {
+  display: grid;
+  align-items: start;
+  gap: 14px;
+  padding: 18px 22px;
+  border-bottom: 1px solid var(--line-light);
+  grid-template-columns: auto minmax(0, 1fr);
+}
+
+.notification-attempt-panel li:last-child {
+  border-bottom: 0;
+}
+
+.notification-attempt-panel li strong,
+.notification-attempt-panel li small,
+.notification-attempt-panel li p {
+  display: block;
+  margin: 0;
+}
+
+.notification-attempt-panel li strong {
+  font-size: 13px;
+}
+
+.notification-attempt-panel li small,
+.notification-attempt-panel li p,
+.notification-attempt-empty {
+  margin-top: 5px;
+  color: var(--ink-600);
+  font-size: 11px;
+}
+
+.notification-attempt-result {
+  display: inline-flex;
+  min-width: 44px;
+  min-height: 25px;
+  align-items: center;
+  justify-content: center;
+  border-radius: 999px;
+  font-size: 10px;
+  font-weight: 900;
+}
+
+.notification-attempt-result--sent {
+  color: var(--sage-700);
+  background: var(--sage-100);
+}
+
+.notification-attempt-result--failed {
+  color: var(--danger-700);
+  background: var(--danger-bg);
+}
+
+.notification-attempt-empty {
+  padding: 22px;
+}
+
+@media (max-width: 780px) {
+  .notification-detail-summary {
+    grid-template-columns: 1fr;
+  }
+
+  .notification-detail-summary > div + div {
+    border-top: 1px solid var(--line-light);
+    border-left: 0;
+  }
+
+  .notification-actions {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .notification-actions > div {
+    margin-bottom: 4px;
+  }
+}
+
 /* MG-11 impacted booking resolution */
 
 .impact-resolution-page {

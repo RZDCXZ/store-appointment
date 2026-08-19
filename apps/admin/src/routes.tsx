@@ -20,7 +20,10 @@ import { ManagerCapacityChangePage } from "./pages/manager/capacity-change-page"
 import { ManagerCapacityChangeResolutionPage } from "./pages/manager/capacity-change-resolution-page";
 import { ManagerServicesPage } from "./pages/manager/services-page";
 import { ManagerStaffPage } from "./pages/manager/staff-page";
-import { ManagerSystemPage } from "./pages/manager/system-page";
+import {
+  ManagerNotificationDetailPage,
+  ManagerNotificationListPage,
+} from "./pages/manager/notification-pages";
 import { ManagerWorkbenchPage } from "./pages/manager/workbench-page";
 import { StaffAppointmentsPage } from "./pages/staff/appointments-page";
 import { StaffAppointmentDetailPage } from "./pages/staff/appointment-detail-page";
@@ -99,7 +102,17 @@ export const routes: RouteObject[] = [
           { path: "services/staff", element: <ManagerStaffPage /> },
           { path: "customers", element: <ManagerCustomersPage /> },
           { path: "business", element: <ManagerBusinessPage /> },
-          { path: "system", element: <ManagerSystemPage /> },
+          {
+            path: "system",
+            children: [
+              { index: true, element: <Navigate to="notifications" replace /> },
+              { path: "notifications", element: <ManagerNotificationListPage /> },
+              {
+                path: "notifications/:notificationId",
+                element: <ManagerNotificationDetailPage />,
+              },
+            ],
+          },
         ],
       },
       {
