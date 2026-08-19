@@ -201,6 +201,17 @@ function overlapMinutes(
   return Math.max(0, Math.min(leftEndsAt, rightEndsAt) - Math.max(leftStartsAt, rightStartsAt));
 }
 
+function formatImpactTime(value: string): string {
+  return new Intl.DateTimeFormat("zh-CN", {
+    month: "numeric",
+    day: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false,
+    timeZone: "Asia/Shanghai",
+  }).format(new Date(value));
+}
+
 @Injectable()
 export class CapacityChangeService {
   constructor(
@@ -380,22 +391,54 @@ export class CapacityChangeService {
     const impactedBookings = await Promise.all(
       change.impact_snapshot.map(async (impact) => {
         const resolution = resolutions.get(impact.id) ?? null;
-        if (resolution || change.status !== "pending") {
+        const options = await this.bookings.managerRescheduleOptions(impact.id);
+        const current = options.booking;
+        const currentFact = {
+          status: current.status,
+          staff: current.staff,
+          startsAt: current.startsAt,
+          endsAt: current.endsAt,
+          turnoverEndsAt: current.turnoverEndsAt,
+        };
+        const factChanged =
+          options.bookingRevision !== impact.revision ||
+          current.status !== impact.status ||
+          current.staff.id !== impact.staff.id ||
+          current.startsAt !== impact.startsAt;
+        const intervalStartsAt = Date.parse(`${change.local_date}T${change.starts_at}:00+08:00`);
+        const intervalEndsAt = Date.parse(`${change.local_date}T${change.ends_at}:00+08:00`);
+        const stillAffected =
+          (current.status === "confirmed" || current.status === "checked_in") &&
+          (normalizedKind === "store_closure" || current.staff.id === change.staff_id) &&
+          Date.parse(current.startsAt) < intervalEndsAt &&
+          Date.parse(current.turnoverEndsAt) > intervalStartsAt;
+        const requiresAcknowledgement = factChanged && !stillAffected;
+        const blockedByFulfilment = current.status === "checked_in" && stillAffected;
+        const cancelNotificationPreview = {
+          kind: "booking_cancelled" as const,
+          recipient: impact.customerName,
+          message: `将通知${impact.customerName}：${impact.petName}原定${impact.staff.displayName} ${formatImpactTime(impact.startsAt)}的预约已取消，并附上本次填写的取消原因。`,
+        };
+        if (
+          resolution ||
+          change.status !== "pending" ||
+          requiresAcknowledgement ||
+          blockedByFulfilment
+        ) {
           return {
             ...impact,
-            bookingRevision: impact.revision,
+            bookingRevision: options.bookingRevision,
+            currentFact,
+            factChanged,
+            requiresAcknowledgement,
+            blockedByFulfilment,
             sameTimeStaffCandidates: [],
             rescheduleSuggestions: [],
-            cancelNotificationPreview: {
-              kind: "booking_cancelled" as const,
-              recipient: impact.customerName,
-              message: `将向${impact.customerName}生成${impact.petName}的预约取消通知。`,
-            },
+            cancelNotificationPreview,
             resolution,
           };
         }
 
-        const options = await this.bookings.managerRescheduleOptions(impact.id);
         const slots =
           options.availability?.days.flatMap((day) =>
             day.slots.map((slot) => ({
@@ -407,7 +450,7 @@ export class CapacityChangeService {
           ) ?? [];
         const candidateOptions = await Promise.all(
           (options.availability?.staffOptions ?? [])
-            .filter((staff) => staff.id !== impact.staff.id)
+            .filter((staff) => staff.id !== current.staff.id)
             .map((staff) => this.bookings.managerRescheduleOptions(impact.id, staff.id)),
         );
         const sameTimeStaffCandidates = [
@@ -416,7 +459,7 @@ export class CapacityChangeService {
               (candidate) =>
                 candidate.availability?.days.flatMap((day) =>
                   day.slots
-                    .filter((slot) => slot.startsAt === impact.startsAt)
+                    .filter((slot) => slot.startsAt === current.startsAt)
                     .map(
                       (slot) =>
                         [
@@ -428,17 +471,30 @@ export class CapacityChangeService {
             ),
           ).values(),
         ];
+        const rescheduleSuggestions = slots
+          .filter((slot) => slot.startsAt !== current.startsAt)
+          .sort((left, right) => {
+            const proximity =
+              Math.abs(Date.parse(left.startsAt) - Date.parse(current.startsAt)) -
+              Math.abs(Date.parse(right.startsAt) - Date.parse(current.startsAt));
+            return (
+              proximity ||
+              left.startsAt.localeCompare(right.startsAt) ||
+              left.staff.id.localeCompare(right.staff.id)
+            );
+          })
+          .slice(0, 5);
 
         return {
           ...impact,
-          bookingRevision: impact.revision,
+          bookingRevision: options.bookingRevision,
+          currentFact,
+          factChanged,
+          requiresAcknowledgement,
+          blockedByFulfilment,
           sameTimeStaffCandidates,
-          rescheduleSuggestions: slots.slice(0, 5),
-          cancelNotificationPreview: {
-            kind: "booking_cancelled" as const,
-            recipient: impact.customerName,
-            message: `将向${impact.customerName}生成${impact.petName}的预约取消通知。`,
-          },
+          rescheduleSuggestions,
+          cancelNotificationPreview,
           resolution,
         };
       }),
@@ -467,12 +523,7 @@ export class CapacityChangeService {
       bookingId,
       body,
     );
-    const detail = await this.detail(normalizedKind, id);
-    return {
-      change: detail.change,
-      progress: detail.progress,
-      resolvedBooking: applied.resolution,
-    };
+    return applied.response;
   }
 
   async revoke(
@@ -778,6 +829,11 @@ export class CapacityChangeService {
        ORDER BY booking.starts_at, booking.id`,
       [input.kind, input.staffId ?? null, input.localDate, input.startsAt, input.endsAt],
     );
+    if (affectedResult.rows.some((booking) => booking.status === "checked_in")) {
+      validationError({
+        interval: "所选区间已有到店服务，不能创建停班或闭店；请先完成或终止该服务。",
+      });
+    }
     const affectedBookings = affectedResult.rows.map<CapacityChangeAffectedBooking>((booking) => ({
       id: booking.id,
       revision: booking.verification_code_version,

@@ -25,6 +25,7 @@ const actionLabels: Record<CapacityChangeResolutionAction, string> = {
   change_staff: "同时间换员工",
   reschedule: "改期",
   cancel: "取消预约",
+  acknowledge_existing: "确认现有结果",
 };
 
 function formatDateTime(value: string): string {
@@ -139,12 +140,71 @@ function ImpactBookingCard({
             {booking.customerName} · 原员工{booking.staff.displayName} ·{" "}
             {formatDateTime(booking.startsAt)}–{formatDateTime(booking.endsAt)}
           </p>
+          {booking.factChanged ? (
+            <p className="impact-current-fact">
+              当前事实：{managerBookingStatusLabels[booking.currentFact.status]} ·
+              {booking.currentFact.staff.displayName} ·{" "}
+              {formatDateTime(booking.currentFact.startsAt)}
+            </p>
+          ) : null}
           <small>当前状态：{managerBookingStatusLabels[booking.status]}</small>
         </div>
       </header>
 
       {booking.resolution ? (
         <ResolutionSummary booking={booking} />
+      ) : booking.blockedByFulfilment ? (
+        <section className="impact-fulfilment-block">
+          <ExclamationTriangleIcon />
+          <span>
+            <strong>预约已经到店，不能再改期或取消</strong>
+            <small>请先在预约详情完成或终止服务；形成终态后刷新本页确认现有结果。</small>
+          </span>
+          <Link to={`/manager/appointments/${booking.id}`}>前往预约详情</Link>
+        </section>
+      ) : booking.requiresAcknowledgement ? (
+        <form
+          className="impact-resolution-form impact-acknowledgement-form"
+          onSubmit={(event) => {
+            event.preventDefault();
+            if (!validReason) return;
+            void onResolve(booking, "acknowledge_existing", reason.trim(), {});
+          }}
+        >
+          <p className="impact-existing-fact-notice">
+            <CheckCircledIcon />
+            <span>
+              <strong>这笔预约已在其他入口解除本次容量影响</strong>
+              <small>
+                当前为{managerBookingStatusLabels[booking.currentFact.status]} ·
+                {booking.currentFact.staff.displayName} ·
+                {formatDateTime(booking.currentFact.startsAt)}
+                。确认后只记录关联结果，不再次移动或取消预约。
+              </small>
+            </span>
+          </p>
+          <label className="impact-resolution-field impact-reason-field">
+            <span>确认原因（必填）</span>
+            <textarea
+              aria-label={`${booking.petName}确认现有结果原因`}
+              rows={3}
+              maxLength={120}
+              value={reason}
+              onChange={(event) => {
+                setReason(event.target.value);
+                edit();
+              }}
+              placeholder="记录核对现有预约事实的原因"
+            />
+            <small>{reason.length}/120 · 需填写 2–120 字</small>
+          </label>
+          <footer>
+            <span>确认只推进本次影响处理进度，现有预约事实保持不变。</span>
+            <button type="submit" disabled={!validReason || submitting}>
+              {submitting ? "正在确认…" : "确认现有结果"}
+            </button>
+          </footer>
+        </form>
       ) : (
         <form
           className="impact-resolution-form"
@@ -271,7 +331,10 @@ function ImpactBookingCard({
               <ExclamationTriangleIcon />
               <span>
                 <strong>通知预览</strong>
-                <small>{booking.cancelNotificationPreview.message}</small>
+                <small>
+                  {booking.cancelNotificationPreview.message}
+                  {reason.trim() ? ` 取消原因：${reason.trim()}` : " 取消原因：待填写。"}
+                </small>
               </span>
             </p>
           ) : null}

@@ -7,7 +7,8 @@ import type {
 
 export type CapacityChangeKind = "time_off" | "store_closure";
 export type CapacityChangeStatus = "pending" | "active" | "cancelled";
-export type CapacityChangeResolutionAction = "change_staff" | "reschedule" | "cancel";
+export type CapacityChangeResolutionAction =
+  "change_staff" | "reschedule" | "cancel" | "acknowledge_existing";
 
 export interface CapacityChangeInput {
   kind: CapacityChangeKind;
@@ -95,6 +96,16 @@ export interface CapacityChangeResolution {
 
 export interface CapacityChangeImpactedBooking extends CapacityChangeAffectedBooking {
   bookingRevision: number;
+  currentFact: {
+    status: ManagerBookingStatus;
+    staff: { id: string; displayName: string };
+    startsAt: string;
+    endsAt: string;
+    turnoverEndsAt: string;
+  };
+  factChanged: boolean;
+  requiresAcknowledgement: boolean;
+  blockedByFulfilment: boolean;
   sameTimeStaffCandidates: Array<{ id: string; displayName: string }>;
   rescheduleSuggestions: BookingConflictSuggestion[];
   cancelNotificationPreview: {
@@ -122,7 +133,11 @@ export interface ResolveCapacityChangeBookingInput {
 }
 
 export interface ResolveCapacityChangeBookingResponse {
-  change: CapacityChangeFact;
+  change: {
+    id: string;
+    kind: CapacityChangeKind;
+    status: CapacityChangeStatus;
+  };
   progress: { resolved: number; total: number };
   resolvedBooking: CapacityChangeResolution & { bookingId: string };
 }

@@ -43,6 +43,7 @@ import type {
   RescheduleBookingInput,
   RescheduleBookingResponse,
   ResolveCapacityChangeBookingInput,
+  ResolveCapacityChangeBookingResponse,
   StaffSkillId,
 } from "@rongguang/contracts";
 import type { PoolClient } from "pg";
@@ -244,23 +245,18 @@ interface CapacityChangeMutationRow {
   status: CapacityChangeStatus;
   affected_booking_count: number;
   impact_snapshot: CapacityChangeAffectedBooking[];
+  staff_id: string | null;
+  interval_starts_at: Date;
+  interval_ends_at: Date;
 }
 
 interface CapacityChangeResolutionReplayRow {
-  id: string;
-  booking_id: string;
-  action: CapacityChangeResolution["action"];
-  reason: string;
-  result_summary: CustomerBookingSchedule | null;
-  booking_event_id: string;
-  resolved_at: Date;
   request_digest: string;
-  status: CapacityChangeStatus;
+  response_body: ResolveCapacityChangeBookingResponse | null;
 }
 
 export interface AppliedCapacityChangeResolution {
-  resolution: CapacityChangeResolution & { bookingId: string };
-  status: CapacityChangeStatus;
+  response: ResolveCapacityChangeBookingResponse;
 }
 
 interface DatabaseError {
@@ -457,6 +453,19 @@ function hasAllSkills(staff: StaffRow, requiredSkills: StaffSkillId[]): boolean 
 
 function requestDigest(input: unknown): string {
   return createHash("sha256").update(JSON.stringify(input)).digest("hex");
+}
+
+function capacityChangeAffectsBooking(
+  kind: CapacityChangeKind,
+  change: CapacityChangeMutationRow,
+  booking: BookingRow,
+): boolean {
+  return (
+    (booking.status === "confirmed" || booking.status === "checked_in") &&
+    (kind === "store_closure" || booking.staff_id === change.staff_id) &&
+    booking.starts_at < change.interval_ends_at &&
+    Boolean(booking.occupancy_ends_at && booking.occupancy_ends_at > change.interval_starts_at)
+  );
 }
 
 function isStoredManagerProxySuccess(value: unknown): value is StoredManagerProxySuccess {
@@ -682,7 +691,12 @@ function parseCapacityChangeResolutionInput(body: unknown): ResolveCapacityChang
   const fieldErrors: Record<string, string> = {};
   const action = input.action;
 
-  if (action !== "change_staff" && action !== "reschedule" && action !== "cancel") {
+  if (
+    action !== "change_staff" &&
+    action !== "reschedule" &&
+    action !== "cancel" &&
+    action !== "acknowledge_existing"
+  ) {
     fieldErrors.action = "请选择同时间换员工、改期或取消。";
   }
   if (typeof input.idempotencyKey !== "string" || !idempotencyPattern.test(input.idempotencyKey)) {
@@ -1623,26 +1637,39 @@ export class BookingService {
     const client = await this.database.pool.connect();
     const idempotencyLockKey = `${manager.id}:resolve_capacity_impact:${input.idempotencyKey}`;
     let idempotencyLockHeld = false;
+    let replayedFailure = false;
 
     try {
       await client.query("SELECT pg_advisory_lock(hashtextextended($1, 0))", [idempotencyLockKey]);
       idempotencyLockHeld = true;
       await client.query("BEGIN TRANSACTION ISOLATION LEVEL READ COMMITTED");
+      const previousFailureResult = await client.query<ManagerChangeIdempotencyRow>(
+        `SELECT request_digest, booking_id, response_status, response_body
+         FROM manager_booking_change_idempotency_keys
+         WHERE manager_id = $1
+           AND command_type = 'capacity_impact_resolution'
+           AND idempotency_key = $2`,
+        [manager.id, input.idempotencyKey],
+      );
+      const previousFailure = previousFailureResult.rows[0];
+      if (previousFailure) {
+        if (previousFailure.request_digest !== digest) {
+          businessError(
+            "IDEMPOTENCY_KEY_REUSED",
+            "这个幂等键已经用于另一项受影响预约处理，请重新提交。",
+            HttpStatus.CONFLICT,
+          );
+        }
+        if (!previousFailure.response_body || typeof previousFailure.response_body !== "object") {
+          throw new Error("受影响预约处理幂等结果缺少失败响应。");
+        }
+        await client.query("COMMIT");
+        replayedFailure = true;
+        throw new HttpException(previousFailure.response_body, previousFailure.response_status);
+      }
       const replayResult = await client.query<CapacityChangeResolutionReplayRow>(
-        `SELECT resolution.id,
-                resolution.booking_id,
-                resolution.action,
-                resolution.reason,
-                resolution.result_summary,
-                resolution.booking_event_id,
-                resolution.resolved_at,
-                resolution.request_digest,
-                COALESCE(time_off.status, closure.status) AS status
+        `SELECT resolution.request_digest, resolution.response_body
          FROM capacity_change_booking_resolutions AS resolution
-         LEFT JOIN staff_time_off_intervals AS time_off
-           ON time_off.id = resolution.staff_time_off_id
-         LEFT JOIN store_closure_intervals AS closure
-           ON closure.id = resolution.store_closure_id
          WHERE resolution.manager_id = $1
            AND resolution.idempotency_key = $2`,
         [manager.id, input.idempotencyKey],
@@ -1656,28 +1683,23 @@ export class BookingService {
             HttpStatus.CONFLICT,
           );
         }
+        if (!replay.response_body) {
+          throw new Error("受影响预约处理的幂等结果缺少首次响应。");
+        }
         await client.query("COMMIT");
-        return {
-          resolution: {
-            id: replay.id,
-            bookingId: replay.booking_id,
-            action: replay.action,
-            operator: { id: manager.id, displayName: manager.displayName },
-            reason: replay.reason,
-            result: replay.result_summary,
-            bookingEventId: replay.booking_event_id,
-            resolvedAt: replay.resolved_at.toISOString(),
-          },
-          status: replay.status,
-        };
+        return { response: replay.response_body };
       }
       const changeResult = await client.query<CapacityChangeMutationRow>(
         kind === "time_off"
-          ? `SELECT status, affected_booking_count, impact_snapshot
+          ? `SELECT status, affected_booking_count, impact_snapshot, staff_id,
+                    ((local_date + starts_at) AT TIME ZONE 'Asia/Shanghai') AS interval_starts_at,
+                    ((local_date + ends_at) AT TIME ZONE 'Asia/Shanghai') AS interval_ends_at
              FROM staff_time_off_intervals
              WHERE id = $1
              FOR UPDATE`
-          : `SELECT status, affected_booking_count, impact_snapshot
+          : `SELECT status, affected_booking_count, impact_snapshot, NULL::text AS staff_id,
+                    ((local_date + starts_at) AT TIME ZONE 'Asia/Shanghai') AS interval_starts_at,
+                    ((local_date + ends_at) AT TIME ZONE 'Asia/Shanghai') AS interval_ends_at
              FROM store_closure_intervals
              WHERE id = $1
              FOR UPDATE`,
@@ -1717,25 +1739,64 @@ export class BookingService {
           HttpStatus.CONFLICT,
         );
       }
-      if (input.expectedBookingRevision !== impact.revision) {
-        businessError(
-          "BOOKING_FACT_CHANGED",
-          "预约安排已被其他操作者更新，原处理页不会覆盖新事实；请重新读取。",
-          HttpStatus.CONFLICT,
-        );
-      }
 
       const row = await this.findManagerBookingRow(client, bookingId, true);
-      this.requireManagerChangeAllowed(row);
-      this.requireManagerExpectedFact(row, {
-        expectedStaffId: impact.staff.id,
-        expectedStartsAt: impact.startsAt,
-        expectedBookingRevision: impact.revision,
-      });
+      const stillAffected = capacityChangeAffectsBooking(kind, change, row);
+      const factChanged =
+        row.verification_code_version !== impact.revision ||
+        row.status !== impact.status ||
+        row.staff_id !== impact.staff.id ||
+        row.starts_at.toISOString() !== impact.startsAt;
 
-      let bookingEventId: string;
-      let occurredAt: string;
-      let result: CustomerBookingSchedule | null;
+      let bookingEventId: string | undefined;
+      let occurredAt: string | undefined;
+      let result: CustomerBookingSchedule | null | undefined;
+      const resolutionAction: CapacityChangeResolution["action"] = input.action;
+      if (input.action === "acknowledge_existing") {
+        if (!factChanged || stillAffected) {
+          businessError(
+            "BOOKING_STILL_IMPACTED",
+            "当前预约仍占用这项容量变化的区间，请换员工、改期或取消。",
+            HttpStatus.CONFLICT,
+          );
+        }
+        const existingEvent = await client.query<{ id: string }>(
+          `SELECT id
+           FROM booking_events
+           WHERE booking_id = $1
+           ORDER BY occurred_at DESC, id DESC
+           LIMIT 1`,
+          [bookingId],
+        );
+        if (!existingEvent.rows[0]) {
+          throw new Error("预约事实已经变化，但缺少可关联的预约历史事件。");
+        }
+        bookingEventId = existingEvent.rows[0].id;
+        occurredAt = getDemoNow();
+        result = row.status === "confirmed" ? currentSchedule(row) : null;
+      } else {
+        if (input.expectedBookingRevision !== row.verification_code_version) {
+          businessError(
+            "BOOKING_FACT_CHANGED",
+            "预约安排已被其他操作者更新，原处理页不会覆盖新事实；请重新读取。",
+            HttpStatus.CONFLICT,
+          );
+        }
+        if (!stillAffected) {
+          businessError(
+            "BOOKING_FACT_CHANGED",
+            "预约已经在其他入口解除本次影响，请刷新后确认现有结果。",
+            HttpStatus.CONFLICT,
+          );
+        }
+        this.requireManagerChangeAllowed(row);
+        this.requireManagerExpectedFact(row, {
+          expectedStaffId: row.staff_id,
+          expectedStartsAt: row.starts_at.toISOString(),
+          expectedBookingRevision: row.verification_code_version,
+        });
+      }
+
       if (input.action === "cancel") {
         const applied = await this.applyAtomicCancellation(client, row, {
           actorType: "manager",
@@ -1746,7 +1807,7 @@ export class BookingService {
         bookingEventId = applied.eventId;
         occurredAt = applied.occurredAt;
         result = null;
-      } else {
+      } else if (input.action === "change_staff" || input.action === "reschedule") {
         const applied = await this.applyAtomicReschedule(
           client,
           row,
@@ -1754,7 +1815,9 @@ export class BookingService {
             idempotencyKey: input.idempotencyKey,
             staffId: input.staffId as string,
             startsAt:
-              input.action === "change_staff" ? impact.startsAt : (input.startsAt as string),
+              input.action === "change_staff"
+                ? row.starts_at.toISOString()
+                : (input.startsAt as string),
           },
           {
             actorType: "manager",
@@ -1767,6 +1830,9 @@ export class BookingService {
         bookingEventId = applied.eventId;
         occurredAt = applied.occurredAt;
         result = applied.next;
+      }
+      if (!bookingEventId || !occurredAt || result === undefined) {
+        throw new Error("受影响预约处理没有产生完整的原子结果。");
       }
 
       const resolutionId = `capacity-resolution-${randomUUID()}`;
@@ -1782,7 +1848,7 @@ export class BookingService {
           kind === "time_off" ? capacityChangeId : null,
           kind === "store_closure" ? capacityChangeId : null,
           bookingId,
-          input.action,
+          resolutionAction,
           manager.id,
           input.idempotencyKey,
           digest,
@@ -1804,7 +1870,12 @@ export class BookingService {
           manager.id,
           subjectType,
           capacityChangeId,
-          JSON.stringify({ bookingId, action: input.action, reason: input.reason, bookingEventId }),
+          JSON.stringify({
+            bookingId,
+            action: resolutionAction,
+            reason: input.reason,
+            bookingEventId,
+          }),
           occurredAt,
         ],
       );
@@ -1815,7 +1886,8 @@ export class BookingService {
            OR $1::text = 'store_closure' AND store_closure_id = $2)`,
         [kind, capacityChangeId],
       );
-      const activated = countResult.rows[0]?.count === change.affected_booking_count;
+      const resolvedCount = countResult.rows[0]?.count ?? 0;
+      const activated = resolvedCount === change.affected_booking_count;
       if (activated) {
         await client.query(
           kind === "time_off"
@@ -1842,37 +1914,61 @@ export class BookingService {
           ],
         );
       }
-      await client.query("COMMIT");
-
-      return {
-        resolution: {
+      const response: ResolveCapacityChangeBookingResponse = {
+        change: {
+          id: capacityChangeId,
+          kind,
+          status: activated ? "active" : "pending",
+        },
+        progress: { resolved: resolvedCount, total: change.affected_booking_count },
+        resolvedBooking: {
           id: resolutionId,
           bookingId,
-          action: input.action,
+          action: resolutionAction,
           operator: { id: manager.id, displayName: manager.displayName },
           reason: input.reason,
           result,
           bookingEventId,
           resolvedAt: occurredAt,
         },
-        status: activated ? "active" : "pending",
       };
+      await client.query(
+        `UPDATE capacity_change_booking_resolutions
+         SET response_body = $2::jsonb
+         WHERE id = $1`,
+        [resolutionId, JSON.stringify(response)],
+      );
+      await client.query("COMMIT");
+      return { response };
     } catch (error) {
       await client.query("ROLLBACK").catch(() => undefined);
       const databaseError = error as DatabaseError;
+      let finalError = error;
       if (
         this.isBookingTimeConflict(error) ||
         databaseError.code === "23P01" ||
         databaseError.code === "40001" ||
         databaseError.code === "40P01"
       ) {
-        businessError(
-          "BOOKING_TIME_CONFLICT",
-          "新安排未能成立，原安排和处理进度保持不变；请重新读取相近建议。",
+        finalError = new HttpException(
+          {
+            code: "BOOKING_TIME_CONFLICT",
+            message: "新安排未能成立，原安排和处理进度保持不变；请重新读取相近建议。",
+          },
           HttpStatus.CONFLICT,
         );
       }
-      throw error;
+      if (!replayedFailure && finalError instanceof HttpException) {
+        await this.persistManagerChangeFailure(
+          client,
+          manager.id,
+          "capacity_impact_resolution",
+          input.idempotencyKey,
+          digest,
+          finalError,
+        );
+      }
+      throw finalError;
     } finally {
       let releaseError: Error | undefined;
       if (idempotencyLockHeld) {
@@ -3175,7 +3271,11 @@ export class BookingService {
   private async persistManagerChangeFailure(
     client: PoolClient,
     managerId: string,
-    commandType: "manager_reschedule" | "manager_cancel" | "manager_content_correction",
+    commandType:
+      | "manager_reschedule"
+      | "manager_cancel"
+      | "manager_content_correction"
+      | "capacity_impact_resolution",
     idempotencyKey: string,
     digest: string,
     error: HttpException,

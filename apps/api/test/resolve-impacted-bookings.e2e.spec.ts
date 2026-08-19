@@ -204,7 +204,7 @@ describe("逐笔处理受影响预约", () => {
         action: "change_staff",
         staffId: "zhaohang",
         reason: "已与顾客确认由赵航同时间服务",
-        idempotencyKey: "impact-change-staff-command",
+        idempotencyKey: `impact-change-staff-command:${runId}`,
         expectedBookingRevision: bookingRevision,
       },
     });
@@ -233,7 +233,7 @@ describe("逐笔处理受影响预约", () => {
         action: "change_staff",
         staffId: "zhaohang",
         reason: "已与顾客确认由赵航同时间服务",
-        idempotencyKey: "impact-change-staff-command",
+        idempotencyKey: `impact-change-staff-command:${runId}`,
         expectedBookingRevision: bookingRevision,
       },
     });
@@ -297,6 +297,16 @@ describe("逐笔处理受影响预约", () => {
       (candidate) => candidate.startsAt !== first.startsAt,
     );
     expect(suggestion).toBeDefined();
+    expect(
+      first?.rescheduleSuggestions.every((candidate) => candidate.startsAt !== first.startsAt),
+    ).toBe(true);
+    const suggestionDistances =
+      first?.rescheduleSuggestions.map((candidate) =>
+        Math.abs(Date.parse(candidate.startsAt) - Date.parse(first.startsAt)),
+      ) ?? [];
+    expect(suggestionDistances).toEqual(
+      [...suggestionDistances].sort((left, right) => left - right),
+    );
 
     const rescheduled = await app.inject({
       method: "POST",
@@ -307,7 +317,7 @@ describe("逐笔处理受影响预约", () => {
         staffId: suggestion?.staff.id,
         startsAt: suggestion?.startsAt,
         reason: "顾客确认改到相近可用时间",
-        idempotencyKey: "impact-partial-reschedule",
+        idempotencyKey: `impact-partial-reschedule:${runId}`,
         expectedBookingRevision: first?.bookingRevision,
       },
     });
@@ -345,7 +355,7 @@ describe("逐笔处理受影响预约", () => {
       payload: {
         action: "cancel",
         reason: "顾客确认取消本次预约",
-        idempotencyKey: "impact-partial-cancel",
+        idempotencyKey: `impact-partial-cancel:${runId}`,
         expectedBookingRevision: second?.bookingRevision,
       },
     });
@@ -377,6 +387,26 @@ describe("逐笔处理受影响预约", () => {
         expect.objectContaining({ type: "booking_cancelled" }),
       ]),
     });
+
+    const replayedFirstResult = await app.inject({
+      method: "POST",
+      url: `/backoffice/manager/capacity-changes/time_off/${timeOffId}/bookings/${firstBookingId}/resolve`,
+      headers: { cookie: managerCookie, origin: adminOrigin },
+      payload: {
+        action: "reschedule",
+        staffId: suggestion?.staff.id,
+        startsAt: suggestion?.startsAt,
+        reason: "顾客确认改到相近可用时间",
+        idempotencyKey: `impact-partial-reschedule:${runId}`,
+        expectedBookingRevision: first?.bookingRevision,
+      },
+    });
+    expect(replayedFirstResult.statusCode).toBe(201);
+    expect(replayedFirstResult.json()).toMatchObject({
+      change: { status: "pending" },
+      progress: { resolved: 1, total: 2 },
+      resolvedBooking: { bookingId: firstBookingId, action: "reschedule" },
+    });
   });
 
   it("并发处理同一笔预约只有一个结果成立，另一请求不会覆盖进度", async () => {
@@ -404,7 +434,7 @@ describe("逐笔处理受影响预约", () => {
           action: "change_staff",
           staffId,
           reason: `并发确认由${staffId}服务`,
-          idempotencyKey,
+          idempotencyKey: `${idempotencyKey}:${runId}`,
           expectedBookingRevision: target?.bookingRevision,
         },
       });
@@ -464,7 +494,7 @@ describe("逐笔处理受影响预约", () => {
         action: "change_staff",
         staffId: "zhaohang",
         reason: "顾客确认同时间改由赵航服务",
-        idempotencyKey: "impact-revoke-move-command",
+        idempotencyKey: `impact-revoke-move-command:${runId}`,
         expectedBookingRevision: moved?.bookingRevision,
       },
     });
@@ -573,7 +603,7 @@ describe("逐笔处理受影响预约", () => {
         action: "change_staff",
         staffId: "zhouning",
         reason: "尝试交给技能不匹配的员工",
-        idempotencyKey: "impact-failed-resolution-command",
+        idempotencyKey: `impact-failed-resolution-command:${runId}`,
         expectedBookingRevision: impact?.bookingRevision,
       },
     });
@@ -636,7 +666,7 @@ describe("逐笔处理受影响预约", () => {
       payload: {
         action: "cancel",
         reason: "顾客确认闭店期间取消预约",
-        idempotencyKey: "impact-store-closure-cancel-command",
+        idempotencyKey: `impact-store-closure-cancel-command:${runId}`,
         expectedBookingRevision: impact?.bookingRevision,
       },
     });
@@ -669,5 +699,89 @@ describe("逐笔处理受影响预约", () => {
     });
     expect(revoke.statusCode).toBe(409);
     expect(revoke.json()).toMatchObject({ code: "CAPACITY_CHANGE_REVOCATION_NOT_ALLOWED" });
+  });
+
+  it("预约已在其他入口解除影响时可显式确认现有结果，不重复取消", async () => {
+    const bookingId = await createBooking(
+      "impact-existing-fact-booking",
+      "2026-08-25T02:00:00.000Z",
+    );
+    const timeOffId = await createTimeOff("2026-08-25", "10:00", "11:15");
+    const before = await app.inject({
+      method: "GET",
+      url: `/backoffice/manager/capacity-changes/time_off/${timeOffId}`,
+      headers: { cookie: managerCookie },
+    });
+    const impact = before.json<{
+      impactedBookings: Array<{ bookingRevision: number }>;
+    }>().impactedBookings[0];
+    const cancelledElsewhere = await app.inject({
+      method: "POST",
+      url: `/backoffice/manager/bookings/${bookingId}/cancel`,
+      headers: { cookie: managerCookie, origin: adminOrigin },
+      payload: {
+        idempotencyKey: `impact-existing-fact-manager-cancel:${runId}`,
+        reason: "顾客先从预约详情确认取消",
+        expectedStaffId: "linxia",
+        expectedStartsAt: "2026-08-25T02:00:00.000Z",
+        expectedBookingRevision: impact?.bookingRevision,
+      },
+    });
+    expect(cancelledElsewhere.statusCode).toBe(201);
+
+    const changed = await app.inject({
+      method: "GET",
+      url: `/backoffice/manager/capacity-changes/time_off/${timeOffId}`,
+      headers: { cookie: managerCookie },
+    });
+    expect(changed.json()).toMatchObject({
+      change: { status: "pending" },
+      progress: { resolved: 0, total: 1 },
+      impactedBookings: [
+        {
+          id: bookingId,
+          factChanged: true,
+          requiresAcknowledgement: true,
+          blockedByFulfilment: false,
+          currentFact: { status: "cancelled" },
+          resolution: null,
+        },
+      ],
+    });
+    const currentRevision = changed.json<{
+      impactedBookings: Array<{ bookingRevision: number }>;
+    }>().impactedBookings[0]?.bookingRevision;
+    const acknowledged = await app.inject({
+      method: "POST",
+      url: `/backoffice/manager/capacity-changes/time_off/${timeOffId}/bookings/${bookingId}/resolve`,
+      headers: { cookie: managerCookie, origin: adminOrigin },
+      payload: {
+        action: "acknowledge_existing",
+        reason: "已核对预约详情中的取消事实",
+        idempotencyKey: `impact-existing-fact-acknowledge:${runId}`,
+        expectedBookingRevision: currentRevision,
+      },
+    });
+    expect(acknowledged.statusCode).toBe(201);
+    expect(acknowledged.json()).toMatchObject({
+      change: { status: "active" },
+      progress: { resolved: 1, total: 1 },
+      resolvedBooking: {
+        bookingId,
+        action: "acknowledge_existing",
+        result: null,
+      },
+    });
+    const booking = await app.inject({
+      method: "GET",
+      url: `/backoffice/manager/bookings/${bookingId}`,
+      headers: { cookie: managerCookie },
+    });
+    expect(booking.json()).toMatchObject({
+      booking: { status: "cancelled" },
+      changeHistory: expect.arrayContaining([
+        expect.objectContaining({ reason: "顾客先从预约详情确认取消" }),
+      ]),
+    });
   });
 });
