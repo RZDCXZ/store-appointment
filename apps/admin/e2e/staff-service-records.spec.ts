@@ -64,6 +64,7 @@ async function login(page: Page): Promise<void> {
   await page.getByRole("combobox", { name: "演示账号" }).selectOption("chenjia");
   await page.getByLabel("演示密码").fill(demoPassword);
   await page.getByRole("button", { name: "进入管理端" }).click();
+  await expect(page).toHaveURL(/\/staff\/today$/);
 }
 
 test.beforeEach(async ({ page }) => {

@@ -17,6 +17,7 @@ async function login(page: Page, username: "chenjia" | "linxia"): Promise<void> 
   await page.getByRole("combobox", { name: "演示账号" }).selectOption(username);
   await page.getByLabel("演示密码").fill(demoPassword);
   await page.getByRole("button", { name: "进入管理端" }).click();
+  await expect(page).toHaveURL(/\/staff\/today$/);
 }
 
 test("员工在 390px 直达今日工作、恢复本人详情并确认揭示手机号", async ({ page }) => {
