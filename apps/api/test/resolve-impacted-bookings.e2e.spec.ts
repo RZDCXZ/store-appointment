@@ -244,6 +244,36 @@ describe("逐笔处理受影响预约", () => {
       resolvedBooking: { bookingId, id: resolved.json().resolvedBooking.id },
     });
 
+    const rejectedReuse = await app.inject({
+      method: "POST",
+      url: `/backoffice/manager/capacity-changes/time_off/${timeOffId}/bookings/${bookingId}/resolve`,
+      headers: { cookie: managerCookie, origin: adminOrigin },
+      payload: {
+        action: "change_staff",
+        staffId: "zhaohang",
+        reason: "尝试用同一幂等键提交不同处理原因",
+        idempotencyKey: `impact-change-staff-command:${runId}`,
+        expectedBookingRevision: bookingRevision,
+      },
+    });
+    expect(rejectedReuse.statusCode).toBe(409);
+    expect(rejectedReuse.json()).toMatchObject({ code: "IDEMPOTENCY_KEY_REUSED" });
+
+    const replayedAfterRejectedReuse = await app.inject({
+      method: "POST",
+      url: `/backoffice/manager/capacity-changes/time_off/${timeOffId}/bookings/${bookingId}/resolve`,
+      headers: { cookie: managerCookie, origin: adminOrigin },
+      payload: {
+        action: "change_staff",
+        staffId: "zhaohang",
+        reason: "已与顾客确认由赵航同时间服务",
+        idempotencyKey: `impact-change-staff-command:${runId}`,
+        expectedBookingRevision: bookingRevision,
+      },
+    });
+    expect(replayedAfterRejectedReuse.statusCode).toBe(201);
+    expect(replayedAfterRejectedReuse.json()).toEqual(resolved.json());
+
     const booking = await app.inject({
       method: "GET",
       url: `/backoffice/manager/bookings/${bookingId}`,
@@ -290,9 +320,16 @@ describe("逐笔处理受影响预约", () => {
         bookingRevision: number;
         startsAt: string;
         rescheduleSuggestions: Array<{ staff: { id: string }; startsAt: string }>;
+        cancelNotificationPreview: { recipient: string; message: string };
       }>;
     }>();
     const first = before.impactedBookings.find((booking) => booking.id === firstBookingId);
+    const secondBefore = before.impactedBookings.find((booking) => booking.id === secondBookingId);
+    expect(secondBefore?.cancelNotificationPreview).toEqual({
+      kind: "booking_cancelled",
+      recipient: "许岚",
+      message: "团子的本次预约已取消。",
+    });
     const suggestion = first?.rescheduleSuggestions.find(
       (candidate) => candidate.startsAt !== first.startsAt,
     );

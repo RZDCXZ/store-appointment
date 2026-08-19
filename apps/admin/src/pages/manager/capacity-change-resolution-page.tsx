@@ -67,7 +67,9 @@ function ResolutionSummary({ booking }: { booking: CapacityChangeImpactedBooking
           {resolution.operator.displayName} · {resolution.reason} ·{" "}
           {formatDateTime(resolution.resolvedAt)}
         </small>
-        {resolution.result ? (
+        {resolution.action === "acknowledge_existing" ? (
+          <small>已关联当前预约事实，未重复移动或取消预约。</small>
+        ) : resolution.result ? (
           <small>
             新安排：{resolution.result.staff.displayName} ·{" "}
             {formatDateTime(resolution.result.startsAt)}
@@ -331,10 +333,7 @@ function ImpactBookingCard({
               <ExclamationTriangleIcon />
               <span>
                 <strong>通知预览</strong>
-                <small>
-                  {booking.cancelNotificationPreview.message}
-                  {reason.trim() ? ` 取消原因：${reason.trim()}` : " 取消原因：待填写。"}
-                </small>
+                <small>{booking.cancelNotificationPreview.message}</small>
               </span>
             </p>
           ) : null}

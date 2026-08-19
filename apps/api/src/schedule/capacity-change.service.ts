@@ -19,7 +19,7 @@ import type { Pool, PoolClient } from "pg";
 
 import { AuditService } from "../audit/audit.service.js";
 import type { BackofficeIdentity } from "../auth/auth.types.js";
-import { BookingService } from "../booking/booking.service.js";
+import { bookingCancellationNotificationBody, BookingService } from "../booking/booking.service.js";
 import { getDemoNow } from "../config/environment.js";
 import { DatabaseService } from "../database/database.service.js";
 import {
@@ -199,17 +199,6 @@ function overlapMinutes(
   rightEndsAt: number,
 ): number {
   return Math.max(0, Math.min(leftEndsAt, rightEndsAt) - Math.max(leftStartsAt, rightStartsAt));
-}
-
-function formatImpactTime(value: string): string {
-  return new Intl.DateTimeFormat("zh-CN", {
-    month: "numeric",
-    day: "numeric",
-    hour: "2-digit",
-    minute: "2-digit",
-    hour12: false,
-    timeZone: "Asia/Shanghai",
-  }).format(new Date(value));
 }
 
 @Injectable()
@@ -417,7 +406,7 @@ export class CapacityChangeService {
         const cancelNotificationPreview = {
           kind: "booking_cancelled" as const,
           recipient: impact.customerName,
-          message: `将通知${impact.customerName}：${impact.petName}原定${impact.staff.displayName} ${formatImpactTime(impact.startsAt)}的预约已取消，并附上本次填写的取消原因。`,
+          message: bookingCancellationNotificationBody(impact.petName),
         };
         if (
           resolution ||

@@ -879,6 +879,10 @@ function asBooking(row: BookingRow): ConfirmedBooking {
   };
 }
 
+export function bookingCancellationNotificationBody(petName: string): string {
+  return `${petName}的本次预约已取消。`;
+}
+
 function asCustomerMessage(row: CustomerMessageRow): CustomerMessage {
   const startsAt =
     row.notification_type === "booking_rescheduled"
@@ -912,7 +916,7 @@ function asCustomerMessage(row: CustomerMessageRow): CustomerMessage {
     },
     booking_cancelled: {
       title: "预约已取消",
-      body: `${petName}的本次预约已取消。`,
+      body: bookingCancellationNotificationBody(petName),
       actionLabel: "查看预约",
     },
     booking_content_corrected: {
@@ -1654,6 +1658,7 @@ export class BookingService {
       const previousFailure = previousFailureResult.rows[0];
       if (previousFailure) {
         if (previousFailure.request_digest !== digest) {
+          replayedFailure = true;
           businessError(
             "IDEMPOTENCY_KEY_REUSED",
             "这个幂等键已经用于另一项受影响预约处理，请重新提交。",
@@ -1677,6 +1682,7 @@ export class BookingService {
       const replay = replayResult.rows[0];
       if (replay) {
         if (replay.request_digest !== digest) {
+          replayedFailure = true;
           businessError(
             "IDEMPOTENCY_KEY_REUSED",
             "这个幂等键已经用于另一项受影响预约处理，请重新提交。",

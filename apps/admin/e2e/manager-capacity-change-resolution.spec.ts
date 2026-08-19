@@ -108,9 +108,8 @@ test("店长从工作台进入独立路由，刷新恢复进度并逐笔完成�
   await expect(page.getByRole("heading", { name: "1 / 2 已处理" })).toBeVisible();
   const second = page.locator(".impact-booking-card").nth(1);
   await second.getByText("取消预约", { exact: true }).click();
-  await expect(second.getByText(/将通知许岚.*团子.*取消原因：待填写/)).toBeVisible();
+  await expect(second.getByText("团子的本次预约已取消。", { exact: true })).toBeVisible();
   await second.getByLabel("团子取消原因").fill("顾客确认培训期间取消本次预约");
-  await expect(second.getByText(/取消原因：顾客确认培训期间取消本次预约/)).toBeVisible();
   await second.getByRole("button", { name: "保存本笔处理结果" }).click();
 
   await expect(page.getByRole("heading", { name: "2 / 2 已处理" })).toBeVisible();
