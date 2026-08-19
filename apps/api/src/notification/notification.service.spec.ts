@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 
+import type { AuditService } from "../audit/audit.service.js";
 import type { DatabaseService } from "../database/database.service.js";
 import type { NotificationClock } from "./notification.clock.js";
 import { NotificationService } from "./notification.service.js";
@@ -21,7 +22,8 @@ describe("NotificationService worker lifecycle", () => {
     const clock: NotificationClock = {
       now: () => new Date("2026-08-13T02:50:00.000Z"),
     };
-    const service = new NotificationService(database, clock);
+    const audits = { append: vi.fn() } as unknown as AuditService;
+    const service = new NotificationService(database, clock, audits);
 
     await service.onModuleInit();
     expect(releaseReminderQuery).toBeTypeOf("function");

@@ -48,6 +48,7 @@ import type {
 } from "@rongguang/contracts";
 import type { PoolClient } from "pg";
 
+import { AuditService } from "../audit/audit.service.js";
 import {
   bookingWindowFor,
   earliestCustomerCandidate,
@@ -983,6 +984,7 @@ export class BookingService {
     @Inject(ServiceCatalogService) private readonly catalog: ServiceCatalogService,
     @Inject(BookingAvailabilityService)
     private readonly availability: BookingAvailabilityService,
+    @Inject(AuditService) private readonly audits: AuditService,
   ) {}
 
   async createConfirmed(customerId: string, body: unknown): Promise<CreateBookingResponse> {
@@ -1897,24 +1899,20 @@ export class BookingService {
         ],
       );
       const subjectType = kind === "time_off" ? "staff_time_off" : "store_closure";
-      await client.query(
-        `INSERT INTO audit_events (
-           id, event_type, actor_type, actor_id, subject_type, subject_id, payload, occurred_at
-         )
-         VALUES ($1, 'capacity_change_booking_resolved', 'manager', $2, $3, $4, $5::jsonb, $6)`,
-        [
-          `audit-${randomUUID()}`,
-          manager.id,
-          subjectType,
-          capacityChangeId,
-          JSON.stringify({
+      await this.audits.append(
+        {
+          eventType: "capacity_change_booking_resolved",
+          actor: { type: "manager", id: manager.id },
+          subject: { type: subjectType, id: capacityChangeId },
+          payload: {
             bookingId,
             action: resolutionAction,
             reasonRecorded: true,
             bookingEventId,
-          }),
+          },
           occurredAt,
-        ],
+        },
+        client,
       );
       const countResult = await client.query<{ count: number }>(
         `SELECT count(*)::int AS count
@@ -1936,19 +1934,15 @@ export class BookingService {
                WHERE id = $1 AND status = 'pending'`,
           [capacityChangeId, occurredAt],
         );
-        await client.query(
-          `INSERT INTO audit_events (
-             id, event_type, actor_type, actor_id, subject_type, subject_id, payload, occurred_at
-           )
-           VALUES ($1, 'capacity_change_status_changed', 'manager', $2, $3, $4, $5::jsonb, $6)`,
-          [
-            `audit-${randomUUID()}`,
-            manager.id,
-            subjectType,
-            capacityChangeId,
-            JSON.stringify({ previousStatus: "pending", status: "active" }),
+        await this.audits.append(
+          {
+            eventType: "capacity_change_status_changed",
+            actor: { type: "manager", id: manager.id },
+            subject: { type: subjectType, id: capacityChangeId },
+            payload: { previousStatus: "pending", status: "active" },
             occurredAt,
-          ],
+          },
+          client,
         );
       }
       const response: ResolveCapacityChangeBookingResponse = {
@@ -2830,7 +2824,7 @@ export class BookingService {
         facts.createdAt,
       ],
     );
-    const factPayload = JSON.stringify({
+    const factPayload = {
       status: "confirmed",
       petId: facts.pet.id,
       staffId: facts.staff.id,
@@ -2839,7 +2833,7 @@ export class BookingService {
       turnoverEndsAt: facts.interval.turnoverEndsAt,
       totalPriceCents: facts.selection.totalPriceCents,
       ...facts.extraFactPayload,
-    });
+    };
     await client.query(
       `
         INSERT INTO booking_events (
@@ -2847,16 +2841,24 @@ export class BookingService {
         )
         VALUES ($1, $2, 'booking_confirmed', $3, $4, $5::jsonb, $6)
       `,
-      [randomUUID(), bookingId, facts.actor.type, facts.actor.id, factPayload, facts.createdAt],
+      [
+        randomUUID(),
+        bookingId,
+        facts.actor.type,
+        facts.actor.id,
+        JSON.stringify(factPayload),
+        facts.createdAt,
+      ],
     );
-    await client.query(
-      `
-        INSERT INTO audit_events (
-          id, event_type, actor_type, actor_id, subject_type, subject_id, payload, occurred_at
-        )
-        VALUES ($1, 'booking_created', $2, $3, 'booking', $4, $5::jsonb, $6)
-      `,
-      [randomUUID(), facts.actor.type, facts.actor.id, bookingId, factPayload, facts.createdAt],
+    await this.audits.append(
+      {
+        eventType: "booking_created",
+        actor: facts.actor,
+        subject: { type: "booking", id: bookingId },
+        payload: factPayload,
+        occurredAt: facts.createdAt,
+      },
+      client,
     );
     await client.query(
       `
@@ -2914,22 +2916,15 @@ export class BookingService {
       `,
       [eventId, row.id, context.actorType, context.actorId, JSON.stringify(payload), occurredAt],
     );
-    await client.query(
-      `
-        INSERT INTO audit_events (
-          id, event_type, actor_type, actor_id, subject_type, subject_id, payload, occurred_at
-        )
-        VALUES ($1, $2, $3, $4, 'booking', $5, $6::jsonb, $7)
-      `,
-      [
-        randomUUID(),
-        context.auditEventType,
-        context.actorType,
-        context.actorId,
-        row.id,
-        JSON.stringify({ reasonRecorded: true, previous, next: null }),
+    await this.audits.append(
+      {
+        eventType: context.auditEventType,
+        actor: { type: context.actorType, id: context.actorId },
+        subject: { type: "booking", id: row.id },
+        payload: { reasonRecorded: true, previous, next: null },
         occurredAt,
-      ],
+      },
+      client,
     );
     await client.query(
       `
@@ -3047,22 +3042,15 @@ export class BookingService {
       `,
       [eventId, row.id, context.actorType, context.actorId, JSON.stringify(payload), occurredAt],
     );
-    await client.query(
-      `
-        INSERT INTO audit_events (
-          id, event_type, actor_type, actor_id, subject_type, subject_id, payload, occurred_at
-        )
-        VALUES ($1, $2, $3, $4, 'booking', $5, $6::jsonb, $7)
-      `,
-      [
-        randomUUID(),
-        context.auditEventType,
-        context.actorType,
-        context.actorId,
-        row.id,
-        JSON.stringify({ reasonRecorded: true, previous, next }),
+    await this.audits.append(
+      {
+        eventType: context.auditEventType,
+        actor: { type: context.actorType, id: context.actorId },
+        subject: { type: "booking", id: row.id },
+        payload: { reasonRecorded: true, previous, next },
         occurredAt,
-      ],
+      },
+      client,
     );
     await client.query(
       `
@@ -3144,27 +3132,19 @@ export class BookingService {
       `,
       [eventId, row.id, manager.id, JSON.stringify(payload), occurredAt],
     );
-    await client.query(
-      `
-        INSERT INTO audit_events (
-          id, event_type, actor_type, actor_id, subject_type, subject_id, payload, occurred_at
-        )
-        VALUES (
-          $1, 'manager_booking_content_corrected', 'manager', $2,
-          'booking', $3, $4::jsonb, $5
-        )
-      `,
-      [
-        randomUUID(),
-        manager.id,
-        row.id,
-        JSON.stringify({
+    await this.audits.append(
+      {
+        eventType: "manager_booking_content_corrected",
+        actor: { type: "manager", id: manager.id },
+        subject: { type: "booking", id: row.id },
+        payload: {
           reasonRecorded: true,
           previous: auditSelection(previous),
           next: auditSelection(next),
-        }),
+        },
         occurredAt,
-      ],
+      },
+      client,
     );
     await client.query(
       `

@@ -54,6 +54,26 @@ describe("到店核销、迟到与爽约", () => {
       "DELETE FROM booking_fulfilment_idempotency_keys WHERE booking_id = $1",
       [bookingId],
     );
+    const client = await database.pool.connect();
+    try {
+      await client.query("BEGIN");
+      await client.query("SET LOCAL session_replication_role = replica");
+      await client.query(
+        `DELETE FROM audit_events
+         WHERE subject_type = 'booking'
+           AND subject_id = $1
+           AND event_type IN (
+             'booking_checked_in', 'booking_late_checked_in', 'booking_no_show'
+           )`,
+        [bookingId],
+      );
+      await client.query("COMMIT");
+    } catch (error) {
+      await client.query("ROLLBACK");
+      throw error;
+    } finally {
+      client.release();
+    }
     await database.pool.query(
       `
         DELETE FROM booking_events
@@ -308,6 +328,29 @@ describe("到店核销、迟到与爽约", () => {
         occurredAt: "2026-08-14T03:15:00.000Z",
       }),
     ]);
+    const audits = await database.pool.query<{
+      event_type: string;
+      actor_type: string;
+      actor_id: string;
+      payload: Record<string, unknown>;
+      occurred_at: Date;
+    }>(
+      `SELECT event_type, actor_type, actor_id, payload, occurred_at
+       FROM audit_events
+       WHERE subject_type = 'booking' AND subject_id = $1
+         AND event_type = 'booking_checked_in'`,
+      [bookingId],
+    );
+    expect(audits.rows).toEqual([
+      {
+        event_type: "booking_checked_in",
+        actor_type: "staff",
+        actor_id: "chenjia",
+        payload: { previousStatus: "confirmed", status: "checked_in", mode: "code" },
+        occurred_at: new Date("2026-08-14T03:15:00.000Z"),
+      },
+    ]);
+    expect(JSON.stringify(audits.rows)).not.toContain(verificationCode);
   });
 
   it("恰好开始后十五分钟不能手动核销，超过后分配员工填写原因即可核销", async () => {
@@ -356,6 +399,16 @@ describe("到店核销、迟到与爽约", () => {
     });
     expect(retry.statusCode).toBe(201);
     expect(retry.json()).toEqual(afterBoundary.json());
+    const audits = await database.pool.query<{ payload: Record<string, unknown> }>(
+      `SELECT payload FROM audit_events
+       WHERE subject_type = 'booking' AND subject_id = $1
+         AND event_type = 'booking_late_checked_in'`,
+      [bookingId],
+    );
+    expect(audits.rows).toEqual([
+      { payload: { previousStatus: "confirmed", status: "checked_in", mode: "late" } },
+    ]);
+    expect(JSON.stringify(audits.rows)).not.toContain(request.payload.reason);
   });
 
   it("时间流逝不自动爽约，店长人工标记后仅释放处理时刻之后的实际占用", async () => {
@@ -431,6 +484,16 @@ describe("到店核销、迟到与爽约", () => {
     const retry = await app.inject(successRequest);
     expect(retry.statusCode).toBe(201);
     expect(retry.json()).toEqual(response.json());
+    const audits = await database.pool.query<{ payload: Record<string, unknown> }>(
+      `SELECT payload FROM audit_events
+       WHERE subject_type = 'booking' AND subject_id = $1
+         AND event_type = 'booking_no_show'`,
+      [bookingId],
+    );
+    expect(audits.rows).toEqual([
+      { payload: { previousStatus: "confirmed", status: "no_show", reasonRecorded: true } },
+    ]);
+    expect(JSON.stringify(audits.rows)).not.toContain(request.payload.reason);
   });
 
   it("同一身份和幂等键在预约进入后续状态后仍返回首次核销结果", async () => {

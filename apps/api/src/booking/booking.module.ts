@@ -1,5 +1,6 @@
 import { Module } from "@nestjs/common";
 
+import { AuditModule } from "../audit/audit.module.js";
 import { BookingAvailabilityModule } from "../booking-availability/booking-availability.module.js";
 import { CustomerModule } from "../customer/customer.module.js";
 import { DatabaseModule } from "../database/database.module.js";
@@ -9,7 +10,13 @@ import { BookingService } from "./booking.service.js";
 import { CustomerMessageController } from "./customer-message.controller.js";
 
 @Module({
-  imports: [BookingAvailabilityModule, CustomerModule, DatabaseModule, ServiceCatalogModule],
+  imports: [
+    AuditModule,
+    BookingAvailabilityModule,
+    CustomerModule,
+    DatabaseModule,
+    ServiceCatalogModule,
+  ],
   controllers: [BookingController, CustomerMessageController],
   providers: [BookingService],
   exports: [BookingService],

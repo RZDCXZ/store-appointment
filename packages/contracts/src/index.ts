@@ -5,6 +5,7 @@ export * from "./notification.js";
 export * from "./customer-records.js";
 export * from "./customer-data-rights.js";
 export * from "./business.js";
+export * from "./audit.js";
 
 export interface HealthResponse {
   service: "rongguang-api";

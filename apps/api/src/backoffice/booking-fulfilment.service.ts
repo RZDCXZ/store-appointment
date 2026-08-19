@@ -18,6 +18,7 @@ import { storeServiceCareTags } from "@rongguang/contracts";
 import type { PoolClient } from "pg";
 
 import type { BackofficeIdentity } from "../auth/auth.types.js";
+import { AuditService } from "../audit/audit.service.js";
 import { getBookingCodeSecret, getDemoNow } from "../config/environment.js";
 import { DatabaseService } from "../database/database.service.js";
 
@@ -257,7 +258,10 @@ function fulfilmentResponse(
 
 @Injectable()
 export class BookingFulfilmentService {
-  constructor(@Inject(DatabaseService) private readonly database: DatabaseService) {}
+  constructor(
+    @Inject(DatabaseService) private readonly database: DatabaseService,
+    @Inject(AuditService) private readonly audits: AuditService,
+  ) {}
 
   async complete(
     identity: BackofficeIdentity,
@@ -891,6 +895,26 @@ export class BookingFulfilmentService {
         JSON.stringify(response),
         response.occurredAt,
       ],
+    );
+    const auditPayload =
+      eventType === "booking_checked_in"
+        ? { previousStatus: "confirmed", status: "checked_in", mode: "code" }
+        : eventType === "booking_late_checked_in"
+          ? { previousStatus: "confirmed", status: "checked_in", mode: "late" }
+          : eventType === "booking_no_show"
+            ? { previousStatus: "confirmed", status: "no_show", reasonRecorded: true }
+            : eventType === "booking_completed"
+              ? { previousStatus: "checked_in", status: "completed" }
+              : { previousStatus: "checked_in", status: "terminated", reasonRecorded: true };
+    await this.audits.append(
+      {
+        eventType,
+        actor: { type: identity.role, id: identity.id },
+        subject: { type: "booking", id: bookingId },
+        payload: auditPayload,
+        occurredAt: response.occurredAt,
+      },
+      client,
     );
   }
 

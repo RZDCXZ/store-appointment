@@ -20,6 +20,7 @@ import type {
 } from "@rongguang/contracts";
 
 import type { BackofficeIdentity } from "../auth/auth.types.js";
+import { AuditService } from "../audit/audit.service.js";
 import { getNotificationRetryBackoffMilliseconds } from "../config/environment.js";
 import { DatabaseService } from "../database/database.service.js";
 import { NOTIFICATION_CLOCK, type NotificationClock } from "./notification.clock.js";
@@ -128,6 +129,7 @@ export class NotificationService implements OnModuleInit, OnModuleDestroy {
   constructor(
     @Inject(DatabaseService) private readonly database: DatabaseService,
     @Inject(NOTIFICATION_CLOCK) private readonly clock: NotificationClock,
+    @Inject(AuditService) private readonly audits: AuditService,
   ) {}
 
   async onModuleInit(): Promise<void> {
@@ -239,25 +241,18 @@ export class NotificationService implements OnModuleInit, OnModuleDestroy {
           HttpStatus.CONFLICT,
         );
       }
-      await client.query(
-        `INSERT INTO audit_events (
-           id, event_type, actor_type, actor_id,
-           subject_type, subject_id, payload, occurred_at
-         )
-         VALUES (
-           $1, 'notification_manual_retry_requested', 'manager', $2,
-           'notification', $3, $4::jsonb, $5
-         )`,
-        [
-          randomUUID(),
-          manager.id,
-          notificationId,
-          JSON.stringify({
+      await this.audits.append(
+        {
+          eventType: "notification_manual_retry_requested",
+          actor: { type: "manager", id: manager.id },
+          subject: { type: "notification", id: notificationId },
+          payload: {
             attemptCount: task.attempt_count,
             managerDisplayName: manager.displayName,
-          }),
-          acceptedAt,
-        ],
+          },
+          occurredAt: acceptedAt,
+        },
+        client,
       );
       await client.query("COMMIT");
       return { notificationId, status: "pending", acceptedAt };

@@ -64,6 +64,13 @@ describe("完成服务、服务终止与追加说明", () => {
       await connection.query("DELETE FROM store_service_records WHERE booking_id = $1", [
         bookingId,
       ]);
+      await connection.query(
+        `DELETE FROM audit_events
+         WHERE subject_type = 'booking'
+           AND subject_id = $1
+           AND event_type IN ('booking_completed', 'booking_terminated')`,
+        [bookingId],
+      );
       await connection.query("COMMIT");
     } catch (error) {
       await connection.query("ROLLBACK");
@@ -273,6 +280,27 @@ describe("完成服务、服务终止与追加说明", () => {
       },
     });
     expect(JSON.stringify(response.json())).not.toContain("priceCents");
+    const audits = await database.pool.query<{
+      event_type: string;
+      actor_type: string;
+      actor_id: string;
+      payload: Record<string, unknown>;
+    }>(
+      `SELECT event_type, actor_type, actor_id, payload
+       FROM audit_events
+       WHERE subject_type = 'booking' AND subject_id = $1
+         AND event_type = 'booking_completed'`,
+      [bookingId],
+    );
+    expect(audits.rows).toEqual([
+      {
+        event_type: "booking_completed",
+        actor_type: "staff",
+        actor_id: "chenjia",
+        payload: { previousStatus: "checked_in", status: "completed" },
+      },
+    ]);
+    expect(JSON.stringify(audits.rows)).not.toContain("洗护过程配合良好");
     await expectStaffCapacityReleasedAt("2026-08-14T03:55:00.000Z");
   });
 
@@ -380,6 +408,18 @@ describe("完成服务、服务终止与追加说明", () => {
       .statusHistory.find((event) => event.type === "booking_terminated");
     expect(detail.statusCode).toBe(200);
     expect(terminationEvent?.reason).toBe("宠物持续应激，无法安全继续服务");
+    const audits = await database.pool.query<{ payload: Record<string, unknown> }>(
+      `SELECT payload FROM audit_events
+       WHERE subject_type = 'booking' AND subject_id = $1
+         AND event_type = 'booking_terminated'`,
+      [bookingId],
+    );
+    expect(audits.rows).toEqual([
+      {
+        payload: { previousStatus: "checked_in", status: "terminated", reasonRecorded: true },
+      },
+    ]);
+    expect(JSON.stringify(audits.rows)).not.toContain("宠物持续应激");
   });
 
   it("改期到首次原计划之后的预约仍按当前计划终止并保留十五分钟周转", async () => {
@@ -608,6 +648,13 @@ describe("完成服务、服务终止与追加说明", () => {
       [bookingId],
     );
     expect(records.rows).toHaveLength(1);
+    const audits = await database.pool.query(
+      `SELECT id FROM audit_events
+       WHERE subject_type = 'booking' AND subject_id = $1
+         AND event_type = 'booking_completed'`,
+      [bookingId],
+    );
+    expect(audits.rows).toHaveLength(1);
     await expect(
       database.pool.query(
         "UPDATE store_service_records SET internal_text = '尝试覆盖' WHERE booking_id = $1",

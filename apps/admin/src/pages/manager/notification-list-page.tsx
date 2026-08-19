@@ -12,6 +12,7 @@ import {
   NotificationInitialState,
   NotificationStatus,
 } from "./notification-presentation";
+import { SystemPageLinks } from "./system-page-links";
 
 function NotificationList({ tasks }: { tasks: ManagerNotificationTask[] }): React.JSX.Element {
   if (tasks.length === 0) {
@@ -88,6 +89,7 @@ export function ManagerNotificationListPage(): React.JSX.Element {
         }}
         badge={resource.data?.channel ?? "模拟微信通道"}
       />
+      <SystemPageLinks />
       <NotificationBusinessFactNotice>
         通知失败不会撤销已经成立的预约事实。
       </NotificationBusinessFactNotice>

@@ -40,6 +40,7 @@ import {
   type ManagerNotificationFailureInjectionResponse,
   type ManagerNotificationListResponse,
   type ManagerNotificationManualRetryResponse,
+  type ManagerAuditListResponse,
   type ManagerWorkbenchResponse,
   type StaffBookingDetailResponse,
   type StaffBookingListResponse,
@@ -51,6 +52,7 @@ import type { FastifyReply } from "fastify";
 import type { Observable } from "rxjs";
 
 import type { AuthenticatedRequest } from "../auth/auth.types.js";
+import { AuditService } from "../audit/audit.service.js";
 import { ManagerGuard } from "../auth/manager.guard.js";
 import { RequestOriginGuard } from "../auth/request-origin.guard.js";
 import { SessionGuard } from "../auth/session.guard.js";
@@ -87,7 +89,25 @@ export class BackofficeController {
     @Inject(LiveRefreshService) private readonly liveRefresh: LiveRefreshService,
     @Inject(BookingService) private readonly bookings: BookingService,
     @Inject(NotificationService) private readonly notifications: NotificationService,
+    @Inject(AuditService) private readonly audits: AuditService,
   ) {}
+
+  @Get("manager/audits")
+  @UseGuards(ManagerGuard)
+  @ApiOperation({ summary: "筛选并分页读取不可修改的安全审计事实" })
+  managerAudits(
+    @Query("actor") actor: string | undefined,
+    @Query("action") action: string | undefined,
+    @Query("subjectType") subjectType: string | undefined,
+    @Query("subjectId") subjectId: string | undefined,
+    @Query("from") from: string | undefined,
+    @Query("to") to: string | undefined,
+    @Query("page") page: string | undefined,
+    @Res({ passthrough: true }) reply: FastifyReply,
+  ): Promise<ManagerAuditListResponse> {
+    reply.header("Cache-Control", "no-store");
+    return this.audits.list({ actor, action, subjectType, subjectId, from, to, page });
+  }
 
   @Get("manager/notifications")
   @UseGuards(ManagerGuard)
