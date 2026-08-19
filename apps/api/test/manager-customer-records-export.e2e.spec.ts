@@ -123,6 +123,34 @@ describe("店长顾客与宠物档案及导出", () => {
     });
   });
 
+  it("未来预约统计不包含已经开始并到店的预约", async () => {
+    await database.pool.query(
+      "UPDATE bookings SET status = 'checked_in', completed_at = NULL WHERE id = 'booking-bohe-completed'",
+    );
+
+    try {
+      const response = await app.inject({
+        method: "GET",
+        url: "/backoffice/manager/customers?q=%E8%96%84%E8%8D%B7",
+        headers: { cookie: managerCookie },
+      });
+
+      expect(response.statusCode).toBe(200);
+      expect(response.json()).toMatchObject({
+        customers: [
+          expect.objectContaining({
+            id: "customer-cheng-mo",
+            futureBookingCount: 1,
+          }),
+        ],
+      });
+    } finally {
+      await database.pool.query(
+        "UPDATE bookings SET status = 'completed', completed_at = '2026-08-06T03:22:00.000Z' WHERE id = 'booking-bohe-completed'",
+      );
+    }
+  });
+
   it("把顾客预约历史关联到宠物门店服务记录并按时间保留更正说明", async () => {
     const response = await app.inject({
       method: "GET",

@@ -8,8 +8,7 @@ import {
   managerBookingStatusLabels,
 } from "../../manager-booking-presentation";
 import { useManagerResource } from "../../manager-live-resource";
-import { ApiError, downloadApiFile } from "../../api";
-import { useAuth } from "../../auth-context";
+import { useFileExport } from "../../use-file-export";
 
 const statusOptions = Object.entries(managerBookingStatusLabels) as Array<
   [ManagerBookingStatus, string]
@@ -34,7 +33,6 @@ function formatPrice(cents: number): string {
 }
 
 export function ManagerAppointmentListPage(): React.JSX.Element {
-  const { markExpired } = useAuth();
   const [searchParams, setSearchParams] = useSearchParams();
   const [draft, setDraft] = useState(() => ({
     date: searchParams.get("date") ?? "",
@@ -47,11 +45,7 @@ export function ManagerAppointmentListPage(): React.JSX.Element {
     listResourcePath(searchParams),
     false,
   );
-  const [exportState, setExportState] = useState<{
-    loading: boolean;
-    message: string | null;
-    error: string | null;
-  }>({ loading: false, message: null, error: null });
+  const exportAction = useFileExport();
   const hasFilters = [...searchParams.values()].some(Boolean);
 
   function applyFilters(event: React.FormEvent<HTMLFormElement>): void {
@@ -83,25 +77,12 @@ export function ManagerAppointmentListPage(): React.JSX.Element {
       if (value) payload[bodyKey] = value;
     }
 
-    setExportState({ loading: true, message: null, error: null });
-    try {
-      const filename = await downloadApiFile(
-        "/backoffice/manager/exports/bookings.csv",
-        payload,
-        "rongguang-bookings.csv",
-      );
-      setExportState({ loading: false, message: `已下载 ${filename}`, error: null });
-    } catch (error) {
-      if (error instanceof ApiError && error.status === 401) {
-        markExpired();
-        return;
-      }
-      setExportState({
-        loading: false,
-        message: null,
-        error: error instanceof Error ? error.message : "预约导出失败，请稍后重试。",
-      });
-    }
+    await exportAction.start(
+      "/backoffice/manager/exports/bookings.csv",
+      payload,
+      "rongguang-bookings.csv",
+      "预约导出失败，请稍后重试。",
+    );
   }
 
   return (
@@ -116,11 +97,11 @@ export function ManagerAppointmentListPage(): React.JSX.Element {
           <button
             className="manager-secondary-link manager-export-button"
             type="button"
-            disabled={exportState.loading}
+            disabled={exportAction.state.loading}
             onClick={() => void exportCsv()}
           >
             <DownloadIcon aria-hidden="true" />
-            {exportState.loading ? "正在导出…" : "导出当前筛选 CSV"}
+            {exportAction.state.loading ? "正在导出…" : "导出当前筛选 CSV"}
           </button>
           <Link className="manager-secondary-link" to="/manager/appointments/calendar">
             按员工日历
@@ -214,14 +195,14 @@ export function ManagerAppointmentListPage(): React.JSX.Element {
         </div>
       </form>
 
-      {exportState.error ? (
+      {exportAction.state.error ? (
         <p className="manager-export-status manager-export-status--error" role="alert">
-          {exportState.error}
+          {exportAction.state.error}
         </p>
       ) : null}
-      {exportState.message ? (
+      {exportAction.state.message ? (
         <p className="manager-export-status" role="status">
-          {exportState.message}
+          {exportAction.state.message}
         </p>
       ) : null}
 

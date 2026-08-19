@@ -3,9 +3,8 @@ import { Link, useSearchParams } from "react-router-dom";
 import { DownloadIcon, MagnifyingGlassIcon, ReloadIcon } from "@radix-ui/react-icons";
 import type { ManagerCustomerListResponse } from "@rongguang/contracts";
 
-import { ApiError, downloadApiFile } from "../../api";
-import { useAuth } from "../../auth-context";
 import { useBackofficeResource } from "../../backoffice-resource";
+import { useFileExport } from "../../use-file-export";
 
 function listPath(searchParams: URLSearchParams): string {
   const query = new URLSearchParams();
@@ -25,15 +24,10 @@ function pagePath(search: string, page: number): string {
 }
 
 export function ManagerCustomersPage(): React.JSX.Element {
-  const { markExpired } = useAuth();
   const [searchParams, setSearchParams] = useSearchParams();
   const search = searchParams.get("q")?.trim() ?? "";
   const [draft, setDraft] = useState(search);
-  const [exportState, setExportState] = useState<{
-    loading: boolean;
-    message: string | null;
-    error: string | null;
-  }>({ loading: false, message: null, error: null });
+  const exportAction = useFileExport();
   const resource = useBackofficeResource<ManagerCustomerListResponse>(listPath(searchParams));
 
   useEffect(() => setDraft(search), [search]);
@@ -47,25 +41,12 @@ export function ManagerCustomersPage(): React.JSX.Element {
   }
 
   async function exportJson(): Promise<void> {
-    setExportState({ loading: true, message: null, error: null });
-    try {
-      const filename = await downloadApiFile(
-        "/backoffice/manager/exports/customers-pets.json",
-        { query: search },
-        "rongguang-customers-pets.json",
-      );
-      setExportState({ loading: false, message: `已下载 ${filename}`, error: null });
-    } catch (error) {
-      if (error instanceof ApiError && error.status === 401) {
-        markExpired();
-        return;
-      }
-      setExportState({
-        loading: false,
-        message: null,
-        error: error instanceof Error ? error.message : "顾客档案导出失败，请稍后重试。",
-      });
-    }
+    await exportAction.start(
+      "/backoffice/manager/exports/customers-pets.json",
+      { query: search },
+      "rongguang-customers-pets.json",
+      "顾客档案导出失败，请稍后重试。",
+    );
   }
 
   return (
@@ -81,11 +62,11 @@ export function ManagerCustomersPage(): React.JSX.Element {
           <button
             className="manager-primary-link manager-export-button"
             type="button"
-            disabled={exportState.loading}
+            disabled={exportAction.state.loading}
             onClick={() => void exportJson()}
           >
             <DownloadIcon aria-hidden="true" />
-            {exportState.loading ? "正在导出…" : "导出当前筛选 JSON"}
+            {exportAction.state.loading ? "正在导出…" : "导出当前筛选 JSON"}
           </button>
         </div>
       </header>
@@ -107,14 +88,14 @@ export function ManagerCustomersPage(): React.JSX.Element {
         <button type="submit">搜索档案</button>
       </form>
 
-      {exportState.error ? (
+      {exportAction.state.error ? (
         <p className="manager-export-status manager-export-status--error" role="alert">
-          {exportState.error}
+          {exportAction.state.error}
         </p>
       ) : null}
-      {exportState.message ? (
+      {exportAction.state.message ? (
         <p className="manager-export-status" role="status">
-          {exportState.message}
+          {exportAction.state.message}
         </p>
       ) : null}
 

@@ -218,6 +218,7 @@ export class ManagerCustomerRecordsService {
   async list(input: { query?: string; page?: string }): Promise<ManagerCustomerListResponse> {
     const filters = listFilters(input);
     const offset = (filters.page - 1) * pageSize;
+    const demoNow = getDemoNow();
     const searchWhere = `
       (
         $1::text = ''
@@ -263,7 +264,8 @@ export class ManagerCustomerRecordsService {
                    SELECT count(*)::text
                    FROM bookings AS booking
                    WHERE booking.customer_id = customer.id
-                     AND booking.status IN ('confirmed', 'checked_in')
+                     AND booking.status = 'confirmed'
+                     AND booking.starts_at > $4::timestamptz
                  ) AS future_booking_count,
                  (
                    SELECT count(*)::text
@@ -276,7 +278,7 @@ export class ManagerCustomerRecordsService {
           ORDER BY customer.display_name, customer.id
           LIMIT $2 OFFSET $3
         `,
-        [filters.query, pageSize, offset],
+        [filters.query, pageSize, offset, demoNow],
       ),
     ]);
     const totalItems = Number(countResult.rows[0]?.count ?? 0);
